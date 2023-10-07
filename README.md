@@ -33,6 +33,7 @@ Hesai Lidar
 $ roslaunch hesai_lidar hesai_lidar.launch lidar_type:="PandarXT-32" frame_id:="PandarXT-32"
 ```
 rosserial
+**/dev/ttyACM0** は各環境に合わせる
 ```
 $ roscore
 $ rosrun rosserial_python serial_node.py /dev/ttyACM0
