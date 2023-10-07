@@ -1,0 +1,3 @@
+[submodule "ws/src/HesaiLidar_General_ROS"]
+	path = ws/src/HesaiLidar_General_ROS
+	url = https://github.com/CoderDojoMusashikosugi/HesaiLidar_General_ROS.git
