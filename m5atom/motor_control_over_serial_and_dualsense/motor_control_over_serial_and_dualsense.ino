@@ -3,6 +3,10 @@
 
 #include <DDT_Motor_M15M06.h> //https://github.com/takex5g/M5_DDTMotor_M15M06
 #include <M5Atom.h>
+
+#include <ros.h>
+#include <std_msgs/Int16MultiArray.h>
+
 #define EMERGENCY_MONITOR (GPIO_NUM_25) //GPIO25ピンを緊急停止ボタンの電圧モニタに利用
 #define EMERGENCY_STOP (0) //ストップ状態
 #define NUM_STRIPS 1
@@ -14,6 +18,9 @@ CRGB leds[NUM_STRIPS][NUM_LEDS_PER_STRIP];
 #define REMOTE_CTRL 2
 #define AUTONOMOUS 1
 #define EMERGENCY 0
+
+#define ROS_PUB_NAME ""
+
 int operation_mode = AUTONOMOUS;
 
 // FastLEDライブラリの設定（CRGB構造体）
@@ -117,6 +124,7 @@ void setup()
 
   connect_dualsense();
 
+  rosserial_setup();
 }
 
 bool toggle_flag = true;
@@ -313,6 +321,9 @@ void loop()
   Serial.println("}");
   delay(5);
 
+  rosserial_update(wheel_sp_L, wheel_sp_R, wheel_pos_L, wheel_pos_R);
+
+
   //TODO: オドメトリを計算する（エンコーダー値0-32767を角度に変換、距離・Yaw角度に変換（タイヤのサイズ、車幅が必要）、原点リセットコマンド（現在のオドメトリを保持）を作る）
   //TODO: ROS2との接続
   //TODO: Spurコマンド的な何か（ROSのナビゲーションの基本を調査する）
@@ -358,3 +369,22 @@ void vehicle_run(int right, int left){
   Speed[1]=left;
   brake = Brake_Disable;
 } 
+
+
+ros::NodeHandle nh;
+std_msgs::Int16MultiArray BSpeed;
+ros::Publisher chatter("DDTMotor", &BSpeed);
+
+void rosserial_setup(){
+  nh.initNode();
+  nh.advertise(chatter);
+}
+
+void rosserial_update(int speedLeft, int speedRight, int positionLeft, int positionRight){
+  BSpeed.data[0] = speedLeft;
+  BSpeed.data[1] = speedRight;
+  BSpeed.data[2] = positionLeft;
+  BSpeed.data[3] = positionRight;
+  chatter.publish(&BSpeed);
+  nh.spinOnce();
+}
