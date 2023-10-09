@@ -1,11 +1,12 @@
-//#include <micro_ros_arduino.h>
 #include <ps5Controller.h> //https://github.com/rodneybakiskan/ps5-esp32
 
 #include <DDT_Motor_M15M06.h> //https://github.com/takex5g/M5_DDTMotor_M15M06
 #include <M5Atom.h>
 
 #include <ros.h>
-#include <std_msgs/Int16MultiArray.h>
+#include <nav_msgs/Odometry.h>
+#include <geometry_msgs/Twist.h>
+#include <tf/tf.h>
 
 #define EMERGENCY_MONITOR (GPIO_NUM_25) //GPIO25ピンを緊急停止ボタンの電圧モニタに利用
 #define EMERGENCY_STOP (0) //ストップ状態
@@ -19,7 +20,19 @@ CRGB leds[NUM_STRIPS][NUM_LEDS_PER_STRIP];
 #define AUTONOMOUS 1
 #define EMERGENCY 0
 
-#define ROS_PUB_NAME ""
+// Odometry Difinition
+#define BASE_WIDTH  (0.52) //(m)トレッド幅
+#define WHEEL_SIZE  (0.067) //(m)ホイールの直径
+#define WHEEL_TIRE_SIZE  (0.150) //(m)タイヤをつけた場合の直径１TODO
+#define MOTOR_POLES  (15.0) //極数
+#define MOTOR_STEPS  (4.0) //4°
+struct ODOMETRY{
+  bool is_reset_req;
+  double last_distance;
+  double pos_x;
+  double pos_y;
+  unsigned long update_millis;
+};
 
 int operation_mode = AUTONOMOUS;
 
@@ -58,6 +71,11 @@ const int16_t SPEED_MAX = 100; //DDT_M6の最高回転数は200±10rpm
 const int16_t AUTO_MAX = 50; //自律走行の最高速度は100rpmに制限　AUTO_MAX <= SPEED_MAX
 const int16_t POS_MAX = 32767; //車輪のエンコーダーの最大値
 uint8_t brake = Brake_Disable;
+
+ros::NodeHandle nh;
+nav_msgs::Odometry odom_msg;
+ros::Publisher odomPublisher("atom/odometry", &odom_msg);
+struct ODOMETRY odom;
 
 
 //Ref: https://kougaku-navi.hatenablog.com/entry/2021/10/04/155038
@@ -124,7 +142,7 @@ void setup()
 
   connect_dualsense();
 
-  rosserial_setup();
+  ros_setup();
 }
 
 bool toggle_flag = true;
@@ -321,7 +339,7 @@ void loop()
   Serial.println("}");
   delay(5);
 
-  rosserial_update(wheel_sp_L, wheel_sp_R, wheel_pos_L, wheel_pos_R);
+  ros_update(wheel_sp_L, wheel_sp_R, wheel_pos_L, wheel_pos_R);
 
 
   //TODO: オドメトリを計算する（エンコーダー値0-32767を角度に変換、距離・Yaw角度に変換（タイヤのサイズ、車幅が必要）、原点リセットコマンド（現在のオドメトリを保持）を作る）
@@ -370,21 +388,72 @@ void vehicle_run(int right, int left){
   brake = Brake_Disable;
 } 
 
-
-ros::NodeHandle nh;
-std_msgs::Int16MultiArray BSpeed;
-ros::Publisher chatter("DDTMotor", &BSpeed);
-
-void rosserial_setup(){
+void ros_setup(){
   nh.initNode();
-  nh.advertise(chatter);
+  nh.advertise(odomPublisher);
+  odometry_reset(&odom);
 }
 
-void rosserial_update(int speedLeft, int speedRight, int positionLeft, int positionRight){
-  BSpeed.data[0] = speedLeft;
-  BSpeed.data[1] = speedRight;
-  BSpeed.data[2] = positionLeft;
-  BSpeed.data[3] = positionRight;
-  chatter.publish(&BSpeed);
+void ros_update(int speed_left, int speed_right, int position_left, int position_right){
+  odometry_udate(speed_left, speed_right); // write odom_msg
+  odomPublisher.publish(&odom_msg);
   nh.spinOnce();
 }
+
+void odometry_reset(struct ODOMETRY* odom){
+  odom->is_reset_req = false;
+  odom->last_distance = 0.0;
+  odom->pos_x= 0.0;
+  odom->pos_y = 0.0;
+  odom->update_millis = millis();
+}
+
+void odometry_udate(int speed_left, int speed_right){
+  if(odom.is_reset_req){
+    odometry_reset(&odom);
+    return;
+  }
+  unsigned long interval_millis, now_millis;
+  now_millis = millis();
+  if(now_millis >= odom.update_millis){
+    interval_millis = now_millis - odom.update_millis;
+  }else{
+    interval_millis = ~(odom.update_millis - now_millis) + 1;
+  }
+
+  double left_velocity, right_velocity, left_distance, right_distance, distance, theta, d_x, d_y;
+  geometry_msgs::Quaternion quat;
+
+  left_velocity = (double)speed_left * WHEEL_TIRE_SIZE / WHEEL_SIZE;
+  right_velocity = (double)speed_right * WHEEL_TIRE_SIZE / WHEEL_SIZE;
+  left_distance = left_velocity * interval_millis / 1000;
+  right_distance = right_velocity * interval_millis / 1000;
+  distance = (left_distance + right_distance / 2.0);
+  theta = (right_distance - left_distance) / BASE_WIDTH;;
+  d_x = (distance - odom.last_distance) * cos(theta);
+  d_y = (distance - odom.last_distance) * sin(theta);
+  quat = tf::createQuaternionFromYaw(theta);
+
+  odom.pos_x += d_x;
+  odom.pos_y += d_y;  
+  odom.last_distance = distance;
+  odom.update_millis = now_millis;
+  
+  odom_msg.header.stamp = nh.now();
+  odom_msg.header.frame_id = "/odometry";
+  odom_msg.child_frame_id = "base_footprint";
+
+  /*位置情報を入れる*/
+  odom_msg.pose.pose.position.x = odom.pos_x;
+  odom_msg.pose.pose.position.y = odom.pos_y;
+  odom_msg.pose.pose.position.z = 0.0;
+  odom_msg.pose.pose.orientation = quat;
+
+  odom_msg.twist.twist.linear.x = (left_velocity + right_velocity) / 2.0;
+  odom_msg.twist.twist.linear.y = 0;
+  odom_msg.twist.twist.linear.z = 0;
+  odom_msg.twist.twist.angular.z = 0;
+  odom_msg.twist.twist.angular.y = 0;
+  odom_msg.twist.twist.angular.z = (right_velocity - left_velocity) / BASE_WIDTH;
+}
+
