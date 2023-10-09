@@ -10,11 +10,11 @@ $ git clone --recursive https://github.com/CoderDojoMusashikosugi/Cub_ROS.git
 ```
 
 ## install
-Hesai Lidar
+### Hesai Lidar
 ```
 $ sudo apt install libpcap-dev libyaml-cpp-dev
 ```
-rosserial
+### rosserial
 ```
 $ sudo apt install ros-noetic-rosserial-arduino
 $ sudo apt install ros-noetic-rosserial
@@ -28,11 +28,11 @@ $ source devel/setup.bash
 ```
 
 ## launch
-Hesai Lidar
+### Hesai Lidar
 ```
 $ roslaunch hesai_lidar hesai_lidar.launch lidar_type:="PandarXT-32" frame_id:="PandarXT-32"
 ```
-rosserial
+### rosserial
 **/dev/ttyACM0** は各環境に合わせる
 ```
 $ roscore
@@ -40,11 +40,18 @@ $ rosrun rosserial_python serial_node.py /dev/ttyACM0
 ```
 
 ## topic name
-Hesai Lidar
+### Hesai Lidar
+Subscribe
 ```
 /hesai/pandar
 ```
-rosserial
+### rosserial
+Subscribe
 ```
-/DDTMotor
+/atom/odometry : nav_msgs/Odometry
+```
+Publish
+```
+/atom/odometry_reset : std_msgs/Empty
+/atom/motor_control : geometry_msgs/Twist
 ```
