@@ -7,6 +7,7 @@
 #include <nav_msgs/Odometry.h>
 #include <geometry_msgs/Twist.h>
 #include <tf/tf.h>
+#include <std_msgs/Empty.h>
 
 #define EMERGENCY_MONITOR (GPIO_NUM_25) //GPIO25ピンを緊急停止ボタンの電圧モニタに利用
 #define EMERGENCY_STOP (0) //ストップ状態
@@ -76,7 +77,8 @@ ros::NodeHandle nh;
 nav_msgs::Odometry odom_msg;
 ros::Publisher odomPublisher("atom/odometry", &odom_msg);
 struct ODOMETRY odom;
-
+ros::Subscriber<geometry_msgs::Twist> twistSubscriber("atom/motor_control", &callBack_motor_control);
+ros::Subscriber<std_msgs::Empty> resetSubscriber("atom/odometry_reset", &callBack_odometry_reset);
 
 //Ref: https://kougaku-navi.hatenablog.com/entry/2021/10/04/155038
 // String型のカンマ区切り文字列をint型配列に分解する関数
@@ -184,7 +186,7 @@ void loop()
         if (ps5.R1() && ps5.L1()) { //左右スティックモード
           int left_vel = (int)(SPEED_MAX*ps5.LStickY()/128);
           int right_vel = (int)(SPEED_MAX*ps5.RStickY()/128);
-          vehicle_run(right_vel,left_vel);
+          vehicle_run(-right_vel,left_vel);
           // Serial.print("Run ");
           // Serial.print(left_vel);
           // Serial.print(",");
@@ -205,7 +207,7 @@ void loop()
 
           int left_vel = (int)(speed_limit*val_LStickY/128)+(int)(rotation_limit*val_LStickX/128);
           int right_vel = (int)(speed_limit*val_LStickY/128)-(int)(rotation_limit*val_LStickX/128);
-          vehicle_run(right_vel,left_vel);
+          vehicle_run(-right_vel,left_vel);
           // Serial.print("Run ");
           // Serial.print(left_vel);
           // Serial.print(",");
@@ -263,46 +265,45 @@ void loop()
     }
   }
 
-  if(operation_mode == AUTONOMOUS){
-    if (Serial.available() > 0) {
-      String text = Serial.readStringUntil('\n');
-      //Ex:100,-200: Right Motor = Speed 100 / Left Motor = Speed -200
-      //Serial.println(text);
-      int data[3];
-      stringToIntValues( text, data, ',' );
-
-      int cmd_speed[2]={0,0};
-      switch(data[0]) {
-        case 1: //Move
-          for(int i = 0; i<=1; i++){
-            delay(5);
-            int sp = data[i+1];
-            //入力データ範囲Check＆速度制限
-            if(sp <= AUTO_MAX && sp >= -AUTO_MAX)cmd_speed[i]=sp;
-            else if(sp>AUTO_MAX)cmd_speed[i]=AUTO_MAX;
-            else if(sp<-AUTO_MAX)cmd_speed[i]=-AUTO_MAX;
-            else cmd_speed[i]=0;
-          }
-          vehicle_run(cmd_speed[0],cmd_speed[1]);
-          break;
-        case 2: //Stop
-          motor_stop();
-          break;
-        case 3: //Stop
-          motor_brake();
-          break;
-        case 4: //Initialize Odometory
-          init_odometry_flag = true;
-          break;
-        case 5: //Get Odometory
-          break;
-        case 6: //Get Current Velocity
-          break;
-        case 7: //Get Angle
-          break;
-      }
-    }
-  }
+  // if(operation_mode == AUTONOMOUS){
+  //   if (Serial.available() > 0) {
+  //     String text = Serial.readStringUntil('\n');
+  //     //Ex:100,-200: Right Motor = Speed 100 / Left Motor = Speed -200
+  //     //Serial.println(text);
+  //     int data[3];
+  //     stringToIntValues( text, data, ',' );
+  //     int cmd_speed[2]={0,0};
+  //     switch(data[0]) {
+  //       case 1: //Move
+  //         for(int i = 0; i<=1; i++){
+  //           delay(5);
+  //           int sp = data[i+1];
+  //           //入力データ範囲Check＆速度制限
+  //           if(sp <= AUTO_MAX && sp >= -AUTO_MAX)cmd_speed[i]=sp;
+  //           else if(sp>AUTO_MAX)cmd_speed[i]=AUTO_MAX;
+  //           else if(sp<-AUTO_MAX)cmd_speed[i]=-AUTO_MAX;
+  //           else cmd_speed[i]=0;
+  //         }
+  //         vehicle_run(cmd_speed[0],cmd_speed[1]);
+  //         break;
+  //       case 2: //Stop
+  //         motor_stop();
+  //         break;
+  //       case 3: //Stop
+  //         motor_brake();
+  //         break;
+  //       case 4: //Initialize Odometory
+  //         init_odometry_flag = true;
+  //         break;
+  //       case 5: //Get Odometory
+  //         break;
+  //       case 6: //Get Current Velocity
+  //         break;
+  //       case 7: //Get Angle
+  //         break;
+  //     }
+  //   }
+  // }
 
   //Set motor speed and report
   int wheel_sp_L = 0; 
@@ -383,13 +384,15 @@ void motor_brake(){
 }
 
 void vehicle_run(int right, int left){
-  Speed[0]=-right;
+  Speed[0]=right;
   Speed[1]=left;
   brake = Brake_Disable;
 } 
 
 void ros_setup(){
   nh.initNode();
+  nh.subscribe(twistSubscriber);
+  nh.subscribe(resetSubscriber);
   nh.advertise(odomPublisher);
   odometry_reset(&odom);
 }
@@ -457,3 +460,23 @@ void odometry_udate(int speed_left, int speed_right){
   odom_msg.twist.twist.angular.z = (right_velocity - left_velocity) / BASE_WIDTH;
 }
 
+void callBack_motor_control(const geometry_msgs::Twist& twist)
+{
+  if(operation_mode == AUTONOMOUS){
+    /*モーター速度の計算*/
+    float left_velocity =  (twist.angular.z * BASE_WIDTH - 2.0f * twist.linear.x) / (-2.0f) * WHEEL_SIZE / WHEEL_TIRE_SIZE;
+    float right_velocity = (twist.angular.z * BASE_WIDTH + 2.0f * twist.linear.x) / 2.0f * WHEEL_SIZE / WHEEL_TIRE_SIZE;
+    vehicle_run(right_velocity, left_velocity);
+    char buf[100];
+    sprintf(buf, "callBack_motor_control %.2f, %.2f", left_velocity, right_velocity);
+    nh.loginfo(buf);
+  }else{
+    nh.loginfo("operation_mode is not AUTONOMOUS...");
+  }
+}
+
+void callBack_odometry_reset(const std_msgs::Empty& flag)
+{
+  odom.is_reset_req = true;
+  nh.loginfo("Reset odometry!");
+}
