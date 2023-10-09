@@ -6,7 +6,7 @@
   2. 『rosserial』と検索
   3. Michael Furguson 氏の『Rosserial Arduino Library』をインストール
   4. ros.hの修正が必要[リンク先参照](https://github.com/espressif/arduino-esp32/issues/4807)
-  5. rosserialがあるフォルダから、Document/Arduino/libraries/Rosserial_Arduino_Library/src/ros/node_handle.hのサイズを1024に変更（nav_msgs::Odometryのサイズ調整のため）
+  5. rosserialがあるフォルダ（Document/Arduino/libraries/Rosserial_Arduino_Library等）から、src/ros/node_handle.hのサイズを1024に変更（nav_msgs::Odometryのサイズ調整のため）
      ```
      /* Node Handle */
      template<class Hardware,
