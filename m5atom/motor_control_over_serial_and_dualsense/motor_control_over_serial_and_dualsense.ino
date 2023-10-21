@@ -22,17 +22,19 @@ CRGB leds[NUM_STRIPS][NUM_LEDS_PER_STRIP];
 #define EMERGENCY 0
 
 // Odometry Difinition
-#define BASE_WIDTH  (0.52) //(m)トレッド幅
-#define WHEEL_SIZE  (0.067) //(m)ホイールの直径
-#define WHEEL_TIRE_SIZE  (0.150) //(m)タイヤをつけた場合の直径１TODO
-#define MOTOR_POLES  (15.0) //極数
-#define MOTOR_STEPS  (4.0) //4°
+#define BASE_WIDTH  (0.245) //(m)トレッド幅
+#define WHEEL_TIRE_RADIUS  (0.1025) //(m)タイヤをつけた場合の直径１TODO
+//#define MOTOR_POLES  (15.0) //極数
+//#define MOTOR_STEPS  (4.0) //4°
+#define M_PI (3.14159)
 struct ODOMETRY{
   bool is_reset_req;
-  double last_distance;
+  double last_theta;
   double pos_x;
   double pos_y;
   unsigned long update_millis;
+  double left_distance;
+  double right_distance;
 };
 
 int operation_mode = AUTONOMOUS;
@@ -316,28 +318,28 @@ void loop()
   // Serial.print(Speed[0]);
   motor_handler.Control_Motor(Speed[0], ID, Acce, brake, &Rcv);//スピード0：モーター停止
   delay(5);//1回の通信ごとに5msのWaitが必要（RS485の半二重通信の問題と思われる）
-  Serial.print("{\"R_VEL\":");
+  // Serial.print("{\"R_VEL\":");
   wheel_sp_R=Rcv.BSpeed;
   Act_Speed[0]=wheel_sp_R;
-  Serial.print(wheel_sp_R);
-  Serial.print(",\"R_POS\":");
+  // Serial.print(wheel_sp_R);
+  // Serial.print(",\"R_POS\":");
   wheel_pos_R=POS_MAX-Rcv.Position; //モーターの向きに合わせて符号を設定
   Act_Pos[0]=wheel_pos_R;
-  Serial.print(wheel_pos_R);
-  Serial.print(",");
+  // Serial.print(wheel_pos_R);
+  // Serial.print(",");
   ID=2; //Wheel L
   // Serial.print(",Speed[2]:");
   // Serial.println(Speed[1]);
   motor_handler.Control_Motor(Speed[1], ID, Acce, brake, &Rcv);//スピード0：モーター停止
-  Serial.print("\"L_VEL\":");
+  // Serial.print("\"L_VEL\":");
   wheel_sp_L=-Rcv.BSpeed; //モーターの向きに合わせて符号を設定
   Act_Speed[1]=wheel_sp_L;
-  Serial.print(wheel_sp_L);
-  Serial.print(",\"L_POS\":");
+  // Serial.print(wheel_sp_L);
+  // Serial.print(",\"L_POS\":");
   wheel_pos_L=Rcv.Position; 
   Act_Pos[1]=wheel_pos_L;
-  Serial.print(wheel_pos_L);
-  Serial.println("}");
+  // Serial.print(wheel_pos_L);
+  // Serial.println("}");
   delay(5);
 
   ros_update(wheel_sp_L, wheel_sp_R, wheel_pos_L, wheel_pos_R);
@@ -405,10 +407,12 @@ void ros_update(int speed_left, int speed_right, int position_left, int position
 
 void odometry_reset(struct ODOMETRY* odom){
   odom->is_reset_req = false;
-  odom->last_distance = 0.0;
+  odom->last_theta = 0.0;
   odom->pos_x= 0.0;
   odom->pos_y = 0.0;
   odom->update_millis = millis();
+  odom->left_distance = 0.0;
+  odom->right_distance = 0.0;
 }
 
 void odometry_udate(int speed_left, int speed_right){
@@ -427,21 +431,29 @@ void odometry_udate(int speed_left, int speed_right){
   double left_velocity, right_velocity, left_distance, right_distance, distance, theta, d_x, d_y;
   geometry_msgs::Quaternion quat;
 
-  left_velocity = (double)speed_left * WHEEL_TIRE_SIZE / WHEEL_SIZE;
-  right_velocity = (double)speed_right * WHEEL_TIRE_SIZE / WHEEL_SIZE;
-  left_distance = left_velocity * interval_millis / 1000;
-  right_distance = right_velocity * interval_millis / 1000;
-  distance = (left_distance + right_distance / 2.0);
-  theta = (right_distance - left_distance) / BASE_WIDTH;;
-  d_x = (distance - odom.last_distance) * cos(theta);
-  d_y = (distance - odom.last_distance) * sin(theta);
-  quat = tf::createQuaternionFromYaw(theta);
+  left_velocity = 2.0 * M_PI *  (double)speed_left * WHEEL_TIRE_RADIUS / 60.0; //角速度[rpm]から並進速度[m/s]を出す 2*PI*R[m]*v[rpm]/60
+  right_velocity = 2.0 * M_PI *  (double)speed_right * WHEEL_TIRE_RADIUS / 60.0; //角速度[rpm]から並進速度[m/s]を出す 2*PI*R[m]*v[rpm]/60
+  left_distance = left_velocity * (double)interval_millis / 1000.0; //距離[m]=速度[m/s]*時間[s]
+  right_distance = right_velocity * (double)interval_millis / 1000.0; //距離[m]=速度[m/s]*時間[s]
+  distance = (left_distance + right_distance) / 2.0; //左右の車輪の移動距離の平均値
+  theta = odom.last_theta + atan2(right_distance - left_distance, BASE_WIDTH); //<<<<<arctanは？　単位は？ 0度方向は？回転方向は？
+  d_x = distance * cos(theta); // 軸の取り方は？
+  d_y = distance * sin(theta);  // 軸の取り方は？
+  quat = tf::createQuaternionFromYaw(theta); //<<<<<単位は？ラジアン？
 
   odom.pos_x += d_x;
   odom.pos_y += d_y;  
-  odom.last_distance = distance;
+  odom.last_theta = theta;
   odom.update_millis = now_millis;
+  odom.left_distance += left_distance;
+  odom.right_distance += right_distance;
   
+  Serial.print(theta * 180 / M_PI);
+  Serial.print(" ");
+  Serial.print(odom.left_distance);
+  Serial.print(" ");
+  Serial.println(odom.right_distance);
+
   odom_msg.header.stamp = nh.now();
   odom_msg.header.frame_id = "/odometry";
   odom_msg.child_frame_id = "base_footprint";
@@ -457,15 +469,15 @@ void odometry_udate(int speed_left, int speed_right){
   odom_msg.twist.twist.linear.z = 0;
   odom_msg.twist.twist.angular.z = 0;
   odom_msg.twist.twist.angular.y = 0;
-  odom_msg.twist.twist.angular.z = (right_velocity - left_velocity) / BASE_WIDTH;
+  odom_msg.twist.twist.angular.z = (right_velocity - left_velocity) / BASE_WIDTH; //<<<<<arctanは？単位は？
 }
 
 void callBack_motor_control(const geometry_msgs::Twist& twist)
 {
   if(operation_mode == AUTONOMOUS){
     /*モーター速度の計算*/
-    float left_velocity =  (twist.angular.z * BASE_WIDTH - 2.0f * twist.linear.x) / (-2.0f) * WHEEL_SIZE / WHEEL_TIRE_SIZE;
-    float right_velocity = (twist.angular.z * BASE_WIDTH + 2.0f * twist.linear.x) / 2.0f * WHEEL_SIZE / WHEEL_TIRE_SIZE;
+    float left_velocity =  (twist.angular.z * BASE_WIDTH - 2.0f * twist.linear.x) / (-2.0f) / WHEEL_TIRE_RADIUS;
+    float right_velocity = (twist.angular.z * BASE_WIDTH + 2.0f * twist.linear.x) / 2.0f / WHEEL_TIRE_RADIUS;
     vehicle_run(right_velocity, left_velocity);
     char buf[100];
     sprintf(buf, "callBack_motor_control %.2f, %.2f", left_velocity, right_velocity);
