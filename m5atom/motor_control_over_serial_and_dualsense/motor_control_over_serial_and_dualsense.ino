@@ -411,8 +411,8 @@ void ros_update(int speed_left, int speed_right, int position_left, int position
   nh.spinOnce();
   // test
   // geometry_msgs::Twist twist;
-  // twist.linear.x = 0.1;
-  // twist.angular.z = 0;
+  // twist.linear.x = 0.0;
+  // twist.angular.z = 0.1;
   // callBack_motor_control(twist);
 }
 
@@ -463,7 +463,7 @@ void odometry_udate(int speed_left, int speed_right, int position_left, int posi
   theta = odom.last_theta + atan2(left_distance - right_distance, BASE_WIDTH); //<<<<<arctanは？　単位は？ 0度方向は？回転方向は？
   d_x = distance * cos(theta); // 軸の取り方は？
   d_y = distance * sin(theta);  // 軸の取り方は？
-  quat = tf::createQuaternionFromYaw(theta); //<<<<<単位は？ラジアン？
+  quat = tf::createQuaternionFromYaw(theta); // クォータニオン
 
   odom.pos_x += d_x;
   odom.pos_y += d_y;  
@@ -488,12 +488,12 @@ void odometry_udate(int speed_left, int speed_right, int position_left, int posi
   odom_msg.pose.pose.position.z = 0.0;
   odom_msg.pose.pose.orientation = quat;
 
-  odom_msg.twist.twist.linear.x = (left_velocity + right_velocity) / 2.0;
+  odom_msg.twist.twist.linear.x = (left_velocity + right_velocity) / 2.0; // 並進速度[m/s]
   odom_msg.twist.twist.linear.y = 0;
   odom_msg.twist.twist.linear.z = 0;
   odom_msg.twist.twist.angular.z = 0;
   odom_msg.twist.twist.angular.y = 0;
-  odom_msg.twist.twist.angular.z = (right_velocity - left_velocity) / BASE_WIDTH; //<<<<<arctanは？単位は？
+  odom_msg.twist.twist.angular.z = (right_velocity - left_velocity) / BASE_WIDTH;// 角速度[rad/s]
 }
 
 int get_angle(int cur, int last){
@@ -514,11 +514,16 @@ void callBack_motor_control(const geometry_msgs::Twist& twist)
 {
   if(operation_mode == AUTONOMOUS){
     /*モーター速度の計算*/
-    float left_velocity =  (twist.angular.z * BASE_WIDTH - 2.0f * twist.linear.x) / (-2.0f) / WHEEL_TIRE_RADIUS;
-    float right_velocity = (twist.angular.z * BASE_WIDTH + 2.0f * twist.linear.x) / 2.0f / WHEEL_TIRE_RADIUS;
-    vehicle_run(right_velocity, left_velocity);
+    float left_velocity, right_velocity;
+    left_velocity = (twist.angular.z * BASE_WIDTH - 2.0f * twist.linear.x) / (-2.0f); // vL[m/s] = (トレッド幅[m] × 角速度[rad/s] - 2 × 並進速度[m/s]) ÷ -2
+    right_velocity = (twist.angular.z * BASE_WIDTH + 2.0f * twist.linear.x) / 2.0f; // vR[m/s] = (トレッド幅[m] × 角速度[rad/s] + 2 × 並進速度[m/s]) ÷ 2
+    float left_rpm, right_rpm;
+    left_rpm =  left_velocity * 60.0f / (2.0f * M_PI * WHEEL_TIRE_RADIUS); // ωL[rad/s] = 速度 × 60秒 ÷ 2πR
+    right_rpm = right_velocity * 60.0f / (2.0f * M_PI * WHEEL_TIRE_RADIUS); // ωR[rad/s] = 速度 × 60秒 ÷ 2πR
+    vehicle_run((int)right_velocity, (int)left_velocity);
     char buf[100];
-    sprintf(buf, "callBack_motor_control %.2f, %.2f", left_velocity, right_velocity);
+    sprintf(buf, "motor_ctrl %.2f, %.2f", left_rpm, right_rpm);
+    // Serial.println(buf);
     nh.loginfo(buf);
   }else{
     nh.loginfo("operation_mode is not AUTONOMOUS...");
