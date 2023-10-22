@@ -10,6 +10,11 @@ $ git clone --recursive https://github.com/CoderDojoMusashikosugi/Cub_ROS.git
 ```
 
 ## install
+### rosdep
+```
+$ rosdep install -i --from-paths ws/src
+```
+
 ### Hesai Lidar
 ```
 $ sudo apt install libpcap-dev libyaml-cpp-dev
