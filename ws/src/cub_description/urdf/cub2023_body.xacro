@@ -47,6 +47,15 @@
       <limit effort="1" velocity="1"/>
       <axis xyz="0 0 1"/>
     </joint>
+    <transmission name="wheel_left_trans" type="SimpleTransmission">
+      <type>transmission_interface/SimpleTransmission</type>
+        <actuator name="wheel_left_motor">
+          <mechanicalReduction>1</mechanicalReduction>
+        </actuator>
+      <joint name="wheel_left_joint">
+        <hardwareInterface>hardware_interface/VelocityJointInterface</hardwareInterface>
+      </joint>
+    </transmission>
     <link name="wheel_left">
       <visual>
         <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -70,6 +79,13 @@
                  izz="0.003879257" />
       </inertial>
     </link>
+    <gazebo reference="wheel_left">
+      <material>Gazebo/Black</material>
+      <mu1 value="10" />
+      <mu2 value="10" />
+      <kp value="10000" />
+      <kd value="100" />
+    </gazebo>
 
     <joint name="wheel_right_joint" type="continuous">
       <origin xyz="0.045 -0.1225 0.1025" rpy="${pi/2} 0 0" />
@@ -78,6 +94,15 @@
       <limit effort="1" velocity="1"/>
       <axis xyz="0 0 1"/>
     </joint>
+    <transmission name="wheel_right_trans" type="SimpleTransmission">
+      <type>transmission_interface/SimpleTransmission</type>
+        <actuator name="wheel_right_motor">
+          <mechanicalReduction>1</mechanicalReduction>
+        </actuator>
+      <joint name="wheel_right_joint">
+        <hardwareInterface>hardware_interface/VelocityJointInterface</hardwareInterface>
+      </joint>
+    </transmission>
     <link name="wheel_right">
       <visual>
         <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -100,6 +125,13 @@
                  izz="0.003879257" />
       </inertial>
     </link>
+    <gazebo reference="wheel_right">
+      <material>Gazebo/Black</material>
+      <mu1 value="10" />
+      <mu2 value="10" />
+      <kp value="10000" />
+      <kd value="100" />
+    </gazebo>
 
     <joint name="caster_joint" type="continuous">
       <origin xyz="-0.156 0.0 0.0" rpy="0 0 0" />
@@ -138,6 +170,15 @@
       <limit effort="1" velocity="1" lower="0" upper="${pi/2}"/>
       <axis xyz="0 1 0"/>
     </joint>
+    <transmission name="head_trans" type="SimpleTransmission">
+      <type>transmission_interface/SimpleTransmission</type>
+        <actuator name="head_motor">
+          <mechanicalReduction>1</mechanicalReduction>
+        </actuator>
+      <joint name="head_joint">
+        <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+      </joint>
+    </transmission>
     <link name="head">
       <visual>
         <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -160,6 +201,9 @@
                  izz="0.003879257" />
       </inertial>
     </link>
+    <gazebo reference="head">
+      <material>Gazebo/White</material>
+    </gazebo>
 
     <joint name="hokuyo_joint" type="fixed">
       <origin xyz="0.0 0.0 0.2342" rpy="0 0 0" />
@@ -175,6 +219,9 @@
         <material name="white"/>
       </visual>
     </link>
+    <gazebo reference="hokuyo">
+      <material>Gazebo/Black</material>
+    </gazebo>
 
     <joint name="hesai_joint" type="fixed">
       <origin xyz="-0.02 0.0 0.3947" rpy="0 0 0" />
@@ -190,6 +237,17 @@
         <material name="white"/>
       </visual>
     </link>
+    <gazebo reference="hesai">
+      <material>Gazebo/White</material>
+    </gazebo>
+
+  <gazebo>
+    <plugin name="gazebo_ros_control" filename="libgazebo_ros_control.so">
+      <robotNamespace>/cub</robotNamespace>
+      <robotSimType>gazebo_ros_control/DefaultRobotHWSim</robotSimType>
+      <legacyModeNS>true</legacyModeNS>
+    </plugin>
+  </gazebo>
 
   </xacro:macro>
 </robot>

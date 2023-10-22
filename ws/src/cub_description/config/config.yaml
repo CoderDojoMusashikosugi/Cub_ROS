@@ -1,0 +1,8 @@
+cub:      
+  head_position:
+    type: position_controllers/JointPositionController
+    joint: head_joint
+    pid: {p: 1.0, i: 1.0, d: 1.0, i_clamp_min: -1.0, i_clamp_max: 1.0}
+  joint_state_controller:
+    type: joint_state_controller/JointStateController
+    publish_rate: 10  

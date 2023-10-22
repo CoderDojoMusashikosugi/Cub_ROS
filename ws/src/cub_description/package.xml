@@ -12,6 +12,7 @@
   <buildtool_depend>catkin</buildtool_depend>
   <depend>urdf</depend>
   <depend>xacro</depend>
+  <depend>joint_trajectory_controller</depend>
 
   <!-- The export tag contains other, unspecified, tags -->
   <export>
