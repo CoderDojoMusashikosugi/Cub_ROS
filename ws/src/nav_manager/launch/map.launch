@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<launch>
+    <!-- point_cloud map -->
+    <node pkg="pcl_ros" type="pcd_to_pointcloud" name="pcd_to_pointcloud" output="screen">
+        <param name="file_name" value="/home/ubuntu/Downloads/0.15_map_all.pcd" />
+        <param name="frame_id" value="map" />
+        <param name="interval" value="3" />
+    </node>
+
+</launch>

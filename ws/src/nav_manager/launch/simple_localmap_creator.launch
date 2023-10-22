@@ -1,0 +1,10 @@
+<launch>
+    <node pkg="nav_manager" type="simple_localmap_creator" name="simple_localmap_creator">
+	</node>
+
+    <!-- tf -->
+	 <!-- <node name="map_to_lidar" pkg="tf2_ros" type="static_transform_publisher" args="0 0 0 0 0 0 0 /map /velodyne_lower"/> -->
+
+    <!-- rviz -->
+    <!-- <node pkg="rviz" type="rviz" name="rviz" args="-d $(find nav_manager)/config/nav_manager.rviz" /> -->
+</launch>

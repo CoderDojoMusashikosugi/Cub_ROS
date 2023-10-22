@@ -1,0 +1,9 @@
+<launch>
+    <node pkg="nav_manager" type="global_path_creator" name="global_path_creator">
+        <rosparam command="load" file="$(find nav_manager)/config/waypoints_list.yaml" />
+        <rosparam command="load" file="$(find nav_manager)/config/route_list.yaml" />
+	</node>
+
+    <!-- rviz -->
+    <!-- <node pkg="rviz" type="rviz11" name="rviz11" args="-d $(find nav_manager)/config/nav_manager.rviz" /> -->
+</launch>
