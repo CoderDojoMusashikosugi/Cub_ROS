@@ -1,0 +1,6 @@
+<launch>
+    <include file="$(find nav_manager)/launch/empty_map.launch"/>
+    <!-- <include file="$(find nav_manager)/launch/empty_odom.launch"/> -->
+    
+    <include file="$(find nav_manager)/launch/local_planner.launch"/>
+</launch>

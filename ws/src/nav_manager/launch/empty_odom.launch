@@ -1,0 +1,4 @@
+<launch>
+  <node name="empty_odom" pkg="nav_manager" type="empty_odom.py" output="screen"/>
+</launch>
+

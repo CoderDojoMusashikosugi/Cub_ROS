@@ -2,7 +2,7 @@
 
 <launch>
     <arg name="hz" default="10"/>
-    <arg name="robot_frame" default="base_link"/>
+    <arg name="robot_frame" default="base_footprint"/>
     <arg name="n_p" default="31"/>
     <arg name="n_h" default="5"/>
     <arg name="max_alpha" default="1.6"/>
@@ -37,8 +37,8 @@
         <param name="TURN_DIRECTION_THRESHOLD" value="$(arg turn_direction_threshold)"/>
         <param name="ENABLE_SHARP_TRAJECTORY" value="$(arg enable_sharp_trajectory)"/>
         <remap from="/local_map" to="/local_map/expand"/>
-        <remap from="/local_goal" to="/next_waypoint"/>
-        <remap from="/cmd_vel" to="/local_path/cmd_vel"/>
-        <remap from="/odom" to="/ypspur/odom"/>
+        <remap from="/local_goal" to="/move_base_simple/goal"/>
+        <remap from="/cmd_vel" to="/atom/motor_control"/>
+        <remap from="/odom" to="/atom/odometry"/>
     </node>
 </launch>
