@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+  <param name="robot_description" textfile="$(find cub_description)/urdf/cub2023_body.xacro" />
+  <arg name="urdf_file" default="$(find xacro)/xacro --inorder '$(find cub_description)/urdf/cub2023_body.xacro'" />
+  <param name="robot_description" command="$(arg urdf_file)" />
+
+  <include file="$(find gazebo_ros)/launch/empty_world.launch" />
+     
+  <node name="urdf_spawner" pkg="gazebo_ros" type="spawn_model" respawn="false" output="screen"
+    args="-urdf -model cub2023_body -param robot_description"/>
+</launch>

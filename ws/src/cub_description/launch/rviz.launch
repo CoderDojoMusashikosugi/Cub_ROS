@@ -1,0 +1,8 @@
+<launch>
+	<param name="robot_description" textfile="$(find cub_description)/urdf/cub2023_body.xacro" />
+    <arg name="urdf_file" default="$(find xacro)/xacro --inorder '$(find cub_description)/urdf/cub2023.xacro'" />
+    <param name="robot_description" command="$(arg urdf_file)" />
+	<node name="joint_state_publisher_gui" pkg="joint_state_publisher_gui" type="joint_state_publisher_gui" />
+	<node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" />
+	<node name="rviz" pkg="rviz" type="rviz" args="-d $(find cub_description)/config/rviz.rviz" required="true" /> 
+</launch>

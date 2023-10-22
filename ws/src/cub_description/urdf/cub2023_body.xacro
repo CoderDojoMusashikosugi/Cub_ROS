@@ -1,0 +1,195 @@
+<?xml version="1.0"?>
+<robot name="cub2023_body" xmlns:xacro="http://ros.org/wiki/xacro">
+  <xacro:macro name="cub_body" params="parent">
+    <material name="white">
+      <color rgba="1.0 1.0 1.0 1.0"/>
+    </material>
+
+    <link name="base_footprint"/>
+    <joint name="base_footprint_joint" type="fixed">
+      <origin xyz="0.045 0 0" rpy="0 0 0" />
+      <parent link="${parent}" />
+      <child link="base_footprint" />
+    </joint>
+
+    <joint name="body_joint" type="fixed">
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <parent link="${parent}" />
+      <child link="body" />
+    </joint>
+    <link name="body">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://cub_description/meshes/cub2023_body.stl"/>
+        </geometry>
+        <material name="white"/>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://cub_description/meshes/cub2023_body.stl"/>
+        </geometry>
+      </collision>
+      <inertial>
+        <mass value="1" />
+        <origin xyz="0 0 0" />
+        <inertia ixx="0.003881243" ixy="0.0" ixz="0.0"
+                 iyy="0.000498940" iyz="0.0"
+                 izz="0.003879257" />
+      </inertial>
+    </link>
+
+    <joint name="wheel_left_joint" type="continuous">
+      <origin xyz="0.045 0.1225 0.1025" rpy="${-pi/2} 0 0" />
+      <parent link="${parent}" />
+      <child link="wheel_left" />
+      <limit effort="1" velocity="1"/>
+      <axis xyz="0 0 1"/>
+    </joint>
+    <link name="wheel_left">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <!-- -0.02375 -->
+        <geometry>
+          <mesh filename="package://cub_description/meshes/cub2023_wheel.stl"/>
+        </geometry>
+        <material name="white"/>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <cylinder length="0.01" radius="0.1025"/>
+        </geometry>
+      </collision>
+      <inertial>
+        <mass value="1" />
+        <origin xyz="0 0 0" />
+        <inertia ixx="0.003881243" ixy="0.0" ixz="0.0"
+                 iyy="0.000498940" iyz="0.0"
+                 izz="0.003879257" />
+      </inertial>
+    </link>
+
+    <joint name="wheel_right_joint" type="continuous">
+      <origin xyz="0.045 -0.1225 0.1025" rpy="${pi/2} 0 0" />
+      <parent link="${parent}" />
+      <child link="wheel_right" />
+      <limit effort="1" velocity="1"/>
+      <axis xyz="0 0 1"/>
+    </joint>
+    <link name="wheel_right">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://cub_description/meshes/cub2023_wheel.stl"/>
+        </geometry>
+        <material name="white"/>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <cylinder length="0.01" radius="0.1025"/>
+        </geometry>
+      </collision>
+      <inertial>
+        <mass value="1" />
+        <origin xyz="0 0 0" />
+        <inertia ixx="0.003881243" ixy="0.0" ixz="0.0"
+                 iyy="0.000498940" iyz="0.0"
+                 izz="0.003879257" />
+      </inertial>
+    </link>
+
+    <joint name="caster_joint" type="continuous">
+      <origin xyz="-0.156 0.0 0.0" rpy="0 0 0" />
+      <parent link="${parent}" />
+      <child link="caster" />
+      <limit effort="1" velocity="1"/>
+      <axis xyz="0 0 1"/>
+    </joint>
+    <link name="caster">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://cub_description/meshes/cub2023_caster.stl"/>
+        </geometry>
+        <material name="white"/>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://cub_description/meshes/cub2023_caster.stl"/>
+        </geometry>
+      </collision>
+      <inertial>
+        <mass value="1" />
+        <origin xyz="0 0 0" />
+        <inertia ixx="0.003881243" ixy="0.0" ixz="0.0"
+                 iyy="0.000498940" iyz="0.0"
+                 izz="0.003879257" />
+      </inertial>
+    </link>
+
+    <joint name="head_joint" type="revolute">
+      <origin xyz="-0.03989 0.0 0.66" rpy="0 0 0" />
+      <parent link="${parent}" />
+      <child link="head" />
+      <limit effort="1" velocity="1" lower="0" upper="${pi/2}"/>
+      <axis xyz="0 1 0"/>
+    </joint>
+    <link name="head">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://cub_description/meshes/cub2023_head.stl"/>
+        </geometry>
+        <material name="white"/>
+      </visual>
+      <collision>
+        <origin xyz="-0.05 0 0.04" rpy="0 0 0"/>
+        <geometry>
+          <box size="0.1 0.1 0.02"/>
+        </geometry>
+      </collision>
+      <inertial>
+        <mass value="1" />
+        <origin xyz="0 0 0" />
+        <inertia ixx="0.003881243" ixy="0.0" ixz="0.0"
+                 iyy="0.000498940" iyz="0.0"
+                 izz="0.003879257" />
+      </inertial>
+    </link>
+
+    <joint name="hokuyo_joint" type="fixed">
+      <origin xyz="0.0 0.0 0.2342" rpy="0 0 0" />
+      <parent link="${parent}" />
+      <child link="hokuyo" />
+    </joint>
+    <link name="hokuyo">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://cub_description/meshes/cub2023_hokuyo.stl"/>
+        </geometry>
+        <material name="white"/>
+      </visual>
+    </link>
+
+    <joint name="hesai_joint" type="fixed">
+      <origin xyz="-0.02 0.0 0.3947" rpy="0 0 0" />
+      <parent link="${parent}" />
+      <child link="hesai" />
+    </joint>
+    <link name="hesai">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <mesh filename="package://cub_description/meshes/cub2023_hesai.stl"/>
+        </geometry>
+        <material name="white"/>
+      </visual>
+    </link>
+
+  </xacro:macro>
+</robot>

@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<robot name="cub" xmlns:xacro="http://ros.org/wiki/xacro">
+
+  <xacro:include filename="$(find cub_description)/urdf/cub2023_body.xacro" />
+  <!-- <xacro:include filename="$(find cub_description)/urdf/cub2023_sensors.xacro" /> -->
+
+  <link name="base_link"/>
+
+  <xacro:cub_body parent="base_link"/>
+  <!-- <xacro:cub_sensors parent="base_link"/> -->
+
+</robot>

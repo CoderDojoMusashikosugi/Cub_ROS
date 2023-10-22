@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>cub_description</name>
+  <version>0.0.0</version>
+  <description>The cub_description package</description>
+
+  <maintainer email="coderdojo-musashikosugi@todo.todo">coderdojo-musashikosugi</maintainer>
+  <license>TODO</license>
+  <url type="website">https://github.com/CoderDojoMusashikosugi/Cub_ROS</url>
+  <author email="coderdojo-musashikosugi@todo.todo">coderdojo-musashikosugi</author>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <depend>urdf</depend>
+  <depend>xacro</depend>
+
+  <!-- The export tag contains other, unspecified, tags -->
+  <export>
+    <!-- Other tools can request additional information be placed here -->
+
+  </export>
+</package>
