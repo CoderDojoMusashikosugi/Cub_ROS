@@ -21,7 +21,10 @@ catkin_make
 - /velodyne_obstacles(sensor_msgs::PointCloud2)
   - Enter obstacle points.
   - [This code](https://github.com/UNI-shibuya-taku/velodyne_height_map.git) can classify ground point clouds and obstacle point clouds.
- 
+    - If you use ↑velodyne_heightmap, please do the following↓
+    - ```
+        roslaunch velodyne_pointcloud VLP16_points.launch
+     ```
 <!-- ## Parameters -->
 ### How to Use
 ```
