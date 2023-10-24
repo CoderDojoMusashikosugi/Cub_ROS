@@ -3,24 +3,15 @@
 NextWaypointCreator::NextWaypointCreator():private_nh("~")
 {
     //parameter
-    private_nh.param("hz",hz,{10});
-    private_nh.param("border_distance",border_distance,{2.0});
+    private_nh.param("border_distance", border_distance,{2.0});
     //subscriber
-    sub_global_path = nh.subscribe("/global_path/path",10,&NextWaypointCreator::global_path_callback,this);
-    sub_current_pose = nh.subscribe("/ekf_pose",10,&NextWaypointCreator::current_pose_callback,this);
-    // sub_path = nh.subscribe("/global_path/path",10,&NextWaypointCreator::path_callback,this);
+    sub_global_path = nh.subscribe("/global_path/path",10,&NextWaypointCreator::global_path_callback, this);
+    sub_current_pose = nh.subscribe("/ekf_pose",10,&NextWaypointCreator::current_pose_callback, this);
 
     //publisher
     pub_next_waypoint = nh.advertise<geometry_msgs::PoseStamped>("/next_waypoint",1);
-    // pub_estimated_edge = nh.advertise<amsl_navigation_msgs::Edge>("/estimated_pose/edge", 1);
 }
 
-// void NextWaypointCreator::path_callback(const std_msgs::Int32MultiArray::ConstPtr& msg_path)
-// {
-//     std::cout<<"path callback "<<std::endl;
-//     global_path_num = *msg_path;
-//     have_recieved_multi_array = true;
-// }
 void NextWaypointCreator::global_path_callback(const nav_msgs::Path::ConstPtr& msg)
 {
     std::cout<<"global_path callback "<<std::endl;
@@ -37,21 +28,6 @@ void NextWaypointCreator::current_pose_callback(const geometry_msgs::PoseStamped
     // if(!have_recieved_pose) 
     have_recieved_pose = true;
 
-    // geometry_msgs::TransformStamped transformStamped;
-    // transformStamped.header.stamp = ros::Time::now();
-    // transformStamped.header.frame_id = "map";
-    // transformStamped.child_frame_id = "base_link";
-    // transformStamped.transform.translation.x = current_pose.pose.position.x;
-    // transformStamped.transform.translation.y = current_pose.pose.position.y;
-    // transformStamped.transform.translation.z = 0.0;
-
-    // // tf2::Quaternion q;
-    // // q.setRPY(0, 0, 0.0); // YAW
-    // transformStamped.transform.rotation.x = current_pose.pose.orientation.x;
-    // transformStamped.transform.rotation.y = current_pose.pose.orientation.y;
-    // transformStamped.transform.rotation.z = current_pose.pose.orientation.z;
-    // transformStamped.transform.rotation.w = current_pose.pose.orientation.w;
-    // dynamic_br_.sendTransform(transformStamped);
 }
 void NextWaypointCreator::select_next_goal()
 {
