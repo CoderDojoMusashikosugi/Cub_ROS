@@ -19,7 +19,7 @@ catkin_make
 - /local_map/expand(nav_msgs::OccupanceGrid)
 ### Subscribed topics
 - /velodyne_obstacles(sensor_msgs::PointCloud2)
-- Enter obstacle points.
+ - Enter obstacle points.
  - [This code](https://github.com/UNI-shibuya-taku/velodyne_height_map.git) can classify ground point clouds and obstacle point clouds.
  
 <!-- ## Parameters -->
