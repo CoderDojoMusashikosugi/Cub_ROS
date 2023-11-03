@@ -1,20 +1,22 @@
 <?xml version="1.0"?>
 <robot name="cub2023_body" xmlns:xacro="http://ros.org/wiki/xacro">
-  <xacro:macro name="cub_body" params="parent">
+  <xacro:macro name="cub_body" params="base_link base_footprint">
     <material name="white">
       <color rgba="1.0 1.0 1.0 1.0"/>
     </material>
 
-    <link name="base_footprint"/>
+    <link name="${base_footprint}"/>
     <joint name="base_footprint_joint" type="fixed">
       <origin xyz="0.045 0 0" rpy="0 0 0" />
-      <parent link="${parent}" />
-      <child link="base_footprint" />
+      <parent link="${base_footprint}" />
+      <child link="${base_link}" />
     </joint>
+
+    <link name="${base_link}"/>
 
     <joint name="body_joint" type="fixed">
       <origin xyz="0 0 0" rpy="0 0 0" />
-      <parent link="${parent}" />
+      <parent link="${base_link}" />
       <child link="body" />
     </joint>
     <link name="body">
@@ -42,7 +44,7 @@
 
     <joint name="wheel_left_joint" type="continuous">
       <origin xyz="0.045 0.1225 0.1025" rpy="${-pi/2} 0 0" />
-      <parent link="${parent}" />
+      <parent link="${base_link}" />
       <child link="wheel_left" />
       <limit effort="1" velocity="1"/>
       <axis xyz="0 0 1"/>
@@ -89,7 +91,7 @@
 
     <joint name="wheel_right_joint" type="continuous">
       <origin xyz="0.045 -0.1225 0.1025" rpy="${pi/2} 0 0" />
-      <parent link="${parent}" />
+      <parent link="${base_link}" />
       <child link="wheel_right" />
       <limit effort="1" velocity="1"/>
       <axis xyz="0 0 1"/>
@@ -135,7 +137,7 @@
 
     <joint name="caster_joint" type="continuous">
       <origin xyz="-0.156 0.0 0.0" rpy="0 0 0" />
-      <parent link="${parent}" />
+      <parent link="${base_link}" />
       <child link="caster" />
       <limit effort="1" velocity="1"/>
       <axis xyz="0 0 1"/>
@@ -165,7 +167,7 @@
 
     <joint name="head_joint" type="revolute">
       <origin xyz="-0.03989 0.0 0.66" rpy="0 0 0" />
-      <parent link="${parent}" />
+      <parent link="${base_link}" />
       <child link="head" />
       <limit effort="1" velocity="1" lower="0" upper="${pi/2}"/>
       <axis xyz="0 1 0"/>
@@ -207,7 +209,7 @@
 
     <joint name="hokuyo_joint" type="fixed">
       <origin xyz="0.0 0.0 0.2342" rpy="0 0 0" />
-      <parent link="${parent}" />
+      <parent link="${base_link}" />
       <child link="hokuyo" />
     </joint>
     <link name="hokuyo">
@@ -225,7 +227,7 @@
 
     <joint name="hesai_joint" type="fixed">
       <origin xyz="-0.02 0.0 0.3947" rpy="0 0 0" />
-      <parent link="${parent}" />
+      <parent link="${base_link}" />
       <child link="hesai" />
     </joint>
     <link name="hesai">
