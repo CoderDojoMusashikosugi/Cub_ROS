@@ -1,7 +1,0 @@
-<?xml version="1.0"?>
-
-<launch>
-    <node pkg="map_server" type="map_server" name="map_server" output="screen" args="$(find nav_manager)/config/empty_map.yaml" >
-        <remap from="map" to="/local_map/expand"/>
-    </node>
-</launch>

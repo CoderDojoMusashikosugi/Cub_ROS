@@ -1,5 +1,5 @@
 <launch>
-    <node pkg="nav_manager" type="simple_localmap_creator" name="simple_localmap_creator">
+    <node pkg="nav_manager" type="simple_localmap_creator" name="simple_localmap_creator" output="screen">
 	</node>
 
     <!-- tf -->

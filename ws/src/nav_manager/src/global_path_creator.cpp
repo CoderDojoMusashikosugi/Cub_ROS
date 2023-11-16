@@ -15,13 +15,11 @@ GlobalPathCreator::GlobalPathCreator() :
 }
 void GlobalPathCreator::load_waypoints()
 {
-    std::cout << "load_waypoints" << std::endl;
     if(!private_nh_.getParam("waypoints_list",waypoints_list_)){
-        ROS_WARN("Cloud not load waypoints list");
+        ROS_WARN("Can not load waypoints list");
         return;
     }
     ROS_ASSERT(waypoints_list_.getType() == XmlRpc::XmlRpcValue::TypeArray);
-    std::cout << "finished ROS_ASSERT" << std::endl;
     std::cout << "waypoints_size: " << waypoints_list_.size() << std::endl;
     for(int i = 0; i < (int)waypoints_list_.size(); i++){
         if(!waypoints_list_[i]["id"].valid() || !waypoints_list_[i]["x"].valid() || !waypoints_list_[i]["y"].valid()){
@@ -39,8 +37,9 @@ void GlobalPathCreator::load_waypoints()
 }
 void GlobalPathCreator::load_route()
 {
-    if(!private_nh_.getParam("route_list",route_list_)){
-        ROS_WARN("Cloud not load route list");
+    std::cout << "load_route" << std::endl;
+    if(!private_nh_.getParam("route_list", route_list_)){
+        ROS_WARN("Can not load route list");
         return;
     }
     ROS_ASSERT(route_list_.getType() == XmlRpc::XmlRpcValue::TypeArray);
@@ -61,6 +60,8 @@ void GlobalPathCreator::make_global_path()
     visualization_msgs::MarkerArray id_markers;
     visualization_msgs::MarkerArray waypoint_markers;
 
+    // routes_[0]
+    // waypoints_[0]
     int count_id = 0;
     for(int i = 0; i < routes_.size(); i++){
         int id = routes_[i];
@@ -71,6 +72,7 @@ void GlobalPathCreator::make_global_path()
                 tmp_path_point.pose.position.y = waypoints_[j].y;
                 tmp_path_point.header.frame_id = "map"; 
                 global_path.poses.push_back(tmp_path_point);
+                std::cout << "route_id: " << id << std::endl;
 
                 visualization_msgs::Marker id_mk;
                 id_mk.header.frame_id = "map";
@@ -117,9 +119,11 @@ void GlobalPathCreator::make_global_path()
         } 
     }
     global_path.header.frame_id = "map";
-    // std::cout << "marker array_size: " << id_markers.markers.size() << " " << waypoint_markers.markers.size() << std::endl;
+    // id_markers.header.frame_id = "map";
+    // waypoint_markers.header.frame_id = "map";
+    std::cout << "marker array_size: " << id_markers.markers.size() << " " << waypoint_markers.markers.size() << std::endl;
     int count = 0;
-    while(count < 10){
+    while(1){
         pub_path.publish(global_path);
         pub_id.publish(id_markers);
         pub_waypoint.publish(waypoint_markers);
@@ -129,11 +133,13 @@ void GlobalPathCreator::make_global_path()
 void GlobalPathCreator::process()
 {
     while(ros::ok()){
+        // pub_path.publish(global_path);
+        // ros::spinOnce();
     }
 }
 int main (int argc, char **argv)
 {
-  ros::init(argc, argv, "global_path_creator");
+  ros::init(argc,argv,"global_path_creator");
   GlobalPathCreator global_path_creator;
   global_path_creator.process();
   return 0;

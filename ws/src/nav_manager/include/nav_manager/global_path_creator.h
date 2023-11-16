@@ -12,10 +12,6 @@
 #include "nav_manager/waypoints.h"
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
-// #include <amsl_navigation_msgs/Node.h>
-// #include <amsl_navigation_msgs/Edge.h>
-// #include <amsl_navigation_msgs/NodeEdgeMap.h>
-// #include <amsl_navigation_msgs/Replan.h>
 class GlobalPathCreator
 {
 public:
@@ -23,9 +19,7 @@ public:
     void process();
 
 private:
-    // void map_callback(const nav_msgs::OccupancyGrid::ConstPtr&);
     // void path_callback(const std_msgs::Int32MultiArray::ConstPtr&);
-    // void node_edge_map_callback(const amsl_navigation_msgs::NodeEdgeMapConstPtr&);
     void load_waypoints();
     void load_route();
     void make_global_path();
@@ -48,8 +42,5 @@ private:
 
     nav_msgs::Path global_path;
     nav_msgs::Path waypoint_path;
-    // amsl_navigation_msgs::NodeEdgeMap map;
-    // std_msgs::Int32MultiArray check_points;
-    // std_msgs::Int32MultiArray global_path_num;
 };
-#endif// __SIMPLE_LOCALMAP_CREATOR_H
+#endif

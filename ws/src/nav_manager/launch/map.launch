@@ -7,4 +7,5 @@
         <param name="interval" value="3" />
     </node>
 
+    <node pkg="rviz" type="rviz_map" name="rviz_map" args="-d $(find nav_manager)/config/map.rviz" />
 </launch>
