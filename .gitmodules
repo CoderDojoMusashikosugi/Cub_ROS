@@ -5,3 +5,6 @@
 	path = ws/src/rosserial
 	url = https://github.com/CoderDojoMusashikosugi/rosserial
 
+[submodule "ws/src/state_lattice_planner"]
+	path = ws/src/state_lattice_planner
+	url = https://github.com/CoderDojoMusashikosugi/state_lattice_planner.git
