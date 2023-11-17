@@ -5,11 +5,20 @@
       <color rgba="1.0 1.0 1.0 1.0"/>
     </material>
 
-    <link name="${base_footprint}"/>
+    <!-- this is setting for "odometory -> base_footprint -> base_link" type  -->
+    <!-- <link name="${base_footprint}"/>
     <joint name="base_footprint_joint" type="fixed">
       <origin xyz="0.045 0 0" rpy="0 0 0" />
       <parent link="${base_footprint}" />
       <child link="${base_link}" />
+    </joint> -->
+
+    <!-- this is setting for "base_link -> odometory" type  -->
+    <link name="odometory"/>
+    <joint name="odometory_joint" type="fixed">
+      <origin xyz="0.045 0 0" rpy="0 0 0" />
+      <parent link="${base_link}" />
+      <child link="odometory" />
     </joint>
 
     <link name="${base_link}"/>
@@ -42,7 +51,7 @@
       </inertial>
     </link>
 
-    <joint name="wheel_left_joint" type="continuous">
+    <!-- <joint name="wheel_left_joint" type="continuous">
       <origin xyz="0.045 0.1225 0.1025" rpy="${-pi/2} 0 0" />
       <parent link="${base_link}" />
       <child link="wheel_left" />
@@ -57,7 +66,12 @@
       <joint name="wheel_left_joint">
         <hardwareInterface>hardware_interface/VelocityJointInterface</hardwareInterface>
       </joint>
-    </transmission>
+    </transmission> -->
+    <joint name="wheel_left_joint" type="fixed">
+      <origin xyz="0.045 0.1225 0.1025" rpy="${-pi/2} 0 0" />
+      <parent link="${base_link}" />
+      <child link="wheel_left" />
+    </joint>
     <link name="wheel_left">
       <visual>
         <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -89,7 +103,7 @@
       <kd value="100" />
     </gazebo>
 
-    <joint name="wheel_right_joint" type="continuous">
+    <!-- <joint name="wheel_right_joint" type="continuous">
       <origin xyz="0.045 -0.1225 0.1025" rpy="${pi/2} 0 0" />
       <parent link="${base_link}" />
       <child link="wheel_right" />
@@ -104,7 +118,12 @@
       <joint name="wheel_right_joint">
         <hardwareInterface>hardware_interface/VelocityJointInterface</hardwareInterface>
       </joint>
-    </transmission>
+    </transmission> -->
+    <joint name="wheel_right_joint" type="fixed">
+      <origin xyz="0.045 -0.1225 0.1025" rpy="${pi/2} 0 0" />
+      <parent link="${base_link}" />
+      <child link="wheel_right" />
+    </joint>
     <link name="wheel_right">
       <visual>
         <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -135,13 +154,21 @@
       <kd value="100" />
     </gazebo>
 
-    <joint name="caster_joint" type="continuous">
+    <!-- <joint name="caster_joint" type="continuous">
       <origin xyz="-0.156 0.0 0.0" rpy="0 0 0" />
       <parent link="${base_link}" />
       <child link="caster" />
       <limit effort="1" velocity="1"/>
       <axis xyz="0 0 1"/>
+    </joint> -->
+    <joint name="caster_joint" type="fixed">
+      <origin xyz="-0.156 0.0 0.0" rpy="0 0 0" />
+      <parent link="${base_link}" />
+      <child link="caster" />
     </joint>
+    <origin xyz="0.045 -0.1225 0.1025" rpy="${pi/2} 0 0" />
+      <parent link="${base_link}" />
+      <child link="wheel_right" />
     <link name="caster">
       <visual>
         <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -165,7 +192,7 @@
       </inertial>
     </link>
 
-    <joint name="head_joint" type="revolute">
+    <!-- <joint name="head_joint" type="revolute">
       <origin xyz="-0.03989 0.0 0.66" rpy="0 0 0" />
       <parent link="${base_link}" />
       <child link="head" />
@@ -180,7 +207,12 @@
       <joint name="head_joint">
         <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
       </joint>
-    </transmission>
+    </transmission> -->
+    <joint name="head_joint" type="fixed">
+      <origin xyz="-0.03989 0.0 0.66" rpy="0 ${30.0*pi/180.0} 0" />
+      <parent link="${base_link}" />
+      <child link="head" />
+    </joint>
     <link name="head">
       <visual>
         <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -225,12 +257,12 @@
       <material>Gazebo/Black</material>
     </gazebo>
 
-    <joint name="hesai_joint" type="fixed">
+    <joint name="Pandar_joint" type="fixed">
       <origin xyz="-0.02 0.0 0.3947" rpy="0 0 0" />
       <parent link="${base_link}" />
-      <child link="hesai" />
+      <child link="Pandar" />
     </joint>
-    <link name="hesai">
+    <link name="Pandar">
       <visual>
         <origin xyz="0 0 0" rpy="0 0 0"/>
         <geometry>
@@ -239,7 +271,7 @@
         <material name="white"/>
       </visual>
     </link>
-    <gazebo reference="hesai">
+    <gazebo reference="Pandar">
       <material>Gazebo/White</material>
     </gazebo>
 
