@@ -12,7 +12,7 @@
 #define EMERGENCY_MONITOR (GPIO_NUM_25) //GPIO25ピンを緊急停止ボタンの電圧モニタに利用
 #define EMERGENCY_STOP (0) //ストップ状態
 #define NUM_STRIPS 1
-#define NUM_LEDS_PER_STRIP 18
+#define NUM_LEDS_PER_STRIP 30
 #define BRIGHTNESS  255
 CRGB leds[NUM_STRIPS][NUM_LEDS_PER_STRIP];
 #define PIN_TO_LEDS 23  // connect to GPIO23
@@ -192,7 +192,7 @@ void loop()
         if (ps5.R1() && ps5.L1()) { //左右スティックモード
           int left_vel = (int)(SPEED_MAX*ps5.LStickY()/128);
           int right_vel = (int)(SPEED_MAX*ps5.RStickY()/128);
-          vehicle_run(-right_vel,left_vel);
+          vehicle_run(right_vel,left_vel);
           // Serial.print("Run ");
           // Serial.print(left_vel);
           // Serial.print(",");
@@ -213,8 +213,8 @@ void loop()
 
           int left_vel = (int)(speed_limit*val_LStickY/128)+(int)(rotation_limit*val_LStickX/128);
           int right_vel = (int)(speed_limit*val_LStickY/128)-(int)(rotation_limit*val_LStickX/128);
-          vehicle_run(-right_vel,left_vel);
-          // Serial.print("Run ");
+          vehicle_run(right_vel,left_vel);
+          // Serial.prsint("Run ");
           // Serial.print(left_vel);
           // Serial.print(",");
           // Serial.print(right_vel);
@@ -363,7 +363,7 @@ void loop()
       // This inner loop will go over each led in the current strip, one at a time
         if(toggle_flag){
           CRGB color = CRGB::Red;
-          if(operation_mode == AUTONOMOUS)color = CRGB::Blue;
+          if(operation_mode == AUTONOMOUS)color = CRGB( 0, 255, 0);
           else if(operation_mode == REMOTE_CTRL)color = CRGB::Yellow;
           else color = CRGB::Red;
           fill_solid(leds[x], NUM_LEDS_PER_STRIP, color);
@@ -392,7 +392,7 @@ void motor_brake(){
 }
 
 void vehicle_run(int right, int left){
-  Speed[0]=right;
+  Speed[0]=-right;
   Speed[1]=left;
   brake = Brake_Disable;
 } 
@@ -412,7 +412,7 @@ void ros_update(int speed_left, int speed_right, int position_left, int position
   // test
   // geometry_msgs::Twist twist;
   // twist.linear.x = 0.0;
-  // twist.angular.z = 0.1;
+  // twist.angular.z = 0.261799;
   // callBack_motor_control(twist);
 }
 
@@ -514,15 +514,19 @@ void callBack_motor_control(const geometry_msgs::Twist& twist)
 {
   if(operation_mode == AUTONOMOUS){
     /*モーター速度の計算*/
+    float x, z;
+    x = isnan(twist.linear.x) ? 0.0f : twist.linear.x;
+    z = isnan(twist.angular.z) ? 0.0f : twist.angular.z;
+
     float left_velocity, right_velocity;
-    left_velocity = (twist.angular.z * BASE_WIDTH - 2.0f * twist.linear.x) / (-2.0f); // vL[m/s] = (トレッド幅[m] × 角速度[rad/s] - 2 × 並進速度[m/s]) ÷ -2
-    right_velocity = (twist.angular.z * BASE_WIDTH + 2.0f * twist.linear.x) / 2.0f; // vR[m/s] = (トレッド幅[m] × 角速度[rad/s] + 2 × 並進速度[m/s]) ÷ 2
+    left_velocity = (z * BASE_WIDTH - 2.0f * x) / (-2.0f); // vL[m/s] = (トレッド幅[m] × 角速度[rad/s] - 2 × 並進速度[m/s]) ÷ -2
+    right_velocity = (z * BASE_WIDTH + 2.0f * x) / 2.0f; // vR[m/s] = (トレッド幅[m] × 角速度[rad/s] + 2 × 並進速度[m/s]) ÷ 2
     float left_rpm, right_rpm;
     left_rpm =  left_velocity * 60.0f / (2.0f * M_PI * WHEEL_TIRE_RADIUS); // ωL[rad/s] = 速度 × 60秒 ÷ 2πR
     right_rpm = right_velocity * 60.0f / (2.0f * M_PI * WHEEL_TIRE_RADIUS); // ωR[rad/s] = 速度 × 60秒 ÷ 2πR
-    vehicle_run((int)right_velocity, (int)left_velocity);
+    vehicle_run((int)left_rpm, (int)right_rpm);
     char buf[100];
-    sprintf(buf, "motor_ctrl %.2f, %.2f", left_rpm, right_rpm);
+    sprintf(buf, "motor_ctrl %.2f, %.2f, %.2f, %.2f", twist.linear.x, twist.angular.z, left_rpm, right_rpm);
     // Serial.println(buf);
     nh.loginfo(buf);
   }else{
