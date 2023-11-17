@@ -409,7 +409,9 @@ void ros_setup(){
 }
 
 void ros_update(int speed_left, int speed_right, int position_left, int position_right){
-  twist_reset_check();
+  if(operation_mode == AUTONOMOUS){
+    twist_reset_check();
+  }
   odometry_udate(speed_left, speed_right, position_left, position_right); // write odom_msg
   odomPublisher.publish(&odom_msg);
   nh.spinOnce();
