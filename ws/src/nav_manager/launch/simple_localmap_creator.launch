@@ -1,5 +1,16 @@
 <launch>
+	<arg name="width"  default="20.0"/>
+	<arg name="resolution"  default="0.1"/>
+	<arg name="max_height"  default="5.0"/>
+	<arg name="min_height"  default="0.05"/>
+	<arg name="expand_radius"  default="0.1"/>
+
     <node pkg="nav_manager" type="simple_localmap_creator" name="simple_localmap_creator" output="screen">
+		<param name="width" type="double" value="$(arg width)"/>
+		<param name="resolution" type="double" value="$(arg resolution)"/>
+		<param name="max_height" type="double" value="$(arg max_height)"/>
+		<param name="min_height" type="double" value="$(arg min_height)"/>
+		<param name="expand_radius" type="double" value="$(arg expand_radius)"/>
 	</node>
 
     <!-- tf -->

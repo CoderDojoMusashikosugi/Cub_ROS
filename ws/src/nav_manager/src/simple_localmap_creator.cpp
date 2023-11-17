@@ -7,15 +7,22 @@ SimpleLocalmapCreator::SimpleLocalmapCreator(void)
     localmap_expand_pub_ = nh_.advertise<nav_msgs::OccupancyGrid>("local_map/expand", 1);
     cloud_sub_ = nh_.subscribe("/velodyne_obstacles", 1, &SimpleLocalmapCreator::cloud_callback, this, ros::TransportHints().reliable().tcpNoDelay());
 
-    local_nh_.param("width", width_, 20.0);
-    local_nh_.param("resolution", resolution_, 0.1);
-    local_nh_.param("max_height", max_height_, 1.5);
-    local_nh_.param("min_height", min_height_, 0.05);
+    double width, resolution, max_height, min_height, expand_radius;
+    nh_.getParam("width", width);
+    nh_.getParam("resolution", resolution);
+    nh_.getParam("max_height", max_height);
+    nh_.getParam("min_height", min_height);
+    nh_.getParam("expand_radius", expand_radius);
+
+    local_nh_.param("width", width_, width);
+    local_nh_.param("resolution", resolution_, resolution);
+    local_nh_.param("max_height", max_height_, max_height);
+    local_nh_.param("min_height", min_height_, min_height);
     grid_width_ = std::round(width_ / resolution_);
     grid_width_2_ = grid_width_ / 2;
     range_ = width_ * 0.5;
     grid_size_ = grid_width_ * grid_width_;
-    local_nh_.param("expand_radius", expand_radius_, 0.3);
+    local_nh_.param("expand_radius", expand_radius_, expand_radius);
     ROS_INFO_STREAM("width: " << width_);
     ROS_INFO_STREAM("max_height: " << max_height_);
     ROS_INFO_STREAM("min_height: " << min_height_);
