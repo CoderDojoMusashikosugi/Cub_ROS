@@ -1,5 +1,0 @@
-<launch>
-    <!-- <include file="$(find cub_description)/launch/robot_state_publisher.launch"/> -->
-    <!-- <include file="$(find cub_bringup)/launch/hardware.launch"/> -->
-    <include file="$(find nav_manager)/launch/start_rwrc23.launch"/>
-</launch>
