@@ -14,8 +14,8 @@
     <!-- local_path_planner -->
     <include file="$(find state_lattice_planner)/launch/local_planner.launch"/>
     <!-- tf -->
-    <include file="$(find ekf_localizer)/launch/tf_cub.launch"/>
-
+    <include file="$(find cub_description)/launch/robot_state_publisher.launch"/>
+    
     <!-- rviz -->
     <!-- <node pkg="rviz" type="rviz" name="rviz" args="-d $(find nav_manager)/config/nav_manager.rviz" /> -->
 </launch>
