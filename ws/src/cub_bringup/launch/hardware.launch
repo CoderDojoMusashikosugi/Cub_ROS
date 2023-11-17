@@ -1,5 +1,2 @@
 <launch>
-    <include file="$(find nav_manager)/launch/empty_map.launch"/>
-    
-    <include file="$(find state_lattice_planner)/launch/local_planner.launch"/>
 </launch>

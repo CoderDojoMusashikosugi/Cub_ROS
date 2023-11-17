@@ -1,11 +1,5 @@
 <launch>
-  <node pkg="tf2_ros" type="static_transform_publisher" name="map_to_odom_tf_publisher" output="screen" args=" 0 0 0 0 0 0 map odometry" />
-  <!-- <node pkg="tf2_ros" type="static_transform_publisher" name="odom_to_base_footprint_tf_publisher" output="screen" args=" 0 0 0 0 0 0 odom base_footprint" /> -->
-    <node name="odom_tf" pkg="nav_manager" type="odom_tf.py" output="screen"/>
-
-    <include file="$(find cub_description)/launch/robot_state_publisher.launch"/>
-       
-    <include file="$(find cub_bringup)/launch/nav.launch"/>
-
-  	<node name="rviz" pkg="rviz" type="rviz" args="-d $(find cub_bringup)/config/rviz.rviz" required="true" /> 
+    <!-- <include file="$(find cub_description)/launch/robot_state_publisher.launch"/> -->
+    <include file="$(find cub_bringup)/launch/hardware.launch"/>
+    <include file="$(find nav_manager)/launch/start_rwrc23.launch"/>
 </launch>
