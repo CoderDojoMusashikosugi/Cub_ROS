@@ -34,12 +34,14 @@ struct ODOMETRY{
   double last_theta;
   double pos_x;
   double pos_y;
-  unsigned long update_millis;
   double left_distance;
   double right_distance;
   int last_position_left;
   int last_position_right;
 };
+
+#define TWIST_RESET_MILLIS 1000
+unsigned long twist_last_millis;
 
 int operation_mode = AUTONOMOUS;
 
@@ -400,12 +402,14 @@ void vehicle_run(int right, int left){
 void ros_setup(){
   nh.initNode();
   nh.subscribe(twistSubscriber);
+  twist_last_millis = millis();
   nh.subscribe(resetSubscriber);
   nh.advertise(odomPublisher);
   odometry_reset(&odom);
 }
 
 void ros_update(int speed_left, int speed_right, int position_left, int position_right){
+  twist_reset_check();
   odometry_udate(speed_left, speed_right, position_left, position_right); // write odom_msg
   odomPublisher.publish(&odom_msg);
   nh.spinOnce();
@@ -416,12 +420,25 @@ void ros_update(int speed_left, int speed_right, int position_left, int position
   // callBack_motor_control(twist);
 }
 
+void twist_reset_check(){
+  unsigned long interval_millis, now_millis;
+  now_millis = millis();
+  if(now_millis >= twist_last_millis){
+    interval_millis = now_millis - twist_last_millis;
+  }else{
+    interval_millis = ~(twist_last_millis - now_millis) + 1;
+  }
+  if(twist_last_millis > TWIST_RESET_MILLIS){
+    vehicle_run(0, 0);
+    twist_last_millis = now_millis;
+  }
+}
+
 void odometry_reset(struct ODOMETRY* odom){
   odom->is_reset_req = false;
   odom->last_theta = 0.0;
   odom->pos_x= 0.0;
   odom->pos_y = 0.0;
-  odom->update_millis = millis();
   odom->left_distance = 0.0;
   odom->right_distance = 0.0;
   odom->last_position_left = POSITION_UNKNOWN;
@@ -433,13 +450,7 @@ void odometry_udate(int speed_left, int speed_right, int position_left, int posi
     odometry_reset(&odom);
     return;
   }
-  unsigned long interval_millis, now_millis;
-  now_millis = millis();
-  if(now_millis >= odom.update_millis){
-    interval_millis = now_millis - odom.update_millis;
-  }else{
-    interval_millis = ~(odom.update_millis - now_millis) + 1;
-  }
+  
   int angle_left, angle_right;
   angle_left = get_angle(position_left, odom.last_position_left);
   angle_right = get_angle(position_right, odom.last_position_right);
@@ -468,7 +479,6 @@ void odometry_udate(int speed_left, int speed_right, int position_left, int posi
   odom.pos_x += d_x;
   odom.pos_y += d_y;  
   odom.last_theta = theta;
-  odom.update_millis = now_millis;
   odom.left_distance += left_distance;
   odom.right_distance += right_distance;
   
@@ -525,6 +535,7 @@ void callBack_motor_control(const geometry_msgs::Twist& twist)
     left_rpm =  left_velocity * 60.0f / (2.0f * M_PI * WHEEL_TIRE_RADIUS); // ωL[rad/s] = 速度 × 60秒 ÷ 2πR
     right_rpm = right_velocity * 60.0f / (2.0f * M_PI * WHEEL_TIRE_RADIUS); // ωR[rad/s] = 速度 × 60秒 ÷ 2πR
     vehicle_run((int)left_rpm, (int)right_rpm);
+    twist_last_millis = millis();
     char buf[100];
     sprintf(buf, "motor_ctrl %.2f, %.2f, %.2f, %.2f", twist.linear.x, twist.angular.z, left_rpm, right_rpm);
     // Serial.println(buf);
