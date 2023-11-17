@@ -1,2 +1,7 @@
 <launch>
+    <include file="$(find hesai_lidar)/launch/hesai_lidar.launch">
+        <arg name="server_ip" default="192.168.1.201"/>
+        <arg name="lidar_type" default="PandarXT-32"/>
+        <arg name="frame_id" default="Pander"/>
+    </include>
 </launch>
