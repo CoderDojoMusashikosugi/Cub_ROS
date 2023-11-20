@@ -91,6 +91,7 @@ void NextWaypointCreator::process()
             select_next_goal();
             next_waypoint.header.frame_id = "map";
             std::cout<<"next_waypoint :"<<next_waypoint.pose.position.x<<","<<next_waypoint.pose.position.y<<std::endl;
+            next_waypoint.pose.orientation.w=1.0;
             pub_next_waypoint.publish(next_waypoint);
         }
         ros::spinOnce();

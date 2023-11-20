@@ -6,19 +6,19 @@
     </material>
 
     <!-- this is setting for "odometory -> base_footprint -> base_link" type  -->
-    <!-- <link name="${base_footprint}"/>
+    <link name="${base_footprint}"/>
     <joint name="base_footprint_joint" type="fixed">
       <origin xyz="0.045 0 0" rpy="0 0 0" />
       <parent link="${base_footprint}" />
       <child link="${base_link}" />
-    </joint> -->
+    </joint>
 
-    <!-- this is setting for "base_link -> odometory" type  -->
-    <link name="odometory"/>
-    <joint name="odometory_joint" type="fixed">
+    <!-- this is setting for "base_link -> odometry" type  -->
+    <link name="odometry"/>
+    <joint name="odometry_joint" type="fixed">
       <origin xyz="0.045 0 0" rpy="0 0 0" />
       <parent link="${base_link}" />
-      <child link="odometory" />
+      <child link="odometry" />
     </joint>
 
     <link name="${base_link}"/>
@@ -258,7 +258,7 @@
     </gazebo>
 
     <joint name="Pandar_joint" type="fixed">
-      <origin xyz="-0.02 0.0 0.3947" rpy="0 0 0" />
+      <origin xyz="-0.02 0.0 0.3947" rpy="0 0 ${90.0*pi/180.0}" />
       <parent link="${base_link}" />
       <child link="Pandar" />
     </joint>

@@ -2,10 +2,11 @@
 <launch>
     <!-- point_cloud map -->
     <node pkg="pcl_ros" type="pcd_to_pointcloud" name="pcd_to_pointcloud" output="screen">
-        <param name="file_name" value="/home/ubuntu/Downloads/0.15_map_all.pcd" />
+        <!-- <param name="file_name" value="/home/musashikosugi/Downloads/0.15_map_all.pcd" /> -->
+        <param name="file_name" value="/home/musashikosugi/Downloads/test_trans.pcd" />
         <param name="frame_id" value="map" />
-        <param name="interval" value="3" />
+        <param name="interval" value="5" />
     </node>
 
-    <node pkg="rviz" type="rviz_map" name="rviz_map" args="-d $(find nav_manager)/config/map.rviz" />
+    <node pkg="rviz" type="rviz" name="rviz_map" args="-d $(find nav_manager)/config/map.rviz" />
 </launch>

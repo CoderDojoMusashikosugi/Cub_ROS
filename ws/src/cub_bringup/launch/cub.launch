@@ -5,4 +5,7 @@
         <include file="$(find cub_bringup)/launch/hardware.launch"/>
     </group>
     <include file="$(find nav_manager)/launch/start_rwrc23.launch"/>
+ 	<!-- <node name="map_to_baselink" pkg="tf2_ros" type="static_transform_publisher" args="0 0 0 0 0 0 map odometry"/> -->
+ 	<!-- <node name="odom_to_base_footprint" pkg="tf2_ros" type="static_transform_publisher" args="0 0 0 0 0 0 odometry base_footprint"/> -->
+
 </launch>

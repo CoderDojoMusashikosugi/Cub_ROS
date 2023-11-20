@@ -1,6 +1,6 @@
 <launch>
     <node pkg="nav_manager" type="global_path_creator" name="global_path_creator">
-        <rosparam command="load" file="$(find nav_manager)/config/test_waypoints_list.yaml" />
+        <rosparam command="load" file="$(find nav_manager)/config/shiyakusyo_half.yaml" />
         <!-- <rosparam command="load" file="$(find nav_manager)/config/waypoints_list.yaml" /> -->
         <rosparam command="load" file="$(find nav_manager)/config/route_list.yaml" />
 	</node>
