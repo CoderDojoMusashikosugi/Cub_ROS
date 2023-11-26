@@ -886,7 +886,7 @@ class BoschIMU:
     def get_gravity(self):
 
         # Get gravity vector data
-        self.raw_gravity
+        response = self.raw_gravity
 
         # Get gravity axis data
         raw_gravity_x = int.from_bytes(response[0:2], 'little',  signed= True) 

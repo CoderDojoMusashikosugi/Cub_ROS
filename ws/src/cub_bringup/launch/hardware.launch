@@ -8,4 +8,5 @@
         <param name="port" value="/dev/ttyATOM" />
         <param name="baud" value="57600" />
     </node>
+    <include file="$(find ros_imu_bno055)/launch/imu.launch"/>
 </launch>

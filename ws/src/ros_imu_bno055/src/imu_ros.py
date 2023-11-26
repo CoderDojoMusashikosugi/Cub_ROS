@@ -275,7 +275,8 @@ class SensorIMU:
         imu_data = Imu()  
         
         quaternion = self.bno055.get_quaternion_orientation()
-        linear_acceleration = self.bno055.get_linear_acceleration()
+        # linear_acceleration = self.bno055.get_linear_acceleration()
+        linear_acceleration = self.bno055.get_gravity()
         gyroscope = self.bno055.get_gyroscope()
         
         imu_data.header.stamp = rospy.Time.now()

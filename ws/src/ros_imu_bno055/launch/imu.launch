@@ -1,7 +1,7 @@
 <?xml version="1.0"?> 
 <launch>
 
-    <arg name="serial_port" default="/dev/ttyUSB0" />
+    <arg name="serial_port" default="/dev/ttyBNO055" />
     <arg name="frame_id" default="imu_link" />
     <arg name="operation_mode" default="IMU"/>
     <arg name="oscillator" default="INTERNAL" />

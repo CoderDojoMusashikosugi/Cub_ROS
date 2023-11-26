@@ -275,6 +275,24 @@
       <material>Gazebo/White</material>
     </gazebo>
 
+    <joint name="imu_joint" type="fixed">
+      <origin xyz="-0.02 0.0 0.3" rpy="0 0 ${-90.0*pi/180.0}" />
+      <parent link="${base_link}" />
+      <child link="imu_link" />
+    </joint>
+    <link name="imu_link">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+          <box size="0.05 0.05 0.02"/>
+        </geometry>
+        <material name="white"/>
+      </visual>
+    </link>
+    <gazebo reference="imu_link">
+      <material>Gazebo/White</material>
+    </gazebo>
+
   <gazebo>
     <plugin name="gazebo_ros_control" filename="libgazebo_ros_control.so">
       <robotNamespace>/cub</robotNamespace>
