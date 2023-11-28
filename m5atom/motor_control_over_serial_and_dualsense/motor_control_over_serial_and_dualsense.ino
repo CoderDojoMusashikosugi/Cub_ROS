@@ -161,32 +161,38 @@ void loop()
 {
   int emergency_status = digitalRead(EMERGENCY_MONITOR);
 
-  if (emergency_status == EMERGENCY_STOP){
+  if (emergency_status == EMERGENCY_STOP){//緊急停止ピン=Highの場合
     motor_brake();
-    //Serial.println("Emergency Stop");
+    //Indicator LED
+    EVERY_N_MILLISECONDS(500) {
+      for(int x = 0; x < NUM_STRIPS; x++) {
+        // This inner loop will go over each led in the current strip, one at a time
+          if(toggle_flag){
+            CRGB color = CRGB::Red;
+            fill_solid(leds[x], NUM_LEDS_PER_STRIP, color);
+            toggle_flag=false;
+          }
+          else {
+            fill_solid(leds[x], NUM_LEDS_PER_STRIP, CRGB::Black);
+            toggle_flag=true;
+          }
+          FastLED.show();
+      }
+    }
   }
-  else{    
+  else{ //緊急停止ではない場合
     if (ps5.isConnected() == true) {
-      if (ps5.Options()){
+      if (ps5.Options()){ //自立走行モード
         operation_mode = AUTONOMOUS;
-        // ps5.setLed(255, 0, 0); //Set LED to Red
-        // //Serial.println("Command Mode");
-        // ps5.setFlashRate(1000,1000); // Range: 0->2550 ms, Set to 0, 0 for the light to remain on
-        // ps5.sendToController(); //Send LED color to DualSense」
         delay(5);
       }
       else if (ps5.Share()){
-        operation_mode = REMOTE_CTRL;
-        // ps5.setLed(0, 255, 0); //Set LED to Green
-        // //Serial.println("Remote Control Mode");
-        // ps5.setFlashRate(1000,1000); // Range: 0->2550 ms, Set to 0, 0 for the light to remain on
-        // ps5.sendToController(); //Send LED color to DualSense
+        operation_mode = REMOTE_CTRL; //遠隔操作モード
         delay(5);
       }
 
       //set Motor Speed on each Operation Mode
-      if (ps5.Cross()){
-        //Serial.println("Brake");
+      if (ps5.Cross()){ //バツボタンでブレーキ
         motor_brake();
       } 
       else if(operation_mode == REMOTE_CTRL){
@@ -195,11 +201,6 @@ void loop()
           int left_vel = (int)(SPEED_MAX*ps5.LStickY()/128);
           int right_vel = (int)(SPEED_MAX*ps5.RStickY()/128);
           vehicle_run(right_vel,left_vel);
-          // Serial.print("Run ");
-          // Serial.print(left_vel);
-          // Serial.print(",");
-          // Serial.print(right_vel);
-          // Serial.println();
         }
         else if(ps5.L2()){ //左スティックモード
           int speed_limit = SPEED_MAX; //通常の走行では100で十分
@@ -216,169 +217,57 @@ void loop()
           int left_vel = (int)(speed_limit*val_LStickY/128)+(int)(rotation_limit*val_LStickX/128);
           int right_vel = (int)(speed_limit*val_LStickY/128)-(int)(rotation_limit*val_LStickX/128);
           vehicle_run(right_vel,left_vel);
-          // Serial.prsint("Run ");
-          // Serial.print(left_vel);
-          // Serial.print(",");
-          // Serial.print(right_vel);
-          // Serial.println();
         } 
         else {
-        //  Serial.println("Free");
          motor_stop();
         }
       }
+    }
 
-      /*
-      if (ps5.Right()) Serial.println("Right Button");
-      if (ps5.Down()) Serial.println("Down Button");
-      if (ps5.Up()) Serial.println("Up Button");
-      if (ps5.Left()) Serial.println("Left Button");
-      if (ps5.Square()) Serial.println("Square Button");
-      if (ps5.Cross()) Serial.println("Cross Button");
-      if (ps5.Circle()) Serial.println("Circle Button");
-      if (ps5.Triangle()) Serial.println("Triangle Button");
-      if (ps5.UpRight()) Serial.println("Up Right");
-      if (ps5.DownRight()) Serial.println("Down Right");
-      if (ps5.UpLeft()) Serial.println("Up Left");
-      if (ps5.DownLeft()) Serial.println("Down Left");
-      if (ps5.L1()) Serial.println("L1 Button");
-      if (ps5.R1()) Serial.println("R1 Button");
-      if (ps5.Share()) Serial.println("Share Button");
-      if (ps5.Options()) Serial.println("Options Button");
-      if (ps5.L3()) Serial.println("L3 Button");
-      if (ps5.R3()) Serial.println("R3 Button");
-      if (ps5.PSButton()) Serial.println("PS Button");
-      if (ps5.Touchpad()) Serial.println("Touch Pad Button");
-      if (ps5.L2()) {
-        Serial.printf("L2 button at %d\n", ps5.L2Value());
+    //Set motor speed and report
+    int wheel_sp_L = 0; 
+    int wheel_sp_R = 0;
+    int wheel_pos_L = 0;
+    int wheel_pos_R = 0;
+
+    ID=1; //Wheel R
+    motor_handler.Control_Motor(Speed[0], ID, Acce, brake, &Rcv);//スピード0：モーター停止
+    delay(5);//1回の通信ごとに5msのWaitが必要（RS485の半二重通信の問題と思われる）
+    wheel_sp_R=Rcv.BSpeed;
+    Act_Speed[0]=wheel_sp_R;
+    wheel_pos_R=  wheel_pos_L= (double)((POS_MAX-Rcv.Position) & 0x7ffc) * 360 / POS_MAX; //モーターの向きに合わせて符号を設定
+    Act_Pos[0]=wheel_pos_R;
+
+    ID=2; //Wheel L
+    motor_handler.Control_Motor(Speed[1], ID, Acce, brake, &Rcv);//スピード0：モーター停止
+    wheel_sp_L=-Rcv.BSpeed; //モーターの向きに合わせて符号を設定
+    Act_Speed[1]=wheel_sp_L;
+    wheel_pos_L= (double)(Rcv.Position & 0x7ffc) * 360 / POS_MAX; 
+    Act_Pos[1]=wheel_pos_L;
+    delay(5);
+
+    ros_update(wheel_sp_L, wheel_sp_R, wheel_pos_L, wheel_pos_R);
+
+    //Indicator LED
+    EVERY_N_MILLISECONDS(500) {
+      for(int x = 0; x < NUM_STRIPS; x++) {
+        // This inner loop will go over each led in the current strip, one at a time
+          if(toggle_flag){
+            CRGB color = CRGB::Red;
+            if(operation_mode == AUTONOMOUS)color = CRGB( 0, 255, 0);
+            else if(operation_mode == REMOTE_CTRL)color = CRGB::Yellow;
+            else color = CRGB::Red;
+            fill_solid(leds[x], NUM_LEDS_PER_STRIP, color);
+            toggle_flag=false;
+          }
+          else {
+            fill_solid(leds[x], NUM_LEDS_PER_STRIP, CRGB::Black);
+            toggle_flag=true;
+          }
+          FastLED.show();
       }
-      if (ps5.R2()) {
-        Serial.printf("R2 button at %d\n", ps5.R2Value());
-      }
-      if (ps5.LStickX()) {
-        Serial.printf("Left Stick x at %d\n", ps5.LStickX());
-      }
-      if (ps5.LStickY()) {
-        Serial.printf("Left Stick y at %d\n", ps5.LStickY());
-      }
-      if (ps5.RStickX()) {
-        Serial.printf("Right Stick x at %d\n", ps5.RStickX());
-      }
-      if (ps5.RStickY()) {
-        Serial.printf("Right Stick y at %d\n", ps5.RStickY());
-      }
-      // This delay is to make the output more human readable
-      // Remove it when you're not trying to see the output
-      //delay(300);*/
     }
   }
-
-  // if(operation_mode == AUTONOMOUS){
-  //   if (Serial.available() > 0) {
-  //     String text = Serial.readStringUntil('\n');
-  //     //Ex:100,-200: Right Motor = Speed 100 / Left Motor = Speed -200
-  //     //Serial.println(text);
-  //     int data[3];
-  //     stringToIntValues( text, data, ',' );
-  //     int cmd_speed[2]={0,0};
-  //     switch(data[0]) {
-  //       case 1: //Move
-  //         for(int i = 0; i<=1; i++){
-  //           delay(5);
-  //           int sp = data[i+1];
-  //           //入力データ範囲Check＆速度制限
-  //           if(sp <= AUTO_MAX && sp >= -AUTO_MAX)cmd_speed[i]=sp;
-  //           else if(sp>AUTO_MAX)cmd_speed[i]=AUTO_MAX;
-  //           else if(sp<-AUTO_MAX)cmd_speed[i]=-AUTO_MAX;
-  //           else cmd_speed[i]=0;
-  //         }
-  //         vehicle_run(cmd_speed[0],cmd_speed[1]);
-  //         break;
-  //       case 2: //Stop
-  //         motor_stop();
-  //         break;
-  //       case 3: //Stop
-  //         motor_brake();
-  //         break;
-  //       case 4: //Initialize Odometory
-  //         init_odometry_flag = true;
-  //         break;
-  //       case 5: //Get Odometory
-  //         break;
-  //       case 6: //Get Current Velocity
-  //         break;
-  //       case 7: //Get Angle
-  //         break;
-  //     }
-  //   }
-  // }
-
-  //Set motor speed and report
-  int wheel_sp_L = 0; 
-  int wheel_sp_R = 0;
-  int wheel_pos_L = 0;
-  int wheel_pos_R = 0;
-
-  ID=1; //Wheel R
-  // Serial.print("Speed[1]:");
-  // Serial.print(Speed[0]);
-  motor_handler.Control_Motor(Speed[0], ID, Acce, brake, &Rcv);//スピード0：モーター停止
-  delay(5);//1回の通信ごとに5msのWaitが必要（RS485の半二重通信の問題と思われる）
-  // Serial.print("{\"R_VEL\":");
-  wheel_sp_R=Rcv.BSpeed;
-  Act_Speed[0]=wheel_sp_R;
-  // Serial.print(wheel_sp_R);
-  // Serial.print(",\"R_POS\":");
-  wheel_pos_R=  wheel_pos_L= (double)((POS_MAX-Rcv.Position) & 0x7ffc) * 360 / POS_MAX; //モーターの向きに合わせて符号を設定
-  Act_Pos[0]=wheel_pos_R;
-  // Serial.print(wheel_pos_R);
-  // Serial.print(",");
-  ID=2; //Wheel L
-  // Serial.print(",Speed[2]:");
-  // Serial.println(Speed[1]);
-  // Serial.print(Rcv.Position);
-  motor_handler.Control_Motor(Speed[1], ID, Acce, brake, &Rcv);//スピード0：モーター停止
-  // Serial.print("\"L_VEL\":");
-  wheel_sp_L=-Rcv.BSpeed; //モーターの向きに合わせて符号を設定
-  Act_Speed[1]=wheel_sp_L;
-  // Serial.print(wheel_sp_L);
-  // Serial.print(",\"L_POS\":");
-  wheel_pos_L= (double)(Rcv.Position & 0x7ffc) * 360 / POS_MAX; 
-  Act_Pos[1]=wheel_pos_L;
-  // Serial.print(wheel_pos_L);
-  // Serial.print(Rcv.Position);
-  // Serial.println("}");
-  delay(5);
-
-  ros_update(wheel_sp_L, wheel_sp_R, wheel_pos_L, wheel_pos_R);
-
-
-  //TODO: オドメトリを計算する（エンコーダー値0-32767を角度に変換、距離・Yaw角度に変換（タイヤのサイズ、車幅が必要）、原点リセットコマンド（現在のオドメトリを保持）を作る）
-  //TODO: ROS2との接続
-  //TODO: Spurコマンド的な何か（ROSのナビゲーションの基本を調査する）
-  //TODO: ナビゲーション (障害物で停止、指定の距離進む)
-  //
-
-  //Indicator LED
-  EVERY_N_MILLISECONDS(500) {
-    for(int x = 0; x < NUM_STRIPS; x++) {
-      // This inner loop will go over each led in the current strip, one at a time
-        if(toggle_flag){
-          CRGB color = CRGB::Red;
-          if(operation_mode == AUTONOMOUS)color = CRGB( 0, 255, 0);
-          else if(operation_mode == REMOTE_CTRL)color = CRGB::Yellow;
-          else color = CRGB::Red;
-          fill_solid(leds[x], NUM_LEDS_PER_STRIP, color);
-          toggle_flag=false;
-        }
-        else {
-          fill_solid(leds[x], NUM_LEDS_PER_STRIP, CRGB::Black);
-          toggle_flag=true;
-        }
-        FastLED.show();
-    }
-  }
-
 }
 
 void motor_stop(){
