@@ -36,8 +36,8 @@ struct ODOMETRY{
   double pos_y;
   double left_distance;
   double right_distance;
-  int last_position_left;
-  int last_position_right;
+  double last_position_left;
+  double last_position_right;
 };
 
 #define TWIST_RESET_MILLIS 1000
