@@ -65,9 +65,6 @@ int matrix[5][5] = {{3,0,0,0,0},
                     {3,0,0,0,0}};
 
 int16_t Speed[2];   // Speed of motor {Right,Left}
-int16_t Act_Speed[2];   // Actual Speed of motor {Right,Left}
-int16_t Act_Pos[2];   // Actual Position of motor {Right,Left}
-int16_t Act_Pos_Offset[2];   // Actual Position of motor {Right,Left}
 uint8_t Acce = 6;    // Acceleration of motor 実験の結果6ぐらいが最適
 uint8_t Brake_Disable = 0; // Brake position of motor
 uint8_t Brake_Enable = 0xFF;
@@ -234,16 +231,12 @@ void loop()
     motor_handler.Control_Motor(Speed[0], ID, Acce, brake, &Rcv);//スピード0：モーター停止
     delay(5);//1回の通信ごとに5msのWaitが必要（RS485の半二重通信の問題と思われる）
     wheel_sp_R=Rcv.BSpeed;
-    Act_Speed[0]=wheel_sp_R;
     wheel_pos_R= (double)((POS_MAX-Rcv.Position) & 0x7ffc) * 360 / POS_MAX; //モーターの向きに合わせて符号を設定
-    Act_Pos[0]=wheel_pos_R;
 
     ID=2; //Wheel L
     motor_handler.Control_Motor(Speed[1], ID, Acce, brake, &Rcv);//スピード0：モーター停止
     wheel_sp_L=-Rcv.BSpeed; //モーターの向きに合わせて符号を設定
-    Act_Speed[1]=wheel_sp_L;
     wheel_pos_L= (double)(Rcv.Position & 0x7ffc) * 360 / POS_MAX; 
-    Act_Pos[1]=wheel_pos_L;
     delay(5);
 
     ros_update(wheel_sp_L, wheel_sp_R, wheel_pos_L, wheel_pos_R);
