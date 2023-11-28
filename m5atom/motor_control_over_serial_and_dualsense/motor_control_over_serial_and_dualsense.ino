@@ -235,7 +235,7 @@ void loop()
     delay(5);//1回の通信ごとに5msのWaitが必要（RS485の半二重通信の問題と思われる）
     wheel_sp_R=Rcv.BSpeed;
     Act_Speed[0]=wheel_sp_R;
-    wheel_pos_R=  wheel_pos_L= (double)((POS_MAX-Rcv.Position) & 0x7ffc) * 360 / POS_MAX; //モーターの向きに合わせて符号を設定
+    wheel_pos_R= (double)((POS_MAX-Rcv.Position) & 0x7ffc) * 360 / POS_MAX; //モーターの向きに合わせて符号を設定
     Act_Pos[0]=wheel_pos_R;
 
     ID=2; //Wheel L
@@ -297,7 +297,7 @@ void ros_setup(){
   odometry_reset(&odom);
 }
 
-void ros_update(int speed_left, int speed_right, int position_left, int position_right){
+void ros_update(double speed_left, double speed_right, double position_left, double position_right){
   if(operation_mode == AUTONOMOUS){
     twist_reset_check();
   }
@@ -336,13 +336,13 @@ void odometry_reset(struct ODOMETRY* odom){
   odom->last_position_right = POSITION_UNKNOWN;
 }
 
-void odometry_udate(int speed_left, int speed_right, int position_left, int position_right){
+void odometry_udate(double speed_left, double speed_right, double position_left, double position_right){
   if(odom.is_reset_req){
     odometry_reset(&odom);
     return;
   }
   
-  int angle_left, angle_right;
+  double angle_left, angle_right;
   angle_left = get_angle(position_left, odom.last_position_left);
   angle_right = get_angle(position_right, odom.last_position_right);
   // Serial.print(angle_left);
@@ -397,16 +397,16 @@ void odometry_udate(int speed_left, int speed_right, int position_left, int posi
   odom_msg.twist.twist.angular.z = (right_velocity - left_velocity) / BASE_WIDTH;// 角速度[rad/s]
 }
 
-int get_angle(int cur, int last){
+double get_angle(double cur, double last){
   if(last == POSITION_UNKNOWN){
     return 0;
   }
-  int angle = cur - last;
+  double angle = cur - last;
 
-  if(angle >= 180){
-    angle -= 360;
-  }else if(angle < -180){
-    angle += 360;
+  if(angle >= 180.0){
+    angle -= 360.0;
+  }else if(angle < -180.0){
+    angle += 360.0;
   }
   return angle;
 }
