@@ -65,7 +65,7 @@ int matrix[5][5] = {{3,0,0,0,0},
                     {3,0,0,0,0}};
 
 int16_t Speed[2];   // Speed of motor {Right,Left}
-uint8_t Acce = 6;    // Acceleration of motor 実験の結果6ぐらいが最適
+uint8_t Acce = 12;    // Acceleration of motor 実験の結果6ぐらいが最適
 uint8_t Brake_Disable = 0; // Brake position of motor
 uint8_t Brake_Enable = 0xFF;
 uint8_t ID = 1;      // ID of Motor (default:1)
@@ -73,8 +73,7 @@ uint8_t ID = 1;      // ID of Motor (default:1)
 Receiver Rcv;
 // M5Stackのモジュールによって対応するRX,TXのピン番号が違うためM5製品とRS485モジュールに対応させてください
 auto motor_handler = MotorHandler(32, 26); // RX,TX (StickC Plus:33, 32, ATOM:32, 26)
-const int16_t SPEED_MAX = 100; //DDT_M6の最高回転数は200±10rpm
-const int16_t AUTO_MAX = 50; //自律走行の最高速度は100rpmに制限　AUTO_MAX <= SPEED_MAX
+const int16_t SPEED_MAX = 64; //100 DDT_M6の最高回転数は200±10rpm
 const int16_t POS_MAX = 32767; //車輪のエンコーダーの最大値
 uint8_t brake = Brake_Disable;
 
@@ -179,22 +178,30 @@ void loop()
   }
   else{ //緊急停止ではない場合
     if (ps5.isConnected() == true) {
-      if (ps5.Options()){ //自立走行モード
-        operation_mode = AUTONOMOUS;
-        delay(5);
-      }
-      else if (ps5.Share()){
-        operation_mode = REMOTE_CTRL; //遠隔操作モード
-        delay(5);
+      EVERY_N_MILLISECONDS(100) {
+        if (ps5.Cross()){ //バツボタンでブレーキ 自律移動モードでは100msec周期なので少しラグあり
+          motor_brake();
+        }
+
+        if(ps5.Options() && ps5.Share()){
+          ESP.restart();
+        }
+        else if (ps5.Options()){ //自律走行モード
+          operation_mode = AUTONOMOUS;
+          delay(5);
+        }
+        else if (ps5.Share()){
+          operation_mode = REMOTE_CTRL; //遠隔操作モード
+          delay(5);
+        }
       }
 
-      //set Motor Speed on each Operation Mode
-      if (ps5.Cross()){ //バツボタンでブレーキ
-        motor_brake();
-      } 
-      else if(operation_mode == REMOTE_CTRL){
-        operation_mode = REMOTE_CTRL;
-        if (ps5.R1() && ps5.L1()) { //左右スティックモード
+      if(operation_mode == REMOTE_CTRL){
+        //set Motor Speed on each Operation Mode
+        if (ps5.Cross()){ //バツボタンでブレーキ 遠隔操作モードではすぐ反応
+          motor_brake();
+        } 
+        else if (ps5.R1() && ps5.L1()) { //左右スティックモード
           int left_vel = (int)(SPEED_MAX*ps5.LStickY()/128);
           int right_vel = (int)(SPEED_MAX*ps5.RStickY()/128);
           vehicle_run(right_vel,left_vel);
@@ -202,9 +209,6 @@ void loop()
         else if(ps5.L2()){ //左スティックモード
           int speed_limit = SPEED_MAX; //通常の走行では100で十分
           int rotation_limit = (int)(SPEED_MAX*0.3);
-          if(ps5.R2()){
-            speed_limit = SPEED_MAX;rotation_limit = (int)(SPEED_MAX*0.4);
-          }
           int val_LStickX = ps5.LStickX();
           int val_LStickY = ps5.LStickY();
           //if(val_LStickY <= -20)val_LStickX = -val_LStickX; //バックする時はスティックの値を反転
@@ -228,16 +232,20 @@ void loop()
     int wheel_pos_R = 0;
 
     ID=1; //Wheel R
-    motor_handler.Control_Motor(Speed[0], ID, Acce, brake, &Rcv);//スピード0：モーター停止
-    delay(5);//1回の通信ごとに5msのWaitが必要（RS485の半二重通信の問題と思われる）
+    if(Speed[ID-1]>SPEED_MAX)Speed[ID-1]=SPEED_MAX;
+    else if(Speed[ID-1]<-SPEED_MAX)Speed[ID-1]=-SPEED_MAX;
+    motor_handler.Control_Motor(Speed[ID-1], ID, Acce, brake, &Rcv);//スピード0：モーター停止
     wheel_sp_R=Rcv.BSpeed;
     wheel_pos_R= (double)((POS_MAX-Rcv.Position) & 0x7ffc) * 360 / POS_MAX; //モーターの向きに合わせて符号を設定
+    delay(5);//1回の通信ごとに5msのWaitが必要（RS485の半二重通信の問題と思われる）
 
     ID=2; //Wheel L
-    motor_handler.Control_Motor(Speed[1], ID, Acce, brake, &Rcv);//スピード0：モーター停止
+    if(Speed[ID-1]>SPEED_MAX)Speed[ID-1]=SPEED_MAX;
+    else if(Speed[ID-1]<-SPEED_MAX)Speed[ID-1]=-SPEED_MAX;
+    motor_handler.Control_Motor(Speed[ID-1], ID, Acce, brake, &Rcv);//スピード0：モーター停止
     wheel_sp_L=-Rcv.BSpeed; //モーターの向きに合わせて符号を設定
     wheel_pos_L= (double)(Rcv.Position & 0x7ffc) * 360 / POS_MAX; 
-    delay(5);
+    delay(5);//1回の通信ごとに5msのWaitが必要（RS485の半二重通信の問題と思われる）
 
     ros_update(wheel_sp_L, wheel_sp_R, wheel_pos_L, wheel_pos_R);
 
@@ -338,11 +346,6 @@ void odometry_udate(double speed_left, double speed_right, double position_left,
   double angle_left, angle_right;
   angle_left = get_angle(position_left, odom.last_position_left);
   angle_right = get_angle(position_right, odom.last_position_right);
-  // Serial.print(angle_left);
-  // Serial.print(" ");
-  // Serial.print(position_left);
-  // Serial.print(" ");
-  // Serial.println(odom.last_position_left);
 
   odom.last_position_left = position_left;
   odom.last_position_right = position_right;
@@ -418,6 +421,7 @@ void callBack_motor_control(const geometry_msgs::Twist& twist)
     float left_rpm, right_rpm;
     left_rpm =  left_velocity * 60.0f / (2.0f * M_PI * WHEEL_TIRE_RADIUS); // ωL[rad/s] = 速度 × 60秒 ÷ 2πR
     right_rpm = right_velocity * 60.0f / (2.0f * M_PI * WHEEL_TIRE_RADIUS); // ωR[rad/s] = 速度 × 60秒 ÷ 2πR
+
     vehicle_run((int)left_rpm, (int)right_rpm);
     twist_last_millis = millis();
     char buf[100];
