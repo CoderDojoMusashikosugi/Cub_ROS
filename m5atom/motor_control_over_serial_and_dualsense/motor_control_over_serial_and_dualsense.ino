@@ -22,7 +22,7 @@ CRGB leds[NUM_STRIPS][NUM_LEDS_PER_STRIP];
 #define EMERGENCY 0
 
 // Odometry Difinition
-#define BASE_WIDTH  (0.245) //(m)トレッド幅
+#define BASE_WIDTH  (0.255) //(m)トレッド幅
 #define WHEEL_TIRE_RADIUS  (0.1025) //(m)タイヤをつけた場合の直径１TODO
 //#define MOTOR_POLES  (15.0) //極数
 //#define MOTOR_STEPS  (4.0) //4°
@@ -65,7 +65,7 @@ int matrix[5][5] = {{3,0,0,0,0},
                     {3,0,0,0,0}};
 
 int16_t Speed[2];   // Speed of motor {Right,Left}
-uint8_t Acce = 12;    // Acceleration of motor 実験の結果6ぐらいが最適
+uint8_t Acce = 2;    // Acceleration of motor 実験の結果6ぐらいが最適
 uint8_t Brake_Disable = 0; // Brake position of motor
 uint8_t Brake_Enable = 0xFF;
 uint8_t ID = 1;      // ID of Motor (default:1)
@@ -73,7 +73,7 @@ uint8_t ID = 1;      // ID of Motor (default:1)
 Receiver Rcv;
 // M5Stackのモジュールによって対応するRX,TXのピン番号が違うためM5製品とRS485モジュールに対応させてください
 auto motor_handler = MotorHandler(32, 26); // RX,TX (StickC Plus:33, 32, ATOM:32, 26)
-const int16_t SPEED_MAX = 64; //100 DDT_M6の最高回転数は200±10rpm
+const int16_t SPEED_MAX = 100; //100 DDT_M6の最高回転数は200±10rpm
 const int16_t POS_MAX = 32767; //車輪のエンコーダーの最大値
 uint8_t brake = Brake_Disable;
 
@@ -153,6 +153,8 @@ void setup()
 
 bool toggle_flag = true;
 bool init_odometry_flag = true;
+int last_num_sign[2] = {0,0};
+
 void loop()
 {
   int emergency_status = digitalRead(EMERGENCY_MONITOR);
@@ -188,10 +190,12 @@ void loop()
         }
         else if (ps5.Options()){ //自律走行モード
           operation_mode = AUTONOMOUS;
+          Acce = 2;
           delay(5);
         }
         else if (ps5.Share()){
           operation_mode = REMOTE_CTRL; //遠隔操作モード
+          Acce = 10;
           delay(5);
         }
       }
@@ -232,19 +236,31 @@ void loop()
     int wheel_pos_R = 0;
 
     ID=1; //Wheel R
-    if(Speed[ID-1]>SPEED_MAX)Speed[ID-1]=SPEED_MAX;
-    else if(Speed[ID-1]<-SPEED_MAX)Speed[ID-1]=-SPEED_MAX;
+    if((last_num_sign[ID-1] > 0 && Speed[ID-1] < 0) || (last_num_sign[ID-1] < 0 && Speed[ID-1] > 0))Speed[ID-1]=0; // 急な符号反転を抑制するために一度コマンドを捨てて0にする
+//    else if(Speed[ID-1]>SPEED_MAX)Speed[ID-1]=SPEED_MAX;
+//    else if(Speed[ID-1]<-SPEED_MAX)Speed[ID-1]=-SPEED_MAX;
+    //Send command to motor
     motor_handler.Control_Motor(Speed[ID-1], ID, Acce, brake, &Rcv);//スピード0：モーター停止
+    //Receive velocity from motor
     wheel_sp_R=Rcv.BSpeed;
     wheel_pos_R= (double)((POS_MAX-Rcv.Position) & 0x7ffc) * 360 / POS_MAX; //モーターの向きに合わせて符号を設定
+    if(Speed[ID-1] > 0)last_num_sign[ID-1] = 1;
+    else if(Speed[ID-1] < 0)last_num_sign[ID-1] = -1;
+    else last_num_sign[ID-1] = 0;
     delay(5);//1回の通信ごとに5msのWaitが必要（RS485の半二重通信の問題と思われる）
 
     ID=2; //Wheel L
-    if(Speed[ID-1]>SPEED_MAX)Speed[ID-1]=SPEED_MAX;
-    else if(Speed[ID-1]<-SPEED_MAX)Speed[ID-1]=-SPEED_MAX;
+    if((last_num_sign[ID-1] > 0 && Speed[ID-1] < 0) || (last_num_sign[ID-1] < 0 && Speed[ID-1] > 0))Speed[ID-1]=0; // 急な符号反転を抑制するために一度コマンドを捨てて0にする
+//    else if(Speed[ID-1]>SPEED_MAX)Speed[ID-1]=SPEED_MAX;
+//    else if(Speed[ID-1]<-SPEED_MAX)Speed[ID-1]=-SPEED_MAX;
+    //Send command to motor
     motor_handler.Control_Motor(Speed[ID-1], ID, Acce, brake, &Rcv);//スピード0：モーター停止
+    //Receive velocity from motor
     wheel_sp_L=-Rcv.BSpeed; //モーターの向きに合わせて符号を設定
     wheel_pos_L= (double)(Rcv.Position & 0x7ffc) * 360 / POS_MAX; 
+    if(Speed[ID-1] > 0)last_num_sign[ID-1] = 1;
+    else if(Speed[ID-1] < 0)last_num_sign[ID-1] = -1;
+    else last_num_sign[ID-1] = 0;
     delay(5);//1回の通信ごとに5msのWaitが必要（RS485の半二重通信の問題と思われる）
 
     ros_update(wheel_sp_L, wheel_sp_R, wheel_pos_L, wheel_pos_R);
@@ -422,7 +438,7 @@ void callBack_motor_control(const geometry_msgs::Twist& twist)
     left_rpm =  left_velocity * 60.0f / (2.0f * M_PI * WHEEL_TIRE_RADIUS); // ωL[rad/s] = 速度 × 60秒 ÷ 2πR
     right_rpm = right_velocity * 60.0f / (2.0f * M_PI * WHEEL_TIRE_RADIUS); // ωR[rad/s] = 速度 × 60秒 ÷ 2πR
 
-    vehicle_run((int)left_rpm, (int)right_rpm);
+    vehicle_run((int)right_rpm, (int)left_rpm); //つくちゃれEXにて反転していたものを修正2023/12/3
     twist_last_millis = millis();
     char buf[100];
     sprintf(buf, "motor_ctrl %.2f, %.2f, %.2f, %.2f", twist.linear.x, twist.angular.z, left_rpm, right_rpm);
