@@ -1,9 +1,0 @@
-# task list
-task:
-    - trigger: "white_line"
-      last_id: 1
-      next_id: 2
-
-    - trigger: "white_line"
-      last_id: 2
-      next_id: 3

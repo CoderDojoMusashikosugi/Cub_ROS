@@ -1,4 +1,0 @@
-<launch>
-    <node pkg="nav_manager" type="next_waypoint_creator" name="next_waypoint_creator">
-	</node>
-</launch>
