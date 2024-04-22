@@ -51,3 +51,10 @@ qtcreator-*
 CATKIN_IGNORE
 
 .DS_store
+
+# docker env custom files
+/docker/home/*
+!docker/home/.bash_logout
+!docker/home/.bashrc
+!docker/home/.profile
+!docker/home/colcon_ws/src/cub/.gitkeep

@@ -1,0 +1,29 @@
+# ここにデバイス接続の設定を書く
+
+services:
+  cub_ros:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      network: host
+
+    image: cub_ros:${TAG:-latest} # dockerにイメージ名:タグ名を付ける
+    container_name: cub_ros       # コンテナ名を付ける
+    hostname: docker              # ホスト名を付ける。内部のシェルを起動した際のプロンプトに影響する。
+    entrypoint: /entrypoint.sh    # コンテナ起動時に最初に実行されるスクリプトの設定
+    stdin_open: true              # docker compose upでコンテナ立ち上げっぱなしにする用
+    tty: true                     # docker compose upでコンテナ立ち上げっぱなしにする用
+    network_mode: "host" # ネットワーク関連のアプリを、コンテナ内でもホストと同じ動きが出来るようにする。
+
+    volumes:                                              # ホストにあるディレクトリをコンテナ内部から読み書き出来るようマウントする
+      - ./home:/home/${USER_NAME:-cub}                    # docker/homeに置いているhomeディレクトリをまるごとコンテナ内と接続する
+      - ../ros:/home/${USER_NAME:-cub}/colcon_ws/src/cub  # ./rosに置いたrosパッケージを、cubという名前でコンテナ内に配置する
+      - /tmp/.X11-unix:/tmp/.X11-unix
+    working_dir: /home/${USER_NAME:-cub} # シェル起動時はホームディレクトリから開始
+
+    environment:                  # コンテナ内で使う環境変数の設定
+      # ユーザー設定関連
+      - HOST_UID                    # コンテナ内で使うユーザーのuid受け渡し用。値の定義はrun.shにある。
+      - HOST_GID                    # コンテナ内で使うユーザーのgid受け渡し用。値の定義はrun.shにある。
+      - USER_NAME=${USER_NAME:-cub} # コンテナ内で使うユーザー名(&パスワード)。値の定義はdocker/.envにある。
+      - DISPLAY
