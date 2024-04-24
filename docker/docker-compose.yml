@@ -7,7 +7,7 @@ services:
       dockerfile: docker/Dockerfile
       network: host
 
-    image: cub_ros:${TAG:-latest} # dockerにイメージ名:タグ名を付ける
+    image: ghcr.io/coderdojomusashikosugi/cub_ros:${TAG:-latest} # dockerにイメージ名:タグ名を付ける
     container_name: cub_ros       # コンテナ名を付ける
     hostname: docker              # ホスト名を付ける。内部のシェルを起動した際のプロンプトに影響する。
     entrypoint: /entrypoint.sh    # コンテナ起動時に最初に実行されるスクリプトの設定
