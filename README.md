@@ -13,34 +13,24 @@
 - README.md: これ。
 - run.sh & stop.sh: docker用、後述する。
 
-## このレポジトリをROSのパッケージ置き場として使う
-- これを colcon_ws/src/以下にクローンする。
-- colcon_ws/src/Cub_ROS/ros/cub_bringup/package.xml のようなファイルパスでパッケージが配置される。
-- colcon_wsに移動して、そのままビルドすると使える。
-
-## Docker環境を使う
+## Docker環境を使うには
 - 対応環境
   - CPU: arm64
-  - OS : Linux系(Ubuntu22.04で動作を確認)
+  - OS
+    - Ubuntu (22.04で動作確認)
+    - RaspberryPi OS 64bit (RaspberryPi5で動作確認)
 
 - 今後対応したいもの
   - CPU: Intel
-  - OS : Windows, macOS, RaspberryPi OS(今でも動くとは思う), Jetpack(これも動くとは思う)
+  - OS : Windows, macOS, Jetpack(これも動くとは思う)
   - GPU: NVIDIA, AMD, Intel
   - dockerイメージの配布
 
-### Docker環境を構築する
+### Dockerをインストールする
 ```
 ./scripts/docker_install.sh
 sudo reboot
 ```
-
-### Docker環境をビルドする
-```
-./scripts/docker_build.sh
-```
-
-立ち上げ中のコンテナが終了するので注意
 
 ### Docker環境を起動する
 ```
@@ -52,13 +42,33 @@ sudo reboot
 ホームディレクトリに置いたファイルはdocker/home以下に出てくる。  
 この環境から抜けるには、exitコマンドを実行する。
 
+### ROS2パッケージをビルドする
+`./run.sh`を実行した状態で
+
+```
+cd colcon_ws/
+colcon build --symlink-install
+```
+
 ### Dockerコンテナを停止する
 ```
 ./stop.sh
 ```
+
+### Docker環境をビルドする
+```
+./scripts/docker_build.sh
+```
+
+立ち上げ中のコンテナが終了するので注意
 
 ### 一番新しいやつ以外のDockerイメージを削除する
 ストレージが一杯になったとき用
 ```
 ./scripts/docker_container_remove.sh
 ```
+
+## このレポジトリをROSのパッケージ置き場として使うには
+- これを colcon_ws/src/以下にクローンする。
+- colcon_ws/src/Cub_ROS/ros/cub_bringup/package.xml のようなファイルパスでパッケージが配置される。
+- colcon_wsに移動して、そのままビルドすると使える。

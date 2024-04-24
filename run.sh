@@ -14,4 +14,5 @@ $docker_compose up -d --no-recreate
 # -d : コンテナをバックグラウンドで起動
 # --no-recreate : docker-composeの変更や環境変数の変更でコンテナを再作成しない。再作成には ./stop.sh を実行。逆に、これを外すとdocker-compose.yml変更のテストに便利。
 
+sleep 0.25 # 低性能環境で、プロンプトが I have no name!@docker:/home/cub$ になっちゃう現象対策。それでも起きたら一旦exitしてから再度./run.shすると治る。
 ./scripts/docker_exec.sh
