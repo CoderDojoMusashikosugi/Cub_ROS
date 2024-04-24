@@ -26,6 +26,12 @@
   - GPU: NVIDIA, AMD, Intel
   - dockerイメージの配布
 
+### このレポジトリをcloneする
+```
+git clone https://github.com/CoderDojoMusashikosugi/Cub_ROS.git -b feature-add-docker-env
+cd Cub_ROS
+```
+
 ### Dockerをインストールする
 ```
 ./scripts/docker_install.sh
