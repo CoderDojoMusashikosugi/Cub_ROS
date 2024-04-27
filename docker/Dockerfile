@@ -6,7 +6,7 @@ COPY docker/install_ros.bash /install_ros.bash
 
 RUN sed -i.bak -e "s/http:\/\/ports\.ubuntu\.com/http:\/\/jp\.ports\.ubuntu\.com/g" /etc/apt/sources.list && \
     apt update && \
-    apt -y install sudo x11-apps net-tools terminator && \
+    apt -y install sudo x11-apps net-tools terminator screen && \
     /install_ros.bash && \
     rm -rf /var/lib/apt/lists/
 

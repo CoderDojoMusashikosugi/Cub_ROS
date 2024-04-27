@@ -14,6 +14,9 @@ services:
     stdin_open: true              # docker compose upでコンテナ立ち上げっぱなしにする用
     tty: true                     # docker compose upでコンテナ立ち上げっぱなしにする用
     network_mode: "host" # ネットワーク関連のアプリを、コンテナ内でもホストと同じ動きが出来るようにする。
+    privileged: true     # ホストのシリアルポートをコンテナに持ってくる
+    group_add: 
+      - dialout          # シリアルポートをsudo無しでアクセス可能にする
 
     volumes:                                              # ホストにあるディレクトリをコンテナ内部から読み書き出来るようマウントする
       - ./home:/home/${USER_NAME:-cub}                    # docker/homeに置いているhomeディレクトリをまるごとコンテナ内と接続する
