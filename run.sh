@@ -10,9 +10,18 @@ source scripts/docker_compose.sh
 export HOST_UID=`id -u`
 export HOST_GID=`id -g`
 
-$docker_compose up -d --no-recreate
-# -d : コンテナをバックグラウンドで起動
-# --no-recreate : docker-composeの変更や環境変数の変更でコンテナを再作成しない。再作成には ./stop.sh を実行。逆に、これを外すとdocker-compose.yml変更のテストに便利。
+container_list=`$docker_compose ps -q`
 
-sleep 0.25 # 低性能環境で、プロンプトが I have no name!@docker:/home/cub$ になっちゃう現象対策。それでも起きたら一旦exitしてから再度./run.shすると治る。
+if [ -z "$container_list" ]; then # コンテナ起動してなければ起動
+    $docker_compose --profile runtime_base up --no-start --no-recreate
+    $docker_compose --profile runtime_base down
+
+    $docker_compose --profile runtime up -d --no-recreate
+    # --profile runtime : runtime用(runtime_baseじゃない)のコンテナのみを起動する
+    # -d : コンテナをバックグラウンドで起動
+    # --no-recreate : docker-composeの変更や環境変数の変更でコンテナを再作成しない。再作成には ./stop.sh を実行。逆に、これを外すとdocker-compose.yml変更のテストに便利。
+
+    sleep 1 # 低性能環境で、プロンプトが I have no name!@docker:/home/cub$ になっちゃう現象対策。それでも起きたら一旦exitしてから再度./run.shすると治る。
+fi
+
 ./scripts/docker_exec.sh

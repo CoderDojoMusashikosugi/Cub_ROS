@@ -1,3 +1,3 @@
 #!/bin/bash
 source scripts/docker_compose.sh
-$docker_compose down
+$docker_compose --profile runtime down

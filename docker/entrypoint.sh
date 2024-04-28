@@ -6,6 +6,5 @@ groupadd -g $HOST_GID $USER_NAME
 useradd -u $HOST_UID -g $HOST_GID -m $USER_NAME --password '$1$1MParYB8$R8c8vAbst5CsASYDC8Bmw1' -s /bin/bash
 echo "$USER_NAME ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 gpasswd -a $USER_NAME sudo
-echo 127.0.0.1 $(hostname) >> /etc/hosts
 
 /bin/bash

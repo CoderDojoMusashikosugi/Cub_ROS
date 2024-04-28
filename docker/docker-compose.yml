@@ -2,14 +2,20 @@
 
 services:
   cub_ros:
+    profiles:
+      - runtime
     build:
       context: ..
       dockerfile: docker/Dockerfile
       network: host
+      args:
+        - BASE_IMAGE_NAME=ghcr.io/coderdojomusashikosugi/cub_ros_base:${TAG_BASE:-latest}
 
     image: ghcr.io/coderdojomusashikosugi/cub_ros:${TAG:-latest} # dockerにイメージ名:タグ名を付ける
     container_name: cub_ros       # コンテナ名を付ける
     hostname: docker              # ホスト名を付ける。内部のシェルを起動した際のプロンプトに影響する。
+    extra_hosts:
+      - "docker:127.0.0.1"        # ホスト名とlocalhostを対応付けておく。sudoのエラーを消す用。
     entrypoint: /entrypoint.sh    # コンテナ起動時に最初に実行されるスクリプトの設定
     stdin_open: true              # docker compose upでコンテナ立ち上げっぱなしにする用
     tty: true                     # docker compose upでコンテナ立ち上げっぱなしにする用
@@ -30,3 +36,13 @@ services:
       - HOST_GID                    # コンテナ内で使うユーザーのgid受け渡し用。値の定義はrun.shにある。
       - USER_NAME=${USER_NAME:-cub} # コンテナ内で使うユーザー名(&パスワード)。値の定義はdocker/.envにある。
       - DISPLAY
+
+  cub_ros_base: # rosだけ入ってる分のコンテナイメージ生成用
+    profiles:
+      - runtime_base
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.base
+      network: host
+    network_mode: "none"
+    image: ghcr.io/coderdojomusashikosugi/cub_ros_base:${TAG_BASE:-latest} # dockerにイメージ名:タグ名を付ける

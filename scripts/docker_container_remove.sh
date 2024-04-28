@@ -4,10 +4,19 @@
 
 
 # 最新のcub_rosイメージを検索
-images=`docker images cub_ros -q`
+images=`docker images ghcr.io/coderdojomusashikosugi/cub_ros -q`
 latest_image=`echo $images | awk '{print $1}'`
 
 # 最新のcub_rosイメージ以外を削除
 if [ -n "$latest_image" ]; then
-    docker rmi -f `docker images cub_ros --filter "before=$latest_image" -q`
+    docker rmi -f `docker images ghcr.io/coderdojomusashikosugi/cub_ros --filter "before=$latest_image" -q`
+fi
+
+# 最新のcub_ros_baseイメージを検索
+images=`docker images ghcr.io/coderdojomusashikosugi/cub_ros_base -q`
+latest_image=`echo $images | awk '{print $1}'`
+
+# 最新のcub_ros_baseイメージ以外を削除
+if [ -n "$latest_image" ]; then
+    docker rmi -f `docker images ghcr.io/coderdojomusashikosugi/cub_ros_base --filter "before=$latest_image" -q`
 fi
