@@ -119,3 +119,12 @@ fi
 source /opt/ros/humble/setup.bash
 source ~/colcon_ws/install/setup.bash
 source ~/.user_config.bash
+
+alias ros='ros2'
+alias bashrc='source ~/.bashrc'
+alias cb="cd ~/colcon_ws && colcon build --symlink-install ; cd - > /dev/null 2>&1"
+cbs(){
+  cd ~/colcon_ws
+  colcon build --symlink-install --packages-select $1
+  cd - > /dev/null 2>&1
+}
