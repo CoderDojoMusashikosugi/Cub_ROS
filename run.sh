@@ -9,6 +9,7 @@ source scripts/docker_compose.sh
 
 export HOST_UID=`id -u`
 export HOST_GID=`id -g`
+export INPUT_GROUP_ID=`getent group input | cut -d: -f3` # ホストのinputのgroup idを取得する。コンテナ内外でinputに割り当てられたidが違う場合があるので、idで指定したい。
 
 container_list=`$docker_compose ps -q`
 

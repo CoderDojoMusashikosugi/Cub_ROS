@@ -23,6 +23,7 @@ services:
     privileged: true     # ホストのシリアルポートをコンテナに持ってくる
     group_add: 
       - dialout          # シリアルポートをsudo無しでアクセス可能にする
+      - ${INPUT_GROUP_ID:-input} # joystickをsudo無しでアクセス可能にする
 
     volumes:                                              # ホストにあるディレクトリをコンテナ内部から読み書き出来るようマウントする
       - ./home:/home/${USER_NAME:-cub}                    # docker/homeに置いているhomeディレクトリをまるごとコンテナ内と接続する
