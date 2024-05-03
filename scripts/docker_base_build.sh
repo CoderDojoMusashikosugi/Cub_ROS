@@ -8,7 +8,7 @@ set -e
 
 export VER_BASE=`date "+%Y%m%d_%H%M%S"`
 
-source scripts/docker_compose.sh
+source scripts/docker_util.sh
 $docker_compose --profile runtime_base build
 
 echo VER_BASE=$VER_BASE > docker/ver_base.env
