@@ -6,9 +6,9 @@ set -e
 
 ./stop.sh
 
-export TAG=`date "+%Y%m%d_%H%M%S"`
+export VER_BASE=`date "+%Y%m%d_%H%M%S"`
 
 source scripts/docker_compose.sh
 $docker_compose --profile runtime_base build
 
-echo TAG_BASE=$TAG > docker/ver_base.env
+echo VER_BASE=$VER_BASE > docker/ver_base.env

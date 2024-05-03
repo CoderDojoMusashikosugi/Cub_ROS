@@ -5,7 +5,7 @@ set -e
 
 ./stop.sh
 
-export TAG=`date "+%Y%m%d_%H%M%S"`
+export VER=`date "+%Y%m%d_%H%M%S"`
 
 source scripts/docker_compose.sh
 $docker_compose --profile runtime_base up --no-start # buildじゃなくてupなのは、一旦pull出来ないか確認するため
@@ -13,4 +13,4 @@ $docker_compose --profile runtime_base down # buildじゃないのでコンテ�
 
 $docker_compose --profile runtime build
 
-echo TAG=$TAG > docker/ver.env
+echo VER=$VER > docker/ver.env
