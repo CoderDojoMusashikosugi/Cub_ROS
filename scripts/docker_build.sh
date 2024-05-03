@@ -13,4 +13,4 @@ $docker_compose --profile runtime_base down # buildじゃないのでコンテ�
 
 $docker_compose --profile runtime build
 
-echo TAG=$TAG > docker/tag.env
+echo TAG=$TAG > docker/ver.env

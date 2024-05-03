@@ -11,4 +11,4 @@ export TAG=`date "+%Y%m%d_%H%M%S"`
 source scripts/docker_compose.sh
 $docker_compose --profile runtime_base build
 
-echo TAG_BASE=$TAG > docker/tag_base.env
+echo TAG_BASE=$TAG > docker/ver_base.env

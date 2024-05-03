@@ -1,1 +1,1 @@
-docker_compose="docker compose -f docker/docker-compose.yml --env-file docker/.env --env-file docker/tag.env --env-file docker/tag_base.env"
+docker_compose="docker compose -f docker/docker-compose.yml --env-file docker/.env --env-file docker/ver.env --env-file docker/ver_base.env"
