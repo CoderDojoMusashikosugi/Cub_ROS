@@ -9,9 +9,9 @@ services:
       dockerfile: docker/Dockerfile
       network: host
       args:
-        - BASE_IMAGE_NAME=ghcr.io/coderdojomusashikosugi/cub_ros_base:${VER_BASE:-latest}
+        - BASE_IMAGE_NAME=ghcr.io/coderdojomusashikosugi/cub_ros_base:${VER_BASE:-latest}_${ARCH:-default}
 
-    image: ghcr.io/coderdojomusashikosugi/cub_ros:${VER:-latest} # dockerにイメージ名:タグ名を付ける
+    image: ghcr.io/coderdojomusashikosugi/cub_ros:${VER:-latest}_${ARCH:-default} # dockerにイメージ名:タグ名を付ける
     container_name: cub_ros       # コンテナ名を付ける
     hostname: docker              # ホスト名を付ける。内部のシェルを起動した際のプロンプトに影響する。
     extra_hosts:
@@ -46,4 +46,4 @@ services:
       dockerfile: docker/Dockerfile.base
       network: host
     network_mode: "none"
-    image: ghcr.io/coderdojomusashikosugi/cub_ros_base:${VER_BASE:-latest} # dockerにイメージ名:タグ名を付ける
+    image: ghcr.io/coderdojomusashikosugi/cub_ros_base:${VER_BASE:-latest}_${ARCH:-default} # dockerにイメージ名:タグ名を付ける

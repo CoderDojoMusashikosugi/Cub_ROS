@@ -6,9 +6,13 @@ set -e
 
 ./stop.sh
 
-export VER_BASE=`date "+%Y%m%d_%H%M%S"`
+if [ ${1:-update} != "stay" ]; then
+    export VER_BASE=`date "+%Y%m%d_%H%M%S"`
+fi
 
 source scripts/docker_util.sh
 $docker_compose --profile runtime_base build
 
-echo VER_BASE=$VER_BASE > docker/ver_base.env
+if [ ${1:-update} != "stay" ]; then
+    echo VER_BASE=$VER_BASE > docker/ver_base.env
+fi
