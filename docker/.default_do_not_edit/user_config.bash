@@ -7,10 +7,15 @@
 # 値は概ね0から100の間で設定すると良いとされる。ROS2としてのデフォルトは0なので、そこと干渉しないようこのファイルでのデフォルト値は1とした。
 export ROS_DOMAIN_ID=1
 
-# ROS_LOCALHOST_ONLYは、他のPCと通信したくない場合に設定する。
-# とりあえず設定しておくと、他のPCからのROS2トピックが手元に流れてくるのを防げる。逆に自分のtopicをLANに流さないので他人への迷惑も避けられる。
-# というわけで、とりあえずオン(=1)で設定しておいたのでPC間通信したければ値を0(=OFF)にすべし。
-export ROS_LOCALHOST_ONLY=1
+# FASTRTPS_DEFAULT_PROFILES_FILEは、他のPCとの通信向けの設定。設定ファイルのパスを指定する。
+# デフォルトで設定されている /home/cub/.fastrtps_whitelist.xml の中には他のPCとの通信を禁止する内容が書いてある。
+# なので、exportの方を設定すると他のPCとの通信ができなくなって、export -nの方を設定すると他のPCと通信できる。
+# 普通はROS_LOCALHOST_ONLYでやるけど、VNC向けのコンテナ間通信も切れちゃうのでこちらで代替
+export FASTRTPS_DEFAULT_PROFILES_FILE=/home/cub/.fastrtps_whitelist.xml
+# export -n FASTRTPS_DEFAULT_PROFILES_FILE
+
+# export ROS_LOCALHOST_ONLY=1 # 一応、普通の設定の雛形も置いておく。これがオンだとMac向けのVNC環境のRVizにTopicが流れなくなるはず。
+
 
 # 以上の内容を適用するには、全てのターミナルでdocker環境から抜けて入り直すのが確実
 # または `source ~/.bashrc` を実行

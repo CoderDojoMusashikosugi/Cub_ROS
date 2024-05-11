@@ -20,15 +20,20 @@ services:
     stdin_open: true              # docker compose upでコンテナ立ち上げっぱなしにする用
     tty: true                     # docker compose upでコンテナ立ち上げっぱなしにする用
     network_mode: "host" # ネットワーク関連のアプリを、コンテナ内でもホストと同じ動きが出来るようにする。
+    ipc: host            # コンテナとホストとのDDSの通信のためにホストとIPCを共有
     privileged: true     # ホストのシリアルポートをコンテナに持ってくる
     group_add: 
       - dialout          # シリアルポートをsudo無しでアクセス可能にする
       - ${INPUT_GROUP_ID:-input} # joystickをsudo無しでアクセス可能にする
+      - docker                   # dockerコマンドをsudoなしでアクセス可能にする(dood)
+      - root                     # 上のmac版
 
     volumes:                                              # ホストにあるディレクトリをコンテナ内部から読み書き出来るようマウントする
       - ./home:/home/${USER_NAME:-cub}                    # docker/homeに置いているhomeディレクトリをまるごとコンテナ内と接続する
       - ../ros:/home/${USER_NAME:-cub}/colcon_ws/src/cub  # ./rosに置いたrosパッケージを、cubという名前でコンテナ内に配置する
       - /tmp/.X11-unix:/tmp/.X11-unix
+      - ~/.Xauthority:/home/${USER_NAME:-cub}/.Xauthority
+      - /var/run/docker.sock:/var/run/docker.sock         # Hostのdockerをコンテナ内から操作可能にする
     working_dir: /home/${USER_NAME:-cub} # シェル起動時はホームディレクトリから開始
 
     environment:                  # コンテナ内で使う環境変数の設定
@@ -36,7 +41,8 @@ services:
       - HOST_UID                    # コンテナ内で使うユーザーのuid受け渡し用。値の定義はrun.shにある。
       - HOST_GID                    # コンテナ内で使うユーザーのgid受け渡し用。値の定義はrun.shにある。
       - USER_NAME=${USER_NAME:-cub} # コンテナ内で使うユーザー名(&パスワード)。値の定義はdocker/.envにある。
-      - DISPLAY
+      - DISPLAY                     # X11用の設定。値の定義はホスト環境のもの、Macだけrun.shにある。
+      - ENABLE_REMOTE_RVIZ          # 主にMAC環境向けで、rvizをVNCで表示するか否かの設定。値の定義はrun.shにある。
 
   cub_ros_base: # rosだけ入ってる分のコンテナイメージ生成用
     profiles:
@@ -47,3 +53,19 @@ services:
       network: host
     network_mode: "none"
     image: ghcr.io/coderdojomusashikosugi/cub_ros_base:${VER_BASE:-latest}_${ARCH:-default} # dockerにイメージ名:タグ名を付ける
+
+  ros2-desktop-vnc:
+    profiles:
+      - runtime_vnc
+    image: tiryoh/ros2-desktop-vnc:humble
+    network_mode: bridge
+    ports:
+      - "6080:80"
+    security_opt:
+      - seccomp:unconfined
+    shm_size: 512M
+    container_name: cub_ros_rviz       # コンテナ名を付ける
+    hostname: cub_ros_rviz             # ホスト名を付ける。内部のシェルを起動した際のプロンプトに影響する。
+    volumes: # 変数のUSER_NAMEがcubになってるの、ビルド結果をマウントする都合上そうせざるを得ない。
+      - ./home/colcon_ws:/home/${USER_NAME:-cub}/colcon_ws
+      - ../ros:/home/${USER_NAME:-cub}/colcon_ws/src/cub

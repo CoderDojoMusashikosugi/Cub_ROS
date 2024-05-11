@@ -1,6 +1,7 @@
 #!/bin/bash
-# ghcrにdocker loginするためのスクリプト
+# ghcrにdocker loginするためのスクリプト。pushする用なので、pullする分には要らない。
 # ~/.netrcにgithub向けのPersonal Access Tokenを置いたら、そこから情報を取ってくる。
+# 詳しくは ".netrc github" とかでググると良い。 packagesへの読み書き権限をお忘れなく。
 
 FILE_NAME=~/.netrc
 if [ ! -e $FILE_NAME ];then
