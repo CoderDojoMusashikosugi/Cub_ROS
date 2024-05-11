@@ -4,6 +4,6 @@
 
 set -e
 
-source scripts/docker_util.sh
+source docker/internal/docker_util.sh
 $docker_compose --profile runtime_base push
 $docker_compose --profile runtime      push

@@ -12,5 +12,5 @@ RUN --mount=type=bind,source=ros/,dst=/ros \
     rosdep update --rosdistro=humble && \
     rosdep install -i -y --from-paths /ros
 
-COPY docker/entrypoint.sh /entrypoint.sh
+COPY docker/internal/entrypoint.sh /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]

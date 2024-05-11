@@ -10,7 +10,7 @@ if [ ${1:-update} != "stay" ]; then
     export VER_BASE=`date "+%Y%m%d_%H%M%S"`
 fi
 
-source scripts/docker_util.sh
+source docker/internal/docker_util.sh
 $docker_compose --profile runtime_base build
 
 if [ ${1:-update} != "stay" ]; then

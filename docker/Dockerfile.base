@@ -2,8 +2,8 @@ FROM ubuntu:22.04
 
 LABEL org.opencontainers.image.source=https://github.com/CoderDojoMusashikosugi/Cub_ROS
 
-COPY docker/install_ros.bash /install_ros.bash
-COPY docker/install_docker.sh /install_docker.sh
+COPY docker/internal/container_install_ros.sh /install_ros.bash
+COPY docker/internal/container_install_docker.sh /install_docker.sh
 
 RUN sed -i.bak -e "s/http:\/\/ports\.ubuntu\.com/http:\/\/jp\.ports\.ubuntu\.com/g" /etc/apt/sources.list && \
     sed -i.bak -e "s/http:\/\/archive\.ubuntu\.com/http:\/\/jp\.archive\.ubuntu\.com/g" /etc/apt/sources.list && \

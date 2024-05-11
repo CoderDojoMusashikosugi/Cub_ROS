@@ -38,7 +38,7 @@ cd Cub_ROS
 
 ### Dockerをインストールする
 ```
-./scripts/docker_install.sh
+./docker/install.sh
 sudo reboot
 ```
 
@@ -74,7 +74,7 @@ colcon build --symlink-install
 
 ### Docker環境をビルドする
 ```
-./scripts/docker_build.sh
+./docker/build.sh
 ```
 
 立ち上げ中のコンテナが終了するので注意
@@ -85,7 +85,7 @@ colcon build --symlink-install
 ### 一番新しいやつ以外のDockerイメージを削除する
 ストレージが一杯になったとき用
 ```
-./scripts/docker_container_remove.sh
+./docker/remove.sh
 ```
 
 ## このレポジトリをROSのパッケージ置き場として使うには
