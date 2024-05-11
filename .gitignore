@@ -57,4 +57,5 @@ CATKIN_IGNORE
 !docker/home/.bash_logout
 !docker/home/.bashrc
 !docker/home/.profile
+!docker/home/.fastrtps_whitelist.xml
 !docker/home/colcon_ws/src/cub/.gitkeep

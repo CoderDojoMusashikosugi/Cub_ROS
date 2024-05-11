@@ -31,8 +31,8 @@ def generate_launch_description():
         ),
 
         ExecuteProcess( # rviz2 リモート起動用
-            cmd=['docker', 'exec', '-u', 'ubuntu', 'cub_ros_rviz', 
-                 '/bin/bash', '-c', 
+            cmd=['docker', 'exec', '-u', 'ubuntu', 'cub_ros_rviz',
+                 '/bin/bash', '-c',
                  'source /home/cub/colcon_ws/install/setup.bash && DISPLAY=:1 ros2 launch cub_visualization rviz.launch.py'],
             output='both',
             condition=IfCondition(remote) # ENABLE_REMOTE_RVIZ=1の時に実行

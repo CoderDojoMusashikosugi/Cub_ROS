@@ -34,9 +34,9 @@ if [ -z "$container_list" ]; then # コンテナ起動してなければ起動
     if [ -f /System/Library/CoreServices/SystemVersion.plist ]; then # macOSの場合
         $docker_compose --profile runtime_vnc up -d --no-recreate # rviz向けにvncコンテナ起動する
         echo rviz用VNC環境へは、こちら↓にアクセス!
-        echo \ \ \ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ 
+        echo \ \ \ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓
         echo →  http://localhost:6080  ←
-        echo \ \ \ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ 
+        echo \ \ \ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑ ↑
     fi
 
     sleep 1 # 低性能環境で、プロンプトが I have no name!@docker:/home/cub$ になっちゃう現象対策。それでも起きたら一旦exitしてから再度./run.shすると治る。
