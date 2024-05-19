@@ -27,7 +27,6 @@
 - 今後対応したいもの
   - OS : Jetpack(これも動くとは思う)
   - GPU: NVIDIA dGPU, NVIDIA Jetson, AMD, Intel
-  - Joystickのhotplug対応
   - 何らかのシミュレーター対応
 
 ### このレポジトリをcloneする

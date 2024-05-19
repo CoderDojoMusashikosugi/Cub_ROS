@@ -34,6 +34,7 @@ services:
       - /tmp/.X11-unix:/tmp/.X11-unix
       - ~/.Xauthority:/home/${USER_NAME:-cub}/.Xauthority
       - /var/run/docker.sock:/var/run/docker.sock         # Hostのdockerをコンテナ内から操作可能にする
+      - /dev:/dev
     working_dir: /home/${USER_NAME:-cub} # シェル起動時はホームディレクトリから開始
 
     environment:                  # コンテナ内で使う環境変数の設定
