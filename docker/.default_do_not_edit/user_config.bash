@@ -5,7 +5,7 @@
 # PC間でも同じ仕組みであるため、ロボットとPCを同じIDにすればPC間の通信が可能。
 # 逆に、間違えて同じLANに居る人全員で同じIDで通信してしまうと干渉してうまく動けないはず。
 # 値は概ね0から100の間で設定すると良いとされる。ROS2としてのデフォルトは0なので、そこと干渉しないようこのファイルでのデフォルト値は1とした。
-export ROS_DOMAIN_ID=1
+export ROS_DOMAIN_ID=0
 
 # FASTRTPS_DEFAULT_PROFILES_FILEは、他のPCとの通信向けの設定。設定ファイルのパスを指定する。
 # デフォルトで設定されている /home/cub/.fastrtps_whitelist.xml の中には他のPCとの通信を禁止する内容が書いてある。

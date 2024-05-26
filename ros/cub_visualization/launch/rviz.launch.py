@@ -13,7 +13,7 @@ from os import system, getenv
 def kill_rviz2(event, context):
     # docker execをkillしても、その先で実行してるプロセスをkill出来ないらしいので、仕方なくここで実行
     # dockerのこの挙動、10年前から困ってる人が居るみたい https://github.com/moby/moby/issues/9098
-    system('docker exec -u ubuntu cub_ros_rviz /bin/bash -c "pkill -f rviz2/rviz2"')
+    system('sudo docker exec -u ubuntu cub_ros_rviz /bin/bash -c "pkill -f rviz2/rviz2"')
 
 def generate_launch_description():
     remote_arg = DeclareLaunchArgument("remote", default_value= ("true" if (getenv('ENABLE_REMOTE_RVIZ') == '1') else "false") )
@@ -31,7 +31,7 @@ def generate_launch_description():
         ),
 
         ExecuteProcess( # rviz2 リモート起動用
-            cmd=['docker', 'exec', '-u', 'ubuntu', 'cub_ros_rviz',
+            cmd=['sudo', 'docker', 'exec', '-u', 'ubuntu', 'cub_ros_rviz',
                  '/bin/bash', '-c',
                  'source /home/cub/colcon_ws/install/setup.bash && DISPLAY=:1 ros2 launch cub_visualization rviz.launch.py'],
             output='both',

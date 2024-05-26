@@ -9,3 +9,4 @@ apt update
 apt upgrade
 
 apt -y install ros-humble-desktop ros-dev-tools python3-rosdep
+apt -y install ros-humble-foxglove-bridge
