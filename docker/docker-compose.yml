@@ -31,6 +31,7 @@ services:
     volumes:                                              # ホストにあるディレクトリをコンテナ内部から読み書き出来るようマウントする
       - ./home:/home/${USER_NAME:-cub}                    # docker/homeに置いているhomeディレクトリをまるごとコンテナ内と接続する
       - ../ros:/home/${USER_NAME:-cub}/colcon_ws/src/cub  # ./rosに置いたrosパッケージを、cubという名前でコンテナ内に配置する
+      - ../support_tools:/home/${USER_NAME:-cub}/support_tools  # ./support_toolsに置いているフォルダ/ファイルをsupport_toolsという名前でコンテナ内に配置する
       - /tmp/.X11-unix:/tmp/.X11-unix
       - ~/.Xauthority:/home/${USER_NAME:-cub}/.Xauthority
       - /var/run/docker.sock:/var/run/docker.sock         # Hostのdockerをコンテナ内から操作可能にする
@@ -70,3 +71,4 @@ services:
     volumes: # 変数のUSER_NAMEがcubになってるの、ビルド結果をマウントする都合上そうせざるを得ない。
       - ./home/colcon_ws:/home/${USER_NAME:-cub}/colcon_ws
       - ../ros:/home/${USER_NAME:-cub}/colcon_ws/src/cub
+      - ../support_tools:/home/${USER_NAME:-cub}/support_tools
