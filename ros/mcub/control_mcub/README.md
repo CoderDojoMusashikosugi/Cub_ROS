@@ -3,6 +3,8 @@ mcubをRaspi経由で操縦するためのパッケージ群
 
 # Requirement
 ・mcubを上から見て左をID1, 右をID2に設定していること
+  IDの変更は下記を参照
+  https://github.com/CoderDojoMusashikosugi/Cub_ROS/tree/feature-add-mcub-environment/support_tools/dynamixel
 
 # Submoduleの取得
 ```bash
