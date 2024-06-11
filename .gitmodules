@@ -5,3 +5,6 @@
 	path = ros/DynamixelSDK
 	url = https://github.com/ROBOTIS-GIT/DynamixelSDK.git
 	branch = humble-devel
+[submodule "ros/sllidar_ros2"]
+	path = ros/sllidar_ros2
+	url = https://github.com/Slamtec/sllidar_ros2.git
