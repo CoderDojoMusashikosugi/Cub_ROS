@@ -28,3 +28,4 @@ ros2 run control_mcub control_mcub_moter_node
 ```bash
 ros2 run control_mcub mcub_teleop_key
 ```
+矢印キーで移動。スペースで停止。
