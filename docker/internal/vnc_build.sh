@@ -5,11 +5,12 @@ set -e
 
 ./stop.sh
 
+source docker/internal/docker_util.sh
+
 if [ ${1:-update} != "stay" ]; then
     export VER_VNC=`date "+%Y%m%d_%H%M%S"`
 fi
 
-source docker/internal/docker_util.sh
 $docker_compose --profile runtime_vnc build
 
 if [ ${1:-update} != "stay" ]; then
