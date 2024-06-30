@@ -61,7 +61,11 @@ services:
   ros2-desktop-vnc:
     profiles:
       - runtime_vnc
-    image: tiryoh/ros2-desktop-vnc:humble
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile_rviz
+      network: host
+    image: ghcr.io/coderdojomusashikosugi/cub_ros_vnc:${VER_VNC:-latest}_${ARCH:-default}
     network_mode: bridge
     ports:
       - "6080:80"

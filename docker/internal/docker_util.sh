@@ -5,11 +5,13 @@ docker_compose="docker compose -f docker/docker-compose.yml"
 source docker/.env
 source docker/ver.env
 source docker/ver_base.env
+source docker/ver_vnc.env
 source target.env
+export CUB_TARGET=${CUB_TARGET}
 export USER_NAME=${USER_NAME}
 export VER=${VER}
 export VER_BASE=${VER_BASE}
-export CUB_TARGET=${CUB_TARGET}
+export VER_VNC=${VER_VNC}
 
 UNAME_M=`uname -m`
 if [ $UNAME_M = "x86_64" ]; then

@@ -81,6 +81,14 @@ colcon build --symlink-install
 追加したいパッケージは、基本的にはROS2パッケージの`package.xml`に`<depend>`タグで追記することでrosdep経由でインストールする。  
 それで追加出来ないものは`docker/additional_pkgs.bash`にインストールの司令を書く。
 
+イメージのバージョンはdocker/ver.envに保存されている。起動時にはこれに該当するイメージからコンテナを起動する。
+
+#### 根本のDocker環境やVNCのDocker環境をビルドする
+上記build.shでは、実は素のubuntuにパッケージを追加していくのでなく、予めROS等がインストールされたベースとなるイメージに対してやっている。ROSのインストールは時間がかかる割にそんなに変更する機会は無いので、その分インストールにかかる時間を削減したくて。  
+このベースとなるイメージを作成するスクリプトが`./docker/internal/base_build.sh`である。`docker/Dockerfile.base`を読んでビルドする。バージョンはdocker/ver_base.envに保存されている。
+
+VNCのDocker環境というのは、RViz等OpenGL関係のアプリをX11で表示できないMac環境向けに作ったもので、殆ど[Tiryoh/docker-ros2-desktop-vnc](https://github.com/Tiryoh/docker-ros2-desktop-vnc/tree/master)。これをベースに、使いたいパッケージを追加している。その生成スクリプトが`./docker/internal/vnc_build.sh`である。バージョンはdocker/ver_vnc.envに保存されている。
+
 ### 一番新しいやつ以外のDockerイメージを削除する
 ストレージが一杯になったとき用
 ```

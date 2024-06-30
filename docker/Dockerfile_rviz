@@ -1,0 +1,11 @@
+FROM  tiryoh/ros2-desktop-vnc:humble
+
+LABEL org.opencontainers.image.source=https://github.com/CoderDojoMusashikosugi/Cub_ROS
+
+RUN --mount=type=bind,source=ros/,dst=/ros \
+    . /opt/ros/humble/setup.sh && \
+    apt update && \
+    rosdep update --rosdistro=humble && \
+    rosdep install -i -y --from-paths /ros/turtlebot3_simulations --skip-keys=gazebo_ros_pkgs
+
+RUN mkdir /home/ubuntu && touch testfile
