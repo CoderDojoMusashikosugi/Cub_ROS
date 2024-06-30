@@ -6,13 +6,17 @@ set -e
 
 ./stop.sh
 
+source docker/internal/docker_util.sh
+
 if [ ${1:-update} != "stay" ]; then
     export VER_BASE=`date "+%Y%m%d_%H%M%S"`
+    echo The tag name will be ${VER_BASE}.
 fi
 
-source docker/internal/docker_util.sh
 $docker_compose --profile runtime_base build
 
 if [ ${1:-update} != "stay" ]; then
     echo VER_BASE=$VER_BASE > docker/ver_base.env
+    cat docker/ver_base.env
+    echo The tag name is ${VER_BASE}.
 fi
