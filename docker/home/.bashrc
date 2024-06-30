@@ -128,3 +128,5 @@ cbs(){
   colcon build --symlink-install --packages-select $1
   cd - > /dev/null 2>&1
 }
+
+export TURTLEBOT3_MODEL=burger
