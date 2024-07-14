@@ -18,7 +18,7 @@ git submodule update --init --recursive
 コンテナ起動(run.sh実行)後に下記コマンドを実行
 ```bash
 cd colcon_ws
-colcon build
+colcon build --symlink-install
 bashrc
 ```
 
