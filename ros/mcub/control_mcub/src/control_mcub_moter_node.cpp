@@ -200,6 +200,33 @@ ReadWriteNode::ReadWriteNode()
       }
     }
     );
+  
+  auto get_present_position =
+    [this](
+    const std::shared_ptr<GetPosition::Request> request,
+    std::shared_ptr<GetPosition::Response> response) -> void
+    {
+      // Read Present Position (length : 4 bytes) and Convert uint32 -> int32
+      // When reading 2 byte data from AX / MX(1.0), use read2ByteTxRx() instead.
+      dxl_comm_result = packetHandler->read4ByteTxRx(
+        portHandler,
+        (uint8_t) request->id,
+        ADDR_PRESENT_POSITION,
+        reinterpret_cast<uint32_t *>(&present_position),
+        &dxl_error
+      );
+
+      RCLCPP_INFO(
+        this->get_logger(),
+        "Get [ID: %d] [Present Position: %d]",
+        request->id,
+        present_position
+      );
+
+      response->position = present_position;
+    };
+
+  get_position_server_ = create_service<GetPosition>("get_position", get_present_position);
 }
 
 ReadWriteNode::~ReadWriteNode()

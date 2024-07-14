@@ -26,6 +26,7 @@ services:
       - dialout          # シリアルポートをsudo無しでアクセス可能にする
       - ${INPUT_GROUP_ID:-input} # joystickをsudo無しでアクセス可能にする
       - docker                   # dockerコマンドをsudoなしでアクセス可能にする(dood)
+      - plugdev
       - root                     # 上のmac版
 
     volumes:                                              # ホストにあるディレクトリをコンテナ内部から読み書き出来るようマウントする
