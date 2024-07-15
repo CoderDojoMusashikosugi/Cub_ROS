@@ -22,7 +22,7 @@ from launch_ros.actions import Node
 from launch.substitutions import LaunchConfiguration
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import ThisLaunchFileDir
+from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
@@ -59,6 +59,7 @@ def generate_launch_description():
             name='cartographer_node',
             output='screen',
             parameters=[{'use_sim_time': use_sim_time}],
+            remappings=[('odom', '/diff_drive_base_controller/odom')],
             arguments=['-configuration_directory', cartographer_config_dir,
                        '-configuration_basename', configuration_basename]),
 
@@ -73,7 +74,7 @@ def generate_launch_description():
             description='OccupancyGrid publishing period'),
 
         IncludeLaunchDescription(
-            PythonLaunchDescriptionSource([ThisLaunchFileDir(), '/occupancy_grid.launch.py']),
+            PythonLaunchDescriptionSource([FindPackageShare("turtlebot3_cartographer"), '/launch/occupancy_grid.launch.py']),
             launch_arguments={'use_sim_time': use_sim_time, 'resolution': resolution,
                               'publish_period_sec': publish_period_sec}.items(),
         ),

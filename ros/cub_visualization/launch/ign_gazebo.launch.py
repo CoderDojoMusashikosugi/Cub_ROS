@@ -7,6 +7,7 @@ from launch.conditions import IfCondition, UnlessCondition
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.substitutions import FindPackageShare
+from launch.actions import IncludeLaunchDescription
 
 from os import system, getenv
 
@@ -23,11 +24,10 @@ def generate_launch_description():
 
     return LaunchDescription([
         remote_arg,
-        Node( # rviz2 ローカル起動用
-            package='rviz2',
-            executable='rviz2',
-            arguments=['-d', rviz_config_file],
-            output='screen',
+        IncludeLaunchDescription(
+            PathJoinSubstitution(
+                [FindPackageShare("turtlebot3_ignition"), "launch", "ignition.launch.py"]
+            ),
             condition=UnlessCondition(remote) # ENABLE_REMOTE_RVIZ=0の時に実行
         ),
 
