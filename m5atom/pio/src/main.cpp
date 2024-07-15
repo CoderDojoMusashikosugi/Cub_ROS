@@ -8,6 +8,7 @@
 
 #include <sensor_msgs/msg/imu.h>
 #include <geometry_msgs/msg/twist.h>
+#include <nav_msgs/msg/odometry.h>
 #include <rosidl_runtime_c/message_type_support_struct.h>
 
 #include <Dynamixel2Arduino.h>
@@ -22,16 +23,20 @@
 #endif
 
 // micro-ros valiable
-rcl_publisher_t publisher;
+rcl_publisher_t imu_publisher;
+rcl_publisher_t odom_publisher;
 rcl_subscription_t subscriber;
-sensor_msgs__msg__Imu msg;
+sensor_msgs__msg__Imu imu_msg;
 geometry_msgs__msg__Twist twist_msg;
+nav_msgs__msg__Odometry odom_msg;
+
 
 rclc_executor_t executor;
 rclc_support_t support;
 rcl_allocator_t allocator;
 rcl_node_t node;
-rcl_timer_t timer;
+rcl_timer_t imu_timer;
+rcl_timer_t odom_timer;
 rcl_init_options_t init_options; // Humble
 size_t domain_id = 1;
 
@@ -70,10 +75,11 @@ void error_loop() {
   }
 }
 
-void timer_callback(rcl_timer_t * timer, int64_t last_call_time) {
+
+void imu_timer_callback(rcl_timer_t * imu_timer, int64_t last_call_time) {
   RCLC_UNUSED(last_call_time);
 
-  if (timer != NULL) {
+  if (imu_timer != NULL) {
     float linear_acceleration_x = 0.0;
     float linear_acceleration_y = 0.0;
     float linear_acceleration_z = 0.0;
@@ -84,31 +90,118 @@ void timer_callback(rcl_timer_t * timer, int64_t last_call_time) {
     M5.Imu.getGyroData(&angular_velocity_x, &angular_velocity_y, &angular_velocity_z);
     M5.Imu.getAccelData(&linear_acceleration_x, &linear_acceleration_y, &linear_acceleration_z);
 
-    msg.linear_acceleration.x = linear_acceleration_x;
-    msg.linear_acceleration.y = linear_acceleration_y;
-    msg.linear_acceleration.z = linear_acceleration_z;
-    msg.angular_velocity.x = angular_velocity_x;
-    msg.angular_velocity.y = angular_velocity_y;
-    msg.angular_velocity.z = angular_velocity_z;
+    imu_msg.linear_acceleration.x = linear_acceleration_x;
+    imu_msg.linear_acceleration.y = linear_acceleration_y;
+    imu_msg.linear_acceleration.z = linear_acceleration_z;
+    imu_msg.angular_velocity.x = angular_velocity_x;
+    imu_msg.angular_velocity.y = angular_velocity_y;
+    imu_msg.angular_velocity.z = angular_velocity_z;
 
-    RCSOFTCHECK(rcl_publish(&publisher, &msg, NULL));
+    RCSOFTCHECK(rcl_publish(&imu_publisher, &imu_msg, NULL));
   }
 }
 
 // caluclate velocity for each dinamixel from twist value
 float cub_d = 62.5;  // [mm] distance between center and wheel
-float motor_vel_unit = 0.229;  //[rpm]
-      
+float motor_vel_unit = 0.229;  //[rpm]a
 float diameter = 40; // [mm] diameter of wheel
+int32_t l_motor_pos = 0;
+int32_t r_motor_pos = 0;
+// オドメトリ情報
+double odom_x = 0.0;
+double odom_y = 0.0;
+double odom_theta = 0.0;
+
+
+void update_odometry(int32_t left_position, int32_t right_position, double dt, double &x, double &y, double &theta, double &vx, double &vtheta) {
+    // エンコーダのカウント差分を計算
+    int32_t delta_left = left_position - l_motor_pos;
+    int32_t delta_right = right_position - r_motor_pos;
+
+   if (delta_left < 2*10^9){
+      delta_left += 2147483647;
+    } else if (delta_left > 2*10^9){
+      delta_left -= 2147483648;
+    }
+    if (delta_right < 2*10^9){
+      delta_right += 2147483647;
+    } else if (delta_right > 2*10^9){
+      delta_right -= 2147483648;
+    }
+
+    // 前の位置を更新
+    l_motor_pos = left_position;
+    r_motor_pos = right_position;
+
+    // エンコーダのカウントをメートルに変換
+    double d_left = delta_left * (2.0 * M_PI * diameter);
+    double d_right = delta_right * (2.0 * M_PI * diameter);
+
+    // 距離の平均と回転角を計算
+    double d_center = (d_left + d_right) / 2.0;
+    double d_theta = (d_right - d_left) / cub_d;
+
+    // ロボットの姿勢を更新
+    x += d_center * cos(theta);
+    y += d_center * sin(theta);
+    theta += d_theta;
+
+    // 速度を計算
+    vx = d_center / dt;
+    vtheta = d_theta / dt;
+}
+
+void odom_timer_callback(rcl_timer_t * odom_timer, int64_t last_call_time) {
+  RCLC_UNUSED(last_call_time);
+  static rcl_time_point_value_t last_time;
+  rcl_time_point_value_t now_time;
+  // 現在の時間を取得
+  rcl_clock_t clock;
+  RCCHECK(rcl_clock_init(RCL_ROS_TIME, &clock, &allocator));
+
+  RCCHECK(rcl_clock_get_now(&clock, &now_time));
+  double dt = (now_time - last_time) / 1e9;  // 秒に変換
+  last_time = now_time;
+
+  if (odom_timer != NULL) {
+
+    // 前のモータ位置情報
+    int32_t l_motor_pos = 0;
+    int32_t r_motor_pos = 0;
+
+    // 速度情報
+    double vx = 0.0;
+    double vy = 0.0;
+    double vtheta = 0.0;
+    
+    int32_t r_cur_pos = dxl.getPresentPosition(DXL1_ID);
+    int32_t l_cur_pos = dxl.getPresentPosition(DXL2_ID);
+
+    // オドメトリを更新
+    update_odometry(l_cur_pos, r_cur_pos, dt, odom_x, odom_y, odom_theta, vx, vtheta);
+
+    // オドメトリメッセージを作成
+    nav_msgs__msg__Odometry odom_msg;
+    odom_msg.pose.pose.position.x = odom_x;
+    odom_msg.pose.pose.position.y = odom_y;
+    odom_msg.pose.pose.orientation.z = sin(odom_theta / 2.0);
+    odom_msg.pose.pose.orientation.w = cos(odom_theta / 2.0);
+    odom_msg.twist.twist.linear.x = vx;
+    odom_msg.twist.twist.angular.z = vtheta;
+
+    // オドメトリをパブリッシュ
+    RCSOFTCHECK(rcl_publish(&odom_publisher, &odom_msg, NULL));
+  }
+}
 
 void twist_callback(const void * msgin)
 {
-  const geometry_msgs__msg__Twist * msg = (const geometry_msgs__msg__Twist *)msgin;
+  const geometry_msgs__msg__Twist * twist_msg = (const geometry_msgs__msg__Twist *)msgin;
   RCUTILS_LOG_INFO("Received Twist message:");
-  printf("Linear: x=%.2f, y=%.2f, z=%.2f\n", msg->linear.x, msg->linear.y, msg->linear.z);
-  printf("Angular: x=%.2f, y=%.2f, z=%.2f\n", msg->angular.x, msg->angular.y, msg->angular.z);
-  double r_vel_m = msg->linear.x + cub_d * msg->angular.z / 1000.0; // [m/s]
-  double l_vel_m = msg->linear.x - cub_d * msg->angular.z / 1000.0; // [m/s]
+  printf("Linear: x=%.2f, y=%.2f, z=%.2f\n", twist_msg->linear.x, twist_msg->linear.y, twist_msg->linear.z);
+  printf("Angular: x=%.2f, y=%.2f, z=%.2f\n", twist_msg->angular.x, twist_msg->angular.y, twist_msg->angular.z);
+  double r_vel_m = twist_msg->linear.x + cub_d * twist_msg->angular.z / 1000.0; // [m/s]
+  double l_vel_m = twist_msg->linear.x - cub_d * twist_msg->angular.z / 1000.0; // [m/s]
   double r_vel_r = r_vel_m / (diameter / 1000.0 / 2.0); // [rad/s]
   double l_vel_r = l_vel_m / (diameter / 1000.0 / 2.0); // [rad/s]
   int32_t r_goal_vel = (int32_t)(r_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit); // right goal velocity
@@ -121,7 +214,7 @@ void twist_callback(const void * msgin)
 
 void remote_control(){
   Serial.println("ps5 loop");
-  geometry_msgs__msg__Twist msg;
+  geometry_msgs__msg__Twist twist_msg;
   float default_linear = 0.3;
   float default_angular = 2.0;
   while(1){
@@ -131,13 +224,13 @@ void remote_control(){
       ps5.sendToController();
       if (ps5.L2()){
         if ((abs(ps5.LStickX()) < 5) && (abs(ps5.LStickY()) < 5)){
-          msg.linear.x = 0;
-          msg.angular.z = 0;
+          twist_msg.linear.x = 0;
+          twist_msg.angular.z = 0;
         } else {
-          msg.linear.x = default_linear * (ps5.LStickY()) / 127.0;
-          msg.angular.z = - default_angular * (ps5.LStickX()) / 127.0;
+          twist_msg.linear.x = default_linear * (ps5.LStickY()) / 127.0;
+          twist_msg.angular.z = - default_angular * (ps5.LStickX()) / 127.0;
         }
-        twist_callback(&msg);
+        twist_callback(&twist_msg);
       } else if (ps5.Share() && ps5.Options()) {
         ESP.restart();
       }
@@ -233,6 +326,9 @@ void setup() {
   } else {
     leds[12] = CRGB::Green;
   }
+
+  r_motor_pos = dxl.getPresentPosition(DXL1_ID);
+  l_motor_pos = dxl.getPresentPosition(DXL2_ID);
   FastLED.show();
   delay(200);
 
@@ -254,12 +350,19 @@ void setup() {
   leds[1] = CRGB::White;
   FastLED.show();
 
-  // create publisher
+  // create imu_publisher
   RCCHECK(rclc_publisher_init_default(
-    &publisher,
+    &imu_publisher,
     &node,
     ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, Imu),
     "pub_imu"));
+
+  // create odom_publisher
+  RCCHECK(rclc_publisher_init_default(
+    &odom_publisher,
+    &node,
+    ROSIDL_GET_MSG_TYPE_SUPPORT(nav_msgs, msg, Odometry),
+    "odom"));
 
   // create subscliber
   RCCHECK(rclc_subscription_init_default(
@@ -268,31 +371,36 @@ void setup() {
     ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Twist),
     "set_twist"));
 
-  // create timer,
+  // create imu_timer,
   const unsigned int timer_timeout = 1000;
   RCCHECK(rclc_timer_init_default(
-    &timer,
+    &imu_timer,
     &support,
     RCL_MS_TO_NS(timer_timeout),
-    timer_callback));
+    imu_timer_callback));
   
+  RCCHECK(rclc_timer_init_default(
+    &odom_timer,
+    &support,
+    RCL_MS_TO_NS(timer_timeout),
+    odom_timer_callback));
+
   leds[2] = CRGB::White;
   FastLED.show();
 
   // create executor
-  RCCHECK(rclc_executor_init(&executor, &support.context, 2, &allocator));
-  RCCHECK(rclc_executor_add_timer(&executor, &timer));
+  RCCHECK(rclc_executor_init(&executor, &support.context, 3, &allocator));
+  RCCHECK(rclc_executor_add_timer(&executor, &imu_timer));
+  // RCCHECK(rclc_executor_add_timer(&executor, &odom_timer));
 
-  RCCHECK(rclc_executor_add_subscription(&executor, &subscriber, &msg, &twist_callback, ON_NEW_DATA));
+  RCCHECK(rclc_executor_add_subscription(&executor, &subscriber, &twist_msg, &twist_callback, ON_NEW_DATA));
 
   leds[3] = CRGB::White;
   FastLED.show();
-  delay(0.5);
-
+  delay(10);
 }
 
 void loop() {
   delay(100);
   RCSOFTCHECK(rclc_executor_spin_some(&executor, RCL_MS_TO_NS(100)));
-
 }
