@@ -66,6 +66,9 @@ cd colcon_ws/
 colcon build --symlink-install
 ```
 
+もし`c++: fatal error: Killed signal terminated program cc1plus`というエラーでビルドが出来ない場合は大抵メモリ不足なので、代わりに`MAKEFLAGS="-j 1" colcon build --symlink-install`等のコマンドでビルドすると上手くいくかもしれない。  
+-j 1のところが並列数を抑える設定で、1の部分を2とかに増やすとビルドが早くなる代わりにメモリを食う。
+
 ### Dockerコンテナを停止する
 ```
 ./stop.sh
