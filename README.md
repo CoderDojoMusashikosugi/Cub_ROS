@@ -31,7 +31,7 @@
 
 ### このレポジトリをcloneする
 ```
-git clone https://github.com/CoderDojoMusashikosugi/Cub_ROS.git -b feature-add-docker-env
+git clone https://github.com/CoderDojoMusashikosugi/Cub_ROS.git -b feature-add-mcub-environment
 cd Cub_ROS
 ```
 
@@ -91,3 +91,6 @@ colcon build --symlink-install
 - これを colcon_ws/src/以下にクローンする。
 - colcon_ws/src/Cub_ROS/ros/cub_bringup/package.xml のようなファイルパスでパッケージが配置される。
 - colcon_wsに移動して、そのままビルドすると使える。
+
+## mcubの動作方法
+[ros/mcub/control_mcub/README.md](ros/mcub/control_mcub/README.md)を参照
