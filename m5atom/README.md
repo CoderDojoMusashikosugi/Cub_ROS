@@ -17,7 +17,7 @@ https://hackmd.io/@aoiyu/HyfU9iXjS#PlatformIOのインストール
 1. サイドバーにあるPIOのマークを開く  
 ![pio-icon](doc/001-pio_icon.png)
 
-2. Pick a folderをクリック
+2. Pick a folderをクリック  
 ![pio_menu](doc/002-pio_menu.png)
 
 3. [pio/platfomio.ini](pio/platformio.ini)を選択する  
