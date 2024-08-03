@@ -41,7 +41,7 @@ rcl_node_t node;
 rcl_timer_t imu_timer;
 rcl_timer_t odom_timer;
 rcl_init_options_t init_options; // Humble
-size_t domain_id = 1;
+size_t domain_id = 1; // ros Domain ID
 
 // for dynamixel valiable
 /* DRIVE_MODE*/
