@@ -72,5 +72,5 @@ services:
     container_name: cub_ros_rviz       # コンテナ名を付ける
     hostname: cub_ros_rviz             # ホスト名を付ける。内部のシェルを起動した際のプロンプトに影響する。
     volumes: # 変数のUSER_NAMEがcubになってるの、ビルド結果をマウントする都合上そうせざるを得ない。
-      - ./home/colcon_ws:/home/${USER_NAME:-cub}/colcon_ws
+      - ./home:/home/${USER_NAME:-cub}
       - ../ros:/home/${USER_NAME:-cub}/colcon_ws/src/cub
