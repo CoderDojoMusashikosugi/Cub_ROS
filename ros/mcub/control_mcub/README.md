@@ -41,6 +41,11 @@ bashrc
 ros2 run micro_ros_agent micro_ros_agent serial --dev /dev/ttyUSB0 -b 115200 -v6
 ```
 
+### ATOM-agent間の接続確認
+m5ATOMの最上部LEDが４つ白に点灯していることを確認。  
+点灯していない場合は、micro-ros-agentが起動していることを確認した上で、m5ATOM左にあるボタンを押し、Resetする。  
+![m5ATOM-LED-image](doc/01-m5ATOM_LED.jpg)
+
 ### キーボードの矢印キーで制御するteleopノードを起動
 新たなターミナルを別途起動し、コンテナ内に入った(run.sh実行）後、下記コマンドを実行
 ```bash
