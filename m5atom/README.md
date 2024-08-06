@@ -14,19 +14,25 @@ https://hackmd.io/@aoiyu/HyfU9iXjS#PlatformIOのインストール
 
 
 # PIOの開き方
-1. サイドバーにあるPIOのマークを開く  
+1. ctrl+shift+@を押し、VSCのターミナルを起動
+2. ターミナル上で、下記コマンドを実行  
+```bash
+sudo apt install python3-venv
+```
+
+3. サイドバーにあるPIOのマークを開く  
 ![pio-icon](doc/001-pio_icon.png)
 
-2. Pick a folderをクリック  
+4. Pick a folderをクリック  
 ![pio_menu](doc/002-pio_menu.png)
 
-3. [pio/platfomio.ini](pio/platformio.ini)を選択する  
+5. [pio/platfomio.ini](pio/platformio.ini)を選択する  
 初回は必要なライブラリインストールが走るため、数分時間がかかります。
 
-4. 画面下部にあるプラグマーク Auto ボタンをクリックし、M5STackのポートを選択する。
+6. 画面下部にあるプラグマーク Auto ボタンをクリックし、M5STackのポートを選択する。
 ![pio_menu2](doc/003-pio_menu.png)
 
-5. Build & M5stackへアップロード  
+7. Build & M5stackへアップロード  
 画面左のUploadボタンをクリック。[pio/src](pio/src)にあるコードが1~2分で転送されます。
 
 # DOMAIN ID

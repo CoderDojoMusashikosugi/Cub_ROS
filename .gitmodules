@@ -8,3 +8,7 @@
 [submodule "ros/sllidar_ros2"]
 	path = ros/sllidar_ros2
 	url = https://github.com/Slamtec/sllidar_ros2.git
+[submodule "ros/micro_ros_setup"]
+	path = ros/micro_ros_setup
+	url = https://github.com/micro-ROS/micro_ros_setup.git
+	branch = humble
