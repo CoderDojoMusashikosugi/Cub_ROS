@@ -28,17 +28,20 @@ def generate_launch_description():
             PathJoinSubstitution(
                 [FindPackageShare("turtlebot3_ignition"), "launch", "ignition.launch.py"]
             ),
-            condition=UnlessCondition(remote) # ENABLE_REMOTE_RVIZ=0の時に実行
+            condition=UnlessCondition(remote), # ENABLE_REMOTE_RVIZ=0の時に実行
+            launch_arguments = {
+                   'use_sim_time' : 'true'
+             }.items(),
         ),
 
-        ExecuteProcess( # rviz2 リモート起動用
+        ExecuteProcess( # リモート起動用
             cmd=['sudo', 'docker', 'exec', '-u', 'ubuntu', 'cub_ros_rviz',
                  '/bin/bash', '-c',
-                 'source /home/cub/colcon_ws/install/setup.bash && DISPLAY=:1 TURTLEBOT3_MODEL='+TURTLEBOT3_MODEL+' ros2 launch turtlebot3_ignition ignition.launch.py'],
+                 'source /home/cub/colcon_ws/install/setup.bash && DISPLAY=:1 TURTLEBOT3_MODEL='+TURTLEBOT3_MODEL+' ros2 launch turtlebot3_ignition ignition.launch.py use_sim_time:=True'],
             output='both',
             condition=IfCondition(remote) # ENABLE_REMOTE_RVIZ=1の時に実行
         ),
-        RegisterEventHandler( # rviz2 リモート終了用
+        RegisterEventHandler( # リモート終了用
             event_handler=OnShutdown(
                 on_shutdown=kill_ign # launchファイル終了タイミングでrviz2をkill
             ),
