@@ -14,6 +14,9 @@
   <depend>sensor_msgs</depend>
   <depend>geometry_msgs</depend>
 
+  <depend>turtlebot3_navigation2</depend>
+  <depend>turtlebot3_cartographer</depend>
+
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
 
