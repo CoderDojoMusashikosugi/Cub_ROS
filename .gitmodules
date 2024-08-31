@@ -4,3 +4,17 @@
 [submodule "ros/gazebo_ros_pkgs"]
 	path = ros/gazebo_ros_pkgs
 	url = https://github.com/ros-simulation/gazebo_ros_pkgs.git
+[submodule "support_tools/dynamixel/DynamixelSDK"]
+	path = support_tools/dynamixel/DynamixelSDK
+	url = https://github.com/ROBOTIS-GIT/DynamixelSDK.git
+[submodule "ros/DynamixelSDK"]
+	path = ros/DynamixelSDK
+	url = https://github.com/ROBOTIS-GIT/DynamixelSDK.git
+	branch = humble-devel
+[submodule "ros/sllidar_ros2"]
+	path = ros/sllidar_ros2
+	url = https://github.com/Slamtec/sllidar_ros2.git
+[submodule "ros/micro_ros_setup"]
+	path = ros/micro_ros_setup
+	url = https://github.com/micro-ROS/micro_ros_setup.git
+	branch = humble
