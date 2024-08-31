@@ -12,6 +12,7 @@
 #include <nav_msgs/msg/odometry.h>
 #include <geometry_msgs/msg/transform_stamped.h>
 #include <rosidl_runtime_c/message_type_support_struct.h>
+#include <std_msgs/msg/int32_multi_array.h>
 
 #include <Dynamixel2Arduino.h>
 
@@ -26,22 +27,20 @@
 
 // micro-ros valiable
 rcl_publisher_t imu_publisher;
-rcl_publisher_t odom_publisher;
-rcl_publisher_t tf_publisher;
+rcl_publisher_t wh_pos_publisher;
 rcl_publisher_t debug_publisher;
 rcl_subscription_t subscriber;
 std_msgs__msg__String debug_msg;
 sensor_msgs__msg__Imu imu_msg;
 geometry_msgs__msg__Twist twist_msg;
-nav_msgs__msg__Odometry odom_msg;
-geometry_msgs__msg__TransformStamped tf_stamp_msg;
+std_msgs__msg__Int32MultiArray wheel_positions_msg;
 
 rclc_executor_t executor;
 rclc_support_t support;
 rcl_allocator_t allocator;
 rcl_node_t node;
 rcl_timer_t imu_timer;
-rcl_timer_t odom_timer;
+rcl_timer_t wh_pos_timer;
 rcl_init_options_t init_options; // Humble
 size_t domain_id = 1; // ros Domain ID
 
@@ -139,31 +138,9 @@ double odom_x = 0.0;
 double odom_y = 0.0;
 double odom_theta = 0.0;
 
-
-void update_odometry(int32_t delta_left, int32_t delta_right, double dt, double &x, double &y, double &theta, double &vx, double &vtheta) {
-    // エンコーダのカウントをメートルに変換
-    double d_left = delta_left * ang_res *  (M_PI / 180.0 * diameter / 1000.0);
-    double d_right = delta_right * ang_res * (M_PI / 180.0 * diameter / 1000.0);
-    debug_message("d left right (%lf, %lf)", d_left, d_right);
-
-    // 距離の平均と回転角を計算
-    double d_center = (d_left + d_right) / 2.0;
-    double d_theta = (d_right - d_left) / (cub_d / 1000.0); // rad?
-    debug_message("d center theta (%lf, %lf)", d_center, d_theta);
-
-    // ロボットの姿勢を更新
-    x += d_center * cos(theta);
-    y += d_center * sin(theta);
-    theta += d_theta;
-    debug_message("calculate x,y,theta=(%lf, %lf, %lf)", x, y, theta);
-    // 速度を計算
-    vx = d_center / dt;
-    vtheta = d_theta / dt;
-    debug_message("velocity vx, vtheta =(%lf, %lf)", vx, vtheta);
-}
-
-void odom_timer_callback(rcl_timer_t * odom_timer, int64_t last_call_time) {
+void wh_pos_timer_callback(rcl_timer_t * wh_pos_timer, int64_t last_call_time) {
   RCLC_UNUSED(last_call_time);
+  
   static rcl_time_point_value_t last_time;
   rcl_time_point_value_t now_time;
   // 現在の時間を取得
@@ -172,88 +149,24 @@ void odom_timer_callback(rcl_timer_t * odom_timer, int64_t last_call_time) {
 
   RCCHECK(rcl_clock_get_now(&clock, &now_time));
 
-  if (odom_timer != NULL) {
-    // 速度情報
-    double vx = 0.0;
-    double vy = 0.0;
-    double vtheta = 0.0;
+  if (wh_pos_timer != NULL) {
+    // 左右の車輪位置の値を取得（ここでは例として定数を使用）
     // buffur clear
     while(DXL_SERIAL.available() > 0){
       DXL_SERIAL.read();
     }
-    int32_t r_cur_pos = dxl.getPresentPosition(DXL1_ID);
+    int32_t left_wheel_position = dxl.getPresentPosition(DXL1_ID);
     delay(5);
-    int32_t l_cur_pos = dxl.getPresentPosition(DXL2_ID);
+    int32_t right_wheel_position = dxl.getPresentPosition(DXL2_ID);
     delay(5);
-    debug_message("got motor pos r = %ld l = %ld", r_cur_pos, l_cur_pos);
 
-    // エンコーダのカウント差分を計算
-    int32_t delta_left = l_cur_pos - l_motor_pos;
-    int32_t delta_right = r_cur_pos - r_motor_pos;
+    // メッセージデータの設定
+    wheel_positions_msg.data.data[0] = left_wheel_position;
+    wheel_positions_msg.data.data[1] = right_wheel_position;
 
-    if (abs(delta_left) > 2000000000){
-      if (delta_left > 0) {
-        delta_left += 2147483647;
-      } else{
-        delta_left -= 2147483648;
-      }
-    }
-    if (abs(delta_right) > 2000000000){
-      if (delta_right > 0){
-        delta_right += 2147483647;
-      }else{
-      delta_right -= 2147483648;
-      }
-    }
-    debug_message("delta value = %ld, %ld", delta_left, delta_right);
+    // メッセージのパブリッシュ
+    rcl_publish(&wh_pos_publisher, &wheel_positions_msg, NULL);
 
-    if ((abs(delta_left) > 20000) || (abs(delta_right) > 20000)) {
-      return;
-    }
-
-    // 前の位置を更新
-    l_motor_pos = l_cur_pos;
-    r_motor_pos = r_cur_pos;
-
-    double dt = (now_time - last_time) / 1e9;  // 秒に変換
-    last_time = now_time;
-    debug_message("dt = %lf", dt);
-
-    // オドメトリを更新
-    update_odometry(delta_left, delta_right, dt, odom_x, odom_y, odom_theta, vx, vtheta);
-
-    // オドメトリメッセージを作成
-    odom_msg.pose.pose.position.x = odom_x;
-    odom_msg.pose.pose.position.y = odom_y;
-    odom_msg.pose.pose.orientation.z = sin(odom_theta / 2.0);
-    odom_msg.pose.pose.orientation.w = cos(odom_theta / 2.0);
-    odom_msg.twist.twist.linear.x = vx;
-    odom_msg.twist.twist.angular.z = vtheta;
-
-    debug_message("publish odometry");
-    // オドメトリをパブリッシュ
-    RCSOFTCHECK(rcl_publish(&odom_publisher, &odom_msg, NULL));
-
-
-    // tf messageを作成
-    // tf_stamp_msg.header.stamp.sec = dt; Todo UNIXタイムを入れる
-    tf_stamp_msg.header.frame_id.data = "odom";
-    tf_stamp_msg.header.frame_id.size = strlen(tf_stamp_msg.header.frame_id.data);
-    tf_stamp_msg.header.frame_id.capacity = strlen(tf_stamp_msg.header.frame_id.data) + 1;
-    tf_stamp_msg.child_frame_id.data = "base_link";
-    tf_stamp_msg.child_frame_id.size = strlen(tf_stamp_msg.child_frame_id.data);
-    tf_stamp_msg.child_frame_id.capacity = strlen(tf_stamp_msg.child_frame_id.data) + 1;
-
-    tf_stamp_msg.transform.translation.x = odom_x;
-    tf_stamp_msg.transform.translation.y = odom_y;
-    tf_stamp_msg.transform.translation.z = 0;
-    tf_stamp_msg.transform.rotation.x = 0;
-    tf_stamp_msg.transform.rotation.y = 0;
-    tf_stamp_msg.transform.rotation.z = odom_msg.pose.pose.orientation.z;
-    tf_stamp_msg.transform.rotation.w = odom_msg.pose.pose.orientation.w;
-
-    debug_message("publish tf");
-    RCSOFTCHECK(rcl_publish(&tf_publisher, &tf_stamp_msg, NULL));
   }
 }
 
@@ -447,19 +360,13 @@ void setup() {
     ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, Imu),
     "pub_imu"));
 
-  // create odom_publisher
+  // create wh_pos_publisher
   RCCHECK(rclc_publisher_init_default(
-    &odom_publisher,
+    &wh_pos_publisher,
     &node,
-    ROSIDL_GET_MSG_TYPE_SUPPORT(nav_msgs, msg, Odometry),
-    "odom"));
+    ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int32MultiArray),
+    "wheel_positions"));
 
-  // create tf_publisher
-  RCCHECK(rclc_publisher_init_default(
-    &tf_publisher,
-    &node,
-    ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, TransformStamped),
-    "/tf"));
 
   // create subscliber
   RCCHECK(rclc_subscription_init_default(
@@ -477,18 +384,24 @@ void setup() {
     imu_timer_callback));
   
   RCCHECK(rclc_timer_init_default(
-    &odom_timer,
+    &wh_pos_timer,
     &support,
-    RCL_MS_TO_NS(500),
-    odom_timer_callback));
+    RCL_MS_TO_NS(100),
+    wh_pos_timer_callback));
 
   leds[2] = CRGB::White;
   FastLED.show();
 
+// メッセージの初期化
+  std_msgs__msg__Int32MultiArray__init(&wheel_positions_msg);
+  wheel_positions_msg.data.capacity = 2;
+  wheel_positions_msg.data.size = 2;
+  wheel_positions_msg.data.data = (int32_t*) malloc(2 * sizeof(int32_t));
+
   // create executor
   RCCHECK(rclc_executor_init(&executor, &support.context, 3, &allocator));
   RCCHECK(rclc_executor_add_timer(&executor, &imu_timer));
-  RCCHECK(rclc_executor_add_timer(&executor, &odom_timer));
+  RCCHECK(rclc_executor_add_timer(&executor, &wh_pos_timer));
 
   RCCHECK(rclc_executor_add_subscription(&executor, &subscriber, &twist_msg, &twist_callback, ON_NEW_DATA));
   
