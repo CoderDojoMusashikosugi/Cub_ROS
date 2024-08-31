@@ -10,6 +10,7 @@
 #include <sensor_msgs/msg/imu.h>
 #include <geometry_msgs/msg/twist.h>
 #include <nav_msgs/msg/odometry.h>
+#include <geometry_msgs/msg/transform_stamped.h>
 #include <rosidl_runtime_c/message_type_support_struct.h>
 
 #include <Dynamixel2Arduino.h>
@@ -26,13 +27,14 @@
 // micro-ros valiable
 rcl_publisher_t imu_publisher;
 rcl_publisher_t odom_publisher;
+rcl_publisher_t tf_publisher;
 rcl_publisher_t debug_publisher;
 rcl_subscription_t subscriber;
 std_msgs__msg__String debug_msg;
 sensor_msgs__msg__Imu imu_msg;
 geometry_msgs__msg__Twist twist_msg;
 nav_msgs__msg__Odometry odom_msg;
-
+geometry_msgs__msg__TransformStamped tf_stamp_msg;
 
 rclc_executor_t executor;
 rclc_support_t support;
@@ -231,6 +233,27 @@ void odom_timer_callback(rcl_timer_t * odom_timer, int64_t last_call_time) {
     debug_message("publish odometry");
     // オドメトリをパブリッシュ
     RCSOFTCHECK(rcl_publish(&odom_publisher, &odom_msg, NULL));
+
+
+    // tf messageを作成
+    // tf_stamp_msg.header.stamp.sec = dt; Todo UNIXタイムを入れる
+    tf_stamp_msg.header.frame_id.data = "odom";
+    tf_stamp_msg.header.frame_id.size = strlen(tf_stamp_msg.header.frame_id.data);
+    tf_stamp_msg.header.frame_id.capacity = strlen(tf_stamp_msg.header.frame_id.data) + 1;
+    tf_stamp_msg.child_frame_id.data = "base_link";
+    tf_stamp_msg.child_frame_id.size = strlen(tf_stamp_msg.child_frame_id.data);
+    tf_stamp_msg.child_frame_id.capacity = strlen(tf_stamp_msg.child_frame_id.data) + 1;
+
+    tf_stamp_msg.transform.translation.x = odom_x;
+    tf_stamp_msg.transform.translation.y = odom_y;
+    tf_stamp_msg.transform.translation.z = 0;
+    tf_stamp_msg.transform.rotation.x = 0;
+    tf_stamp_msg.transform.rotation.y = 0;
+    tf_stamp_msg.transform.rotation.z = odom_msg.pose.pose.orientation.z;
+    tf_stamp_msg.transform.rotation.w = odom_msg.pose.pose.orientation.w;
+
+    debug_message("publish tf");
+    RCSOFTCHECK(rcl_publish(&tf_publisher, &tf_stamp_msg, NULL));
   }
 }
 
@@ -430,6 +453,13 @@ void setup() {
     &node,
     ROSIDL_GET_MSG_TYPE_SUPPORT(nav_msgs, msg, Odometry),
     "odom"));
+
+  // create tf_publisher
+  RCCHECK(rclc_publisher_init_default(
+    &tf_publisher,
+    &node,
+    ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, TransformStamped),
+    "/tf"));
 
   // create subscliber
   RCCHECK(rclc_subscription_init_default(
