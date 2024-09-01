@@ -38,21 +38,24 @@ public:
 private:
     void wheelPositionCallback(const std_msgs::msg::Int32MultiArray::SharedPtr msg)
     {
-        // オドメトリの計算
-        double wheel_distance = 62.5; // 車輪間距離 [mm]
-        double wheel_radius = 40;  // 車輪の半径 (例) [mm]
-        const float ang_res = 0.088; // [deg/pluse] motor pluse resolution
         
         // メッセージから車輪の位置を取得
         int32_t left_wheel_position = msg->data[0];
         int32_t right_wheel_position = msg->data[1];
 
-        double delta_left = (left_wheel_position - last_left_wheel_position_) * ang_res *  (M_PI / 180.0 * wheel_radius / 1000.0);
-        double delta_right = (right_wheel_position - last_right_wheel_position_) * ang_res *  (M_PI / 180.0 * wheel_radius / 1000.0);
-        double delta_center = (delta_left + delta_right) / 2.0;
+        if((last_left_wheel_position_ == 0) && (last_right_wheel_position_ == 0)) {
+            last_left_wheel_position_ = left_wheel_position;
+            last_right_wheel_position_ = right_wheel_position;
+        }
+
+        int32_t delta_left_pos = (left_wheel_position - last_left_wheel_position_);     // pulse
+        int32_t delta_right_pos = (right_wheel_position - last_right_wheel_position_);  // pulse
+        double delta_left = delta_left_pos * pulse2meter_param_;    // [m]
+        double delta_right = delta_right_pos * pulse2meter_param_;  // [m]
+        double delta_center = (delta_left + delta_right) / 2.0; //[m]
 
         // 角度の更新
-        double delta_theta = (delta_right - delta_left) / wheel_distance;
+        double delta_theta = (delta_right - delta_left) / wheel_distance_;  // [rad]
         theta_ += delta_theta;
 
         // 位置の更新
@@ -60,6 +63,8 @@ private:
         double delta_y = delta_center * sin(theta_);
         x_ += delta_x;
         y_ += delta_y;
+
+        RCLCPP_DEBUG(this->get_logger(), "delta (l,r) = (%lf, %lf), delta_center = %lf delta_theta = %lf", delta_left, delta_right, delta_center, delta_theta);
 
         // オドメトリメッセージの作成
         auto odometry_msg = nav_msgs::msg::Odometry();
@@ -97,6 +102,12 @@ private:
 
     int32_t last_left_wheel_position_;
     int32_t last_right_wheel_position_;
+
+    // オドメトリの計算
+    const double wheel_distance_ = 125.0 / 1000.0;   // 車輪間距離 [mm]
+    const double wheel_circumference_ = 40 * M_PI / 1000.0;       // 車輪の円周 [mm]　直径 * pi
+    const double ang_res_ = 0.088;    // [deg/pulse] motor pluse resolution
+    const double pulse2meter_param_ = ang_res_ * wheel_circumference_ / 360.0;
 
     double x_, y_, theta_; // 現在のオドメトリの位置と角度
 };

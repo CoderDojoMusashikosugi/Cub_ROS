@@ -9,8 +9,6 @@
 #include <std_msgs/msg/string.h>
 #include <sensor_msgs/msg/imu.h>
 #include <geometry_msgs/msg/twist.h>
-#include <nav_msgs/msg/odometry.h>
-#include <geometry_msgs/msg/transform_stamped.h>
 #include <rosidl_runtime_c/message_type_support_struct.h>
 #include <std_msgs/msg/int32_multi_array.h>
 
@@ -91,14 +89,11 @@ void debug_message(const char* format, ...) {
   vsnprintf(message_buffer, sizeof(message_buffer), format, args);
   va_end(args);
 
-  // シリアルモニタに出力
-  Serial.println(message_buffer);
-
   // ROSトピックにパブリッシュ
   debug_msg.data.data = message_buffer;
   debug_msg.data.size = strlen(message_buffer);
   debug_msg.data.capacity = sizeof(message_buffer);
-  rcl_publish(&debug_publisher, &debug_msg, NULL);
+  RCCHECK(rcl_publish(&debug_publisher, &debug_msg, NULL));
 }
 
 void imu_timer_callback(rcl_timer_t * imu_timer, int64_t last_call_time) {
@@ -133,22 +128,10 @@ const float diameter = 40; // [mm] diameter of wheel
 const float ang_res = 0.088; // [deg/pluse] motor pluse resolution
 int32_t l_motor_pos = 0;
 int32_t r_motor_pos = 0;
-// オドメトリ情報
-double odom_x = 0.0;
-double odom_y = 0.0;
-double odom_theta = 0.0;
 
 void wh_pos_timer_callback(rcl_timer_t * wh_pos_timer, int64_t last_call_time) {
   RCLC_UNUSED(last_call_time);
   
-  static rcl_time_point_value_t last_time;
-  rcl_time_point_value_t now_time;
-  // 現在の時間を取得
-  rcl_clock_t clock;
-  RCCHECK(rcl_clock_init(RCL_ROS_TIME, &clock, &allocator));
-
-  RCCHECK(rcl_clock_get_now(&clock, &now_time));
-
   if (wh_pos_timer != NULL) {
     // 左右の車輪位置の値を取得（ここでは例として定数を使用）
     // buffur clear
@@ -165,7 +148,9 @@ void wh_pos_timer_callback(rcl_timer_t * wh_pos_timer, int64_t last_call_time) {
     wheel_positions_msg.data.data[1] = right_wheel_position;
 
     // メッセージのパブリッシュ
-    rcl_publish(&wh_pos_publisher, &wheel_positions_msg, NULL);
+    RCCHECK(rcl_publish(&wh_pos_publisher, &wheel_positions_msg, NULL));
+
+    debug_message("published wh_pos_msg %ld %ld", left_wheel_position, right_wheel_position);
 
   }
 }
@@ -236,6 +221,13 @@ void setup() {
   // initialize PS5
   connect_dualsense();
   ps5task.begin(remote_control, 2, 2);
+
+  // メッセージの初期化
+  std_msgs__msg__Int32MultiArray__init(&wheel_positions_msg);
+  wheel_positions_msg.data.capacity = 2;
+  wheel_positions_msg.data.size = 2;
+  wheel_positions_msg.data.data = (int32_t*) malloc(2 * sizeof(int32_t));
+
 
   // initialize dynamixel
   DXL_SERIAL.begin(57600, SERIAL_8N1, RX_SERVO, TX_SERVO);
@@ -391,12 +383,6 @@ void setup() {
 
   leds[2] = CRGB::White;
   FastLED.show();
-
-// メッセージの初期化
-  std_msgs__msg__Int32MultiArray__init(&wheel_positions_msg);
-  wheel_positions_msg.data.capacity = 2;
-  wheel_positions_msg.data.size = 2;
-  wheel_positions_msg.data.data = (int32_t*) malloc(2 * sizeof(int32_t));
 
   // create executor
   RCCHECK(rclc_executor_init(&executor, &support.context, 3, &allocator));
