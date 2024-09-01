@@ -365,7 +365,7 @@ void setup() {
     &subscriber,
     &node,
     ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Twist),
-    "set_twist"));
+    "cmd_vel"));
 
   // create imu_timer,
   const unsigned int timer_timeout = 1000;

@@ -83,7 +83,7 @@ public:
     nh_->declare_parameter("scale_angular", 1.0);
     nh_->declare_parameter("scale_linear", 1.0);
 
-    twist_pub_ = nh_->create_publisher<geometry_msgs::msg::Twist>("set_twist", 1);
+    twist_pub_ = nh_->create_publisher<geometry_msgs::msg::Twist>("cmd_vel", 1);
   }
 
   int keyLoop()

@@ -108,7 +108,7 @@ ReadWriteNode::ReadWriteNode()
 
   set_twist_subscriber_ =
     this->create_subscription<Twist>(
-    "set_twist",
+    "cmd_vel",
     QOS_RKL10V,
     [this](const Twist::SharedPtr msg) -> void
     {
