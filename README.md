@@ -31,7 +31,7 @@
 
 ### このレポジトリをcloneする
 ```
-git clone https://github.com/CoderDojoMusashikosugi/Cub_ROS.git -b feature-add-mcub-environment
+git clone https://github.com/CoderDojoMusashikosugi/Cub_ROS.git
 cd Cub_ROS
 ```
 
