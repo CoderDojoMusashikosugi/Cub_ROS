@@ -138,9 +138,9 @@ void wh_pos_timer_callback(rcl_timer_t * wh_pos_timer, int64_t last_call_time) {
     while(DXL_SERIAL.available() > 0){
       DXL_SERIAL.read();
     }
-    int32_t left_wheel_position = dxl.getPresentPosition(DXL1_ID);
+    int32_t right_wheel_position = dxl.getPresentPosition(DXL1_ID);
     delay(5);
-    int32_t right_wheel_position = dxl.getPresentPosition(DXL2_ID);
+    int32_t left_wheel_position = dxl.getPresentPosition(DXL2_ID);
     delay(5);
 
     // メッセージデータの設定
