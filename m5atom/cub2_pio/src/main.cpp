@@ -12,7 +12,7 @@
 #include <nav_msgs/msg/odometry.h>
 #include <rosidl_runtime_c/message_type_support_struct.h>
 
-#include <Dynamixel2Arduino.h>
+#include <DDT_Motor_M15M06.h>
 
 // for control LED
 #include <FastLED.h>
@@ -41,29 +41,34 @@ rcl_node_t node;
 rcl_timer_t imu_timer;
 rcl_timer_t odom_timer;
 rcl_init_options_t init_options; // Humble
-size_t domain_id = 1; // ros Domain ID
+size_t domain_id = 1;
 
-// for dynamixel valiable
-/* DRIVE_MODE*/
-const uint8_t ADDR_DRIVE_MODE = 10;
-const uint8_t NORMAL_MODE = 0;
-const uint8_t REVERSE_MODE = 1;
-HardwareSerial& DXL_SERIAL  = Serial2; // 使うシリアル系統
-Dynamixel2Arduino dxl;
-const uint8_t RX_SERVO = 23;
-const uint8_t TX_SERVO = 33;
-const float DXL_PROTOCOL_VERSION = 2.0; //プロトコルのバージョン
-const uint8_t DXL1_ID = 1;
-const uint8_t DXL2_ID = 2;
+
+// for cub motor valiable
+int16_t Speed[4];   // Speed of motor {Right,Left}
+uint8_t Brake_Disable = 0; // Brake position of motor
+uint8_t Brake_Enable = 0xFF;
+uint8_t Acce = 2;    // Acceleration of motor
+uint8_t Brake_P = 0; // Brake position of motor
+uint8_t ID = 1;      // ID of Motor (default:1)
+uint8_t brake = Brake_Disable;
+const int16_t POS_MAX = 32767; //車輪のエンコーダーの最大値
+Receiver Receiv;
+// M5Stackのモジュールによって対応するRX,TXのピン番号が違うためM5製品とRS485モジュールに対応させてください
+auto motor_handler = MotorHandler(33, 23); // Cub2 ATOM(33, 23) Cub1 RX,TX ATOM(32, 26) DDSM210 ATOM S3(2,1)
+
+int last_num_sign[2] = {0,0};
+const int16_t SPEED_MAX = 115;  //DDSM115 115rpm = max11
+const int16_t SPEED_MIN = -115;
 
 // for LED valiable
 CRGB leds[NUM_LEDS];
 
 // for PS5 valiable
 #include <ps5Controller.h>
-#include <EspEasyTask.h>
+// #include <EspEasyTask.h>
 
-EspEasyTask ps5task;
+// EspEasyTask ps5task;
 
 void connect_dualsense(){
   ps5.begin("e8:47:3a:34:44:a6"); //replace with your MAC address
@@ -91,7 +96,7 @@ void debug_message(const char* format, ...) {
   va_end(args);
 
   // シリアルモニタに出力
-  Serial.println(message_buffer);
+  // Serial.println(message_buffer);
 
   // ROSトピックにパブリッシュ
   debug_msg.data.data = message_buffer;
@@ -125,11 +130,41 @@ void imu_timer_callback(rcl_timer_t * imu_timer, int64_t last_call_time) {
   }
 }
 
+
+void motor_exec(){
+  for(int i=0;i<4;i++){
+    motor_handler.Control_Motor(Speed[i], i+1, Acce, brake, &Receiv);//スピード0：モーター停止
+    debug_message("i = %d send speed %d receiver id %d temp %d err %d", i, Speed[i], Receiv.ID, Receiv.Temp, Receiv.ErrCode);
+    delay(5);//1回の通信ごとに5msのWaitが必要（RS485の半二重通信の問題と思われる）
+  }
+}
+
+void motor_stop(){
+  Speed[0]=Speed[2]=0;
+  Speed[1]=Speed[3]=0;
+  brake = Brake_Disable;
+  motor_exec();
+}
+
+void motor_brake(){
+  Speed[0]=Speed[2]=0;
+  Speed[1]=Speed[3]=0;
+  brake = Brake_Enable;
+  motor_exec();
+}
+
+void vehicle_run(int right, int left){
+  Speed[0]=Speed[2]=-right;
+  Speed[1]=Speed[3]=left;
+  brake = Brake_Disable;
+  debug_message("vehicle run value %d %d", right, left);
+  motor_exec();
+} 
+
 // caluclate velocity for each dinamixel from twist value
-const float cub_d = 62.5;  // [mm] distance between center and wheel
-const float motor_vel_unit = 0.229;  //[rpm]
-const float diameter = 40; // [mm] diameter of wheel
-const float ang_res = 0.088; // [deg/pluse] motor pluse resolution
+const float cub_d = 800;  // [mm] distance between center and wheel
+float motor_vel_unit = 0.001;  //[rpm]
+const float diameter = 550; // [mm] diameter of wheel
 int32_t l_motor_pos = 0;
 int32_t r_motor_pos = 0;
 // オドメトリ情報
@@ -138,26 +173,42 @@ double odom_y = 0.0;
 double odom_theta = 0.0;
 
 
-void update_odometry(int32_t delta_left, int32_t delta_right, double dt, double &x, double &y, double &theta, double &vx, double &vtheta) {
+void update_odometry(int32_t left_position, int32_t right_position, double dt, double &x, double &y, double &theta, double &vx, double &vtheta) {
+    // エンコーダのカウント差分を計算
+    int32_t delta_left = left_position - l_motor_pos;
+    int32_t delta_right = right_position - r_motor_pos;
+
+   if (delta_left < 2*10^9){
+      delta_left += 2147483647;
+    } else if (delta_left > 2*10^9){
+      delta_left -= 2147483648;
+    }
+    if (delta_right < 2*10^9){
+      delta_right += 2147483647;
+    } else if (delta_right > 2*10^9){
+      delta_right -= 2147483648;
+    }
+
+    // 前の位置を更新
+    l_motor_pos = left_position;
+    r_motor_pos = right_position;
+
     // エンコーダのカウントをメートルに変換
-    double d_left = delta_left * ang_res *  (M_PI / 180.0 * diameter / 1000.0);
-    double d_right = delta_right * ang_res * (M_PI / 180.0 * diameter / 1000.0);
-    debug_message("d left right (%lf, %lf)", d_left, d_right);
+    double d_left = delta_left * (2.0 * M_PI * diameter);
+    double d_right = delta_right * (2.0 * M_PI * diameter);
 
     // 距離の平均と回転角を計算
     double d_center = (d_left + d_right) / 2.0;
-    double d_theta = (d_right - d_left) / (cub_d / 1000.0); // rad?
-    debug_message("d center theta (%lf, %lf)", d_center, d_theta);
+    double d_theta = (d_right - d_left) / cub_d;
 
     // ロボットの姿勢を更新
     x += d_center * cos(theta);
     y += d_center * sin(theta);
     theta += d_theta;
-    debug_message("calculate x,y,theta=(%lf, %lf, %lf)", x, y, theta);
+
     // 速度を計算
     vx = d_center / dt;
     vtheta = d_theta / dt;
-    debug_message("velocity vx, vtheta =(%lf, %lf)", vx, vtheta);
 }
 
 void odom_timer_callback(rcl_timer_t * odom_timer, int64_t last_call_time) {
@@ -169,58 +220,28 @@ void odom_timer_callback(rcl_timer_t * odom_timer, int64_t last_call_time) {
   RCCHECK(rcl_clock_init(RCL_ROS_TIME, &clock, &allocator));
 
   RCCHECK(rcl_clock_get_now(&clock, &now_time));
+  double dt = (now_time - last_time) / 1e9;  // 秒に変換
+  last_time = now_time;
 
   if (odom_timer != NULL) {
+
+    // 前のモータ位置情報
+    int32_t l_motor_pos = 0;
+    int32_t r_motor_pos = 0;
+
     // 速度情報
     double vx = 0.0;
     double vy = 0.0;
     double vtheta = 0.0;
-    // buffur clear
-    while(DXL_SERIAL.available() > 0){
-      DXL_SERIAL.read();
-    }
-    int32_t r_cur_pos = dxl.getPresentPosition(DXL1_ID);
-    delay(5);
-    int32_t l_cur_pos = dxl.getPresentPosition(DXL2_ID);
-    delay(5);
-    debug_message("got motor pos r = %ld l = %ld", r_cur_pos, l_cur_pos);
-
-    // エンコーダのカウント差分を計算
-    int32_t delta_left = l_cur_pos - l_motor_pos;
-    int32_t delta_right = r_cur_pos - r_motor_pos;
-
-    if (abs(delta_left) > 2000000000){
-      if (delta_left > 0) {
-        delta_left += 2147483647;
-      } else{
-        delta_left -= 2147483648;
-      }
-    }
-    if (abs(delta_right) > 2000000000){
-      if (delta_right > 0){
-        delta_right += 2147483647;
-      }else{
-      delta_right -= 2147483648;
-      }
-    }
-    debug_message("delta value = %ld, %ld", delta_left, delta_right);
-
-    if ((abs(delta_left) > 20000) || (abs(delta_right) > 20000)) {
-      return;
-    }
-
-    // 前の位置を更新
-    l_motor_pos = l_cur_pos;
-    r_motor_pos = r_cur_pos;
-
-    double dt = (now_time - last_time) / 1e9;  // 秒に変換
-    last_time = now_time;
-    debug_message("dt = %lf", dt);
+    
+    // int32_t r_cur_pos = dxl.getPresentPosition(DXL1_ID);
+    // int32_t l_cur_pos = dxl.getPresentPosition(DXL2_ID);
 
     // オドメトリを更新
-    update_odometry(delta_left, delta_right, dt, odom_x, odom_y, odom_theta, vx, vtheta);
+    // update_odometry(l_cur_pos, r_cur_pos, dt, odom_x, odom_y, odom_theta, vx, vtheta);
 
     // オドメトリメッセージを作成
+    nav_msgs__msg__Odometry odom_msg;
     odom_msg.pose.pose.position.x = odom_x;
     odom_msg.pose.pose.position.y = odom_y;
     odom_msg.pose.pose.orientation.z = sin(odom_theta / 2.0);
@@ -228,7 +249,6 @@ void odom_timer_callback(rcl_timer_t * odom_timer, int64_t last_call_time) {
     odom_msg.twist.twist.linear.x = vx;
     odom_msg.twist.twist.angular.z = vtheta;
 
-    debug_message("publish odometry");
     // オドメトリをパブリッシュ
     RCSOFTCHECK(rcl_publish(&odom_publisher, &odom_msg, NULL));
   }
@@ -237,23 +257,25 @@ void odom_timer_callback(rcl_timer_t * odom_timer, int64_t last_call_time) {
 void twist_callback(const void * msgin)
 {
   const geometry_msgs__msg__Twist * twist_msg = (const geometry_msgs__msg__Twist *)msgin;
-  RCUTILS_LOG_INFO("Received Twist message:");
-  printf("Linear: x=%.2f, y=%.2f, z=%.2f\n", twist_msg->linear.x, twist_msg->linear.y, twist_msg->linear.z);
-  printf("Angular: x=%.2f, y=%.2f, z=%.2f\n", twist_msg->angular.x, twist_msg->angular.y, twist_msg->angular.z);
+  debug_message("Received Twist message:");
+  debug_message("Linear: x=%.2f, y=%.2f, z=%.2f", twist_msg->linear.x, twist_msg->linear.y, twist_msg->linear.z);
+  debug_message("Angular: x=%.2f, y=%.2f, z=%.2f", twist_msg->angular.x, twist_msg->angular.y, twist_msg->angular.z);
   double r_vel_m = twist_msg->linear.x + cub_d * twist_msg->angular.z / 1000.0; // [m/s]
   double l_vel_m = twist_msg->linear.x - cub_d * twist_msg->angular.z / 1000.0; // [m/s]
   double r_vel_r = r_vel_m / (diameter / 1000.0 / 2.0); // [rad/s]
   double l_vel_r = l_vel_m / (diameter / 1000.0 / 2.0); // [rad/s]
-  int32_t r_goal_vel = (int32_t)(r_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit); // right goal velocity
-  int32_t l_goal_vel = (int32_t)(l_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit); // left goal velocity
+  int r_goal_vel = (int)(r_vel_r / (2 * M_PI) * 60.0); // right goal velocity[rpm]
+  int l_goal_vel = (int)(l_vel_r / (2 * M_PI) * 60.0); // left goal velocity[rpm]
 
-  dxl.setGoalVelocity(DXL1_ID, r_goal_vel);
-  delay(5);
-  dxl.setGoalVelocity(DXL2_ID, l_goal_vel);
+  debug_message("goal velocity (r,l)=(%d, %d)", r_goal_vel, l_goal_vel);
+  vehicle_run(r_goal_vel, l_goal_vel);
+  // dxl.setGoalVelocity(DXL1_ID, r_goal_vel);
+  // delay(20);
+  // dxl.setGoalVelocity(DXL2_ID, l_goal_vel);
 }
 
 void remote_control(){
-  Serial.println("ps5 loop");
+  // Serial.println("ps5 loop");
   geometry_msgs__msg__Twist twist_msg;
   float default_linear = 0.3;
   float default_angular = 2.0;
@@ -282,8 +304,9 @@ void remote_control(){
 
 void setup() {
   
-  auto cfg = M5.config();
-  M5.begin(cfg);
+  // auto cfg = M5.config();
+  // M5.begin(cfg);
+  // auto motor_handler = MotorHandler(33, 23); // Cub2 ATOM(33, 23) Cub1 RX,TX ATOM(32, 26) DDSM210 ATOM S3(2,1)
 
   // Configure serial transport
   Serial.begin(115200);
@@ -297,101 +320,17 @@ void setup() {
   FastLED.show();
   delay(10);
 
+  for(int i=1;i<=4;i++){
+    motor_handler.Control_Motor(0, i, Acce, Brake_P, &Receiv); //4つのモーター
+  }
+
   // initialize PS5
   connect_dualsense();
-  ps5task.begin(remote_control, 2, 2);
+  // ps5task.begin(remote_control, 2, 2);
 
-  // initialize dynamixel
-  DXL_SERIAL.begin(57600, SERIAL_8N1, RX_SERVO, TX_SERVO);
-  dxl = Dynamixel2Arduino(DXL_SERIAL); //Dynamixel用ライブラリのインスタンス化
-  dxl.begin(57600); // デフォルトのbaudrate. 必要に応じてサーボの設定にあわせる.
-  dxl.setPortProtocolVersion(DXL_PROTOCOL_VERSION);
   leds[5] = CRGB::White;
   FastLED.show();
   
-  Serial.println("dxl begin");
-  // dxl.ping();
-  if (dxl.ping(DXL1_ID) &&  dxl.ping(DXL2_ID)) {
-    leds[5] = CRGB::Green;
-  } else {
-    leds[5] = CRGB::Red;
-  }
-  delay(5);
-  Serial.println("dxl ping");
-
-
-  if (dxl.torqueOff(DXL1_ID)){
-    leds[5] = CRGB::Red;
-  } else {
-    leds[5] = CRGB::Green;
-  }
-  FastLED.show();
-  delay(5);
-  
-  if (!dxl.write(DXL1_ID, ADDR_DRIVE_MODE, (uint8_t*)&REVERSE_MODE, 1)){
-    leds[6] = CRGB::Red;
-  } else {
-    leds[6] = CRGB::Green;
-  }
-  delay(5);
-
-  if (!dxl.setOperatingMode(DXL1_ID, OP_VELOCITY)){
-    leds[7] = CRGB::Red;
-  } else {
-    leds[7] = CRGB::Green;
-  }
-  FastLED.show();
-  delay(5);
-  
-  if (!dxl.torqueOn(DXL1_ID)) {
-    leds[8] = CRGB::Red;
-  } else {
-    leds[8] = CRGB::Green;
-  }
-  FastLED.show();
-  delay(5);
-
-  if (!dxl.torqueOff(DXL2_ID)){
-    leds[10] = CRGB::Red;
-  } else {
-    leds[10] = CRGB::Green;
-  }
-  FastLED.show();
-  delay(5);
-  
-  if (!dxl.write(DXL2_ID, ADDR_DRIVE_MODE, (uint8_t*)&NORMAL_MODE, 1)){
-    leds[11] = CRGB::Red;
-  } else {
-    leds[11] = CRGB::Green;
-  }
-  delay(5);
-
-  if (!dxl.setOperatingMode(DXL2_ID, OP_VELOCITY)) {
-    leds[12] = CRGB::Red;
-  } else {
-    leds[12] = CRGB::Green;
-  }
-  FastLED.show();
-  delay(5);
-
-  if (!dxl.torqueOn(DXL2_ID)) {
-    leds[13] = CRGB::Red;
-  } else {
-    leds[13] = CRGB::Green;
-  }
-  delay(5);
-
-  // buffur clear
-  while(DXL_SERIAL.available() > 0){
-    DXL_SERIAL.read();
-  }
-
-  r_motor_pos = dxl.getPresentPosition(DXL1_ID);
-  delay(5);
-  l_motor_pos = dxl.getPresentPosition(DXL2_ID);
-  FastLED.show();
-  delay(5);
-
   // initialize micro-ros
   allocator = rcl_get_default_allocator();
 
@@ -416,7 +355,7 @@ void setup() {
     &node,
     ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, String),
     "mros_debug_topic"));
-
+    
   // create imu_publisher
   RCCHECK(rclc_publisher_init_default(
     &imu_publisher,
@@ -439,35 +378,34 @@ void setup() {
     "set_twist"));
 
   // create imu_timer,
-  const unsigned int timer_timeout = 1000;
-  RCCHECK(rclc_timer_init_default(
-    &imu_timer,
-    &support,
-    RCL_MS_TO_NS(timer_timeout),
-    imu_timer_callback));
+  // const unsigned int timer_timeout = 1000;
+  // RCCHECK(rclc_timer_init_default(
+  //   &imu_timer,
+  //   &support,
+  //   RCL_MS_TO_NS(timer_timeout),
+  //   imu_timer_callback));
   
-  RCCHECK(rclc_timer_init_default(
-    &odom_timer,
-    &support,
-    RCL_MS_TO_NS(500),
-    odom_timer_callback));
+  // RCCHECK(rclc_timer_init_default(
+  //   &odom_timer,
+  //   &support,
+  //   RCL_MS_TO_NS(timer_timeout),
+  //   odom_timer_callback));
 
   leds[2] = CRGB::White;
   FastLED.show();
 
   // create executor
-  RCCHECK(rclc_executor_init(&executor, &support.context, 3, &allocator));
-  RCCHECK(rclc_executor_add_timer(&executor, &imu_timer));
-  RCCHECK(rclc_executor_add_timer(&executor, &odom_timer));
+  RCCHECK(rclc_executor_init(&executor, &support.context, 1, &allocator));
+  // RCCHECK(rclc_executor_add_timer(&executor, &imu_timer));
+  // RCCHECK(rclc_executor_add_timer(&executor, &odom_timer));
 
   RCCHECK(rclc_executor_add_subscription(&executor, &subscriber, &twist_msg, &twist_callback, ON_NEW_DATA));
-  
-  debug_message("initial motor val l,r = (%ld, %ld)", r_motor_pos, l_motor_pos);
 
   leds[3] = CRGB::White;
   FastLED.show();
   delay(10);
 }
+
 
 void loop() {
   delay(100);

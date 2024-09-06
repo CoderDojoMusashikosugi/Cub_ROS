@@ -93,4 +93,4 @@ colcon build --symlink-install
 - colcon_wsに移動して、そのままビルドすると使える。
 
 ## mcubの動作方法
-[ros/mcub/control_mcub/README.md](ros/mcub/control_mcub/README.md)を参照
+[ros/mcub/README.md](ros/mcub/README.md)を参照
