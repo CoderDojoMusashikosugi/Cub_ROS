@@ -59,7 +59,7 @@ ros2 run control_mcub mcub_teleop_key
 ### ホイールオドメトリを起動する場合
 新たなターミナルを別途起動し、コンテナ内に入った(run.sh実行）後、下記コマンドを実行
 ```bash
-ros2 ros2 run wheel_odometry wheel_odometry_nod
+ros2 run wheel_odometry wheel_odometry_node
 ```
 
 ## M5Stackを使用しない場合
