@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(mcub_wheel_odometry)
+project(cub2_wheel_odometry)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -13,11 +13,11 @@ find_package(nav_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 
-add_executable(mcub_wheel_odometry_node src/wheel_odometry.cpp)
-ament_target_dependencies(mcub_wheel_odometry_node rclcpp std_msgs nav_msgs tf2 tf2_ros)
+add_executable(cub2_wheel_odometry_node src/wheel_odometry.cpp)
+ament_target_dependencies(cub2_wheel_odometry_node rclcpp std_msgs nav_msgs tf2 tf2_ros)
 
 install(TARGETS
-  mcub_wheel_odometry_node
+  cub2_wheel_odometry_node
   DESTINATION lib/${PROJECT_NAME})
 
 

@@ -15,7 +15,7 @@ class WheelOdometryNode : public rclcpp::Node
 {
 public:
     WheelOdometryNode()
-    : Node("mcub_wheel_odometry_node")
+    : Node("cub2_wheel_odometry_node")
     {
         // オドメトリのパブリッシャーの初期化
         odometry_publisher_ = this->create_publisher<nav_msgs::msg::Odometry>("odom", 10);
@@ -104,9 +104,9 @@ private:
     int32_t last_right_wheel_position_;
 
     // オドメトリの計算
-    const double wheel_distance_ = 125.0 / 1000.0;   // 車輪間距離 [mm]
-    const double wheel_circumference_ = 40 * M_PI / 1000.0;       // 車輪の円周 [mm]　直径 * pi
-    const double ang_res_ = 0.088;    // [deg/pulse] motor pluse resolution
+    const double wheel_distance_ = 800.0 / 1000.0;   // 車輪間距離 [mm]
+    const double wheel_circumference_ = 550 * M_PI / 1000.0;       // 車輪の円周 [mm]　直径 * pi
+    const double ang_res_ = 360/256.0;    // [deg/pulse] motor pluse resolution
     const double pulse2meter_param_ = ang_res_ * wheel_circumference_ / 360.0;
 
     double x_, y_, theta_; // 現在のオドメトリの位置と角度
