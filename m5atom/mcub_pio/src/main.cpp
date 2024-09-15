@@ -207,7 +207,7 @@ void setup() {
   M5.begin(cfg);
 
   // Configure serial transport
-  Serial.begin(115200);
+  Serial.begin(1500000);
   set_microros_serial_transports(Serial);
   delay(2000);
 
