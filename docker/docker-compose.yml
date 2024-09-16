@@ -46,6 +46,7 @@ services:
       - USER_NAME=${USER_NAME:-cub} # コンテナ内で使うユーザー名(&パスワード)。値の定義はdocker/.envにある。
       - DISPLAY                     # X11用の設定。値の定義はホスト環境のもの、Macだけrun.shにある。
       - ENABLE_REMOTE_RVIZ          # 主にMAC環境向けで、rvizをVNCで表示するか否かの設定。値の定義はrun.shにある。
+      - CUB_TARGET                  # どの機体向けに実行するかの設置を読み込む。値の定義はtarget.envにある。
 
   cub_ros_base: # rosだけ入ってる分のコンテナイメージ生成用
     profiles:
