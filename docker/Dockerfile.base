@@ -2,13 +2,17 @@ FROM ubuntu:22.04
 
 LABEL org.opencontainers.image.source=https://github.com/CoderDojoMusashikosugi/Cub_ROS
 
-COPY docker/internal/container_install_ros.sh /install_ros.bash
+COPY docker/internal/container_install_ros.sh /install_ros.sh
+COPY docker/internal/container_install_prebuilt.sh /install_prebuilt.sh
 COPY docker/internal/container_install_docker.sh /install_docker.sh
 
 RUN sed -i.bak -e "s/http:\/\/ports\.ubuntu\.com/http:\/\/jp\.ports\.ubuntu\.com/g" /etc/apt/sources.list && \
     sed -i.bak -e "s/http:\/\/archive\.ubuntu\.com/http:\/\/jp\.archive\.ubuntu\.com/g" /etc/apt/sources.list && \
     apt update && \
     apt -y install sudo vim x11-apps net-tools iputils-ping terminator screen neovim tmux && \
-    /install_ros.bash && \
+    /install_ros.sh && \
+    rosdep init && \
+    rosdep update --rosdistro=humble && \
+    /install_prebuilt.sh && \
     /install_docker.sh && \
     rm -rf /var/lib/apt/lists/
