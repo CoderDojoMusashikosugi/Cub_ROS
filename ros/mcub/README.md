@@ -25,15 +25,6 @@ colcon build --symlink-install && \
 bashrc
 ```
 
-# mros_agentのbuild
-下記コマンドを実行
-```bash
-ros2 run micro_ros_setup create_agent_ws.sh && \
-colcon build --symlink-install && \
-ros2 run micro_ros_setup build_agent.sh && \
-bashrc
-```
-
 # 使用方法
 ## M5Stackを使用する場合
 ### m5stackのコード書き込み
