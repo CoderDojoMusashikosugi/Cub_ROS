@@ -6,7 +6,7 @@ def generate_launch_description():
     return LaunchDescription([
         # 1. micro_ros_agent の実行
         ExecuteProcess(
-            cmd=['ros2', 'run', 'micro_ros_agent', 'micro_ros_agent', 'serial', '--dev', '/dev/ttyATOM', '-b', '1500000'],
+            cmd=['ros2', 'run', 'micro_ros_agent', 'micro_ros_agent', 'serial', '--dev', '/dev/ttyATOM', '-b', '1500000', '-v', '6'],
             output='screen'
         ),
 
@@ -18,7 +18,7 @@ def generate_launch_description():
 
         # 3. sllidar_c1_launch.py の実行
         ExecuteProcess(
-            cmd=['ros2', 'launch', 'sllidar_ros2', 'sllidar_c1_launch.py'],
+            cmd=['ros2', 'launch', 'sllidar_ros2', 'sllidar_c1_launch.py', 'serial_port:=/dev/ttySLC1'],
             output='screen'
         ),
     ])
