@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "../../../../Assignment"
+		},
+		{
+			"path": "../.."
+		},
+		{
+			"path": "../../../../Cub_ROS"
+		}
+	],
+	"settings": {}
+}

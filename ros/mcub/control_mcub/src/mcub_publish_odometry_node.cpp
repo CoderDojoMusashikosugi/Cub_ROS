@@ -72,7 +72,7 @@ private:
         odom_msg.pose.pose.orientation.w = quat.w();
 
         // ツイストを設定
-        odom_msg.child_frame_id = "base_link";
+        odom_msg.child_frame_id = "base_footprint";
         odom_msg.twist.twist.linear.x = delta_s / 0.1;  // 0.1秒ごとに発行するので
         odom_msg.twist.twist.angular.z = delta_theta / 0.1;
 

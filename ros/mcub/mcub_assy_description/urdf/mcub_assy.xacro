@@ -1,0 +1,27 @@
+<?xml version="1.0" ?>
+<robot name="mcub_assy" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+<xacro:include filename="$(find mcub_assy_description)/urdf/materials.xacro" />
+<xacro:include filename="$(find mcub_assy_description)/urdf/mcub_assy.trans" />
+<link name="base_link">
+  <inertial>
+    <origin xyz="2.1678420067940175e-11 -0.04194959407557256 0.0347990148195754" rpy="0 0 0"/>
+    <mass value="0.8873002912160953"/>
+    <inertia ixx="0.001657" iyy="0.000928" izz="0.00256" ixy="0.0" iyz="2.5e-05" ixz="0.0"/>
+  </inertial>
+  <visual>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://mcub_assy_description/meshes/base_link.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+    <material name="opaque10251204"/>
+  </visual>
+  <collision>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <geometry>
+      <mesh filename="package://mcub_assy_description/meshes/base_link.stl" scale="0.001 0.001 0.001"/>
+    </geometry>
+  </collision>
+</link>
+
+</robot>

@@ -70,7 +70,7 @@ private:
         auto odometry_msg = nav_msgs::msg::Odometry();
         odometry_msg.header.stamp = this->get_clock()->now();
         odometry_msg.header.frame_id = "odom";
-        odometry_msg.child_frame_id = "base_link";
+        odometry_msg.child_frame_id = "base_footprint";
         odometry_msg.pose.pose.position.x = x_;
         odometry_msg.pose.pose.position.y = y_;
         odometry_msg.pose.pose.orientation.z = sin(theta_ / 2.0);
@@ -83,7 +83,7 @@ private:
         geometry_msgs::msg::TransformStamped transform_stamped;
         transform_stamped.header.stamp = odometry_msg.header.stamp;
         transform_stamped.header.frame_id = "odom";
-        transform_stamped.child_frame_id = "base_link";
+        transform_stamped.child_frame_id = "base_footprint";
         transform_stamped.transform.translation.x = x_;
         transform_stamped.transform.translation.y = y_;
         transform_stamped.transform.translation.z = 0.0;
