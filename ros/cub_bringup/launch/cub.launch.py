@@ -8,7 +8,7 @@ from launch.substitutions import LaunchConfiguration, EnvironmentVariable
 import os
 
 def generate_launch_description():
-    cub_target = os.getenv('CUB_TARGET', 'cub2')
+    cub_target = os.getenv('CUB_TARGET', 'mcub')
     print("launch target:", cub_target)
 
     return LaunchDescription([
@@ -16,7 +16,7 @@ def generate_launch_description():
             package='micro_ros_agent',
             executable='micro_ros_agent',
             name='micro_ros_agent',
-            arguments=["serial", "--dev", "/dev/ttyATOM", "-b", "115200", "-v6"]
+            arguments=["serial", "--dev", "/dev/ttyUSB0", "-b", "115200", "-v6"]
         ),
 
         IncludeLaunchDescription(
