@@ -42,6 +42,7 @@ std_msgs__msg__Int32MultiArray wheel_positions_msg;
 unsigned long prev_cmd_time = 0;
 
 rclc_executor_t executor;
+rclc_executor_t sub_executor;
 rclc_support_t support;
 rcl_allocator_t allocator;
 rcl_node_t node;
@@ -81,17 +82,19 @@ void connect_dualsense(){
 
 void debug_message(const char* format, ...);
 
-#define RCCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){error_loop();}}
+#define RCCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){error_loop(temp_rc);}}
 #define RCSOFTCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){}}
 
 // Error handle loop
-void error_loop() {
-  while (1) {
-    debug_message("Error at line %d: %s\n", __LINE__, rcl_get_error_string().str);
-    leds[25] = CRGB::Red;
-    FastLED.show();
-    delay(100);
-  }
+void error_loop(rcl_ret_t temp_rc) {
+  leds[24] = CRGB::Red;
+  FastLED.show();
+  vTaskDelay(1000 / portTICK_PERIOD_MS);
+  debug_message("Error at line %d: error value %d \n %s\n", __LINE__, (int32_t)temp_rc, rcl_get_error_string().str);
+
+  rcl_reset_error();
+  leds[24] = CRGB::Black;
+  FastLED.show();
 }
 
 // デバッグメッセージを出力する関数
@@ -169,6 +172,7 @@ void wh_pos_timer_callback(rcl_timer_t * wh_pos_timer, int64_t last_call_time) {
 void twist_callback(const void * msgin)
 {
   prev_cmd_time = millis();
+  delay(100);
 }
 
 void motor_controll_callback(rcl_timer_t * motor_callback_timer, int64_t last_call_time)
@@ -395,19 +399,20 @@ void setup() {
   RCCHECK(rclc_timer_init_default(
     &motor_controll_timer,
     &support,
-    RCL_MS_TO_NS(20),
+    RCL_MS_TO_NS(100),
     motor_controll_callback));
 
   leds[2] = CRGB::White;
   FastLED.show();
 
   // create executor
-  RCCHECK(rclc_executor_init(&executor, &support.context, 4, &allocator));
+  RCCHECK(rclc_executor_init(&executor, &support.context, 3, &allocator));
+  RCCHECK(rclc_executor_init(&sub_executor, &support.context, 1, &allocator));
   RCCHECK(rclc_executor_add_timer(&executor, &imu_timer));
   RCCHECK(rclc_executor_add_timer(&executor, &wh_pos_timer));
   RCCHECK(rclc_executor_add_timer(&executor, &motor_controll_timer));
 
-  RCCHECK(rclc_executor_add_subscription(&executor, &subscriber, &twist_msg, &twist_callback, ON_NEW_DATA));
+  RCCHECK(rclc_executor_add_subscription(&sub_executor, &subscriber, &twist_msg, &twist_callback, ON_NEW_DATA));
   
   leds[3] = CRGB::White;
   FastLED.show();
@@ -415,6 +420,7 @@ void setup() {
 }
 
 void loop() {
-  vTaskDelay(10 / portTICK_PERIOD_MS);
-  RCSOFTCHECK(rclc_executor_spin_some(&executor, RCL_MS_TO_NS(40)));  // threadセーフではないことに注意
+  delay(50);
+  RCSOFTCHECK(rclc_executor_spin_some(&executor, RCL_MS_TO_NS(100)));  // threadセーフではないことに注意
+  RCSOFTCHECK(rclc_executor_spin_some(&sub_executor, RCL_MS_TO_NS(100)));  // threadセーフではないことに注意
 }
