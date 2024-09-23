@@ -145,7 +145,8 @@ void motor_exec(){
   for(int i=0;i<4;i++){
     motor_handler.Control_Motor(Speed[i], i+1, Acce, brake, &Receiv);//スピード0：モーター停止
     // debug_message("i = %d send speed %d receiver id %d temp %d err %d", i, Speed[i], Receiv.ID, Receiv.Temp, Receiv.ErrCode);
-    delay(5);//1回の通信ごとに5msのWaitが必要（RS485の半二重通信の問題と思われる）
+    vTaskDelay(5 / portTICK_PERIOD_MS);//1回の通信ごとに5msのWaitが必要（RS485の半二重通信の問題と思われる）
+    
     switch (i)
     {
     case 0:
@@ -255,8 +256,10 @@ void remote_control(){
         ESP.restart();
       }
     } else {
+      twist_msg.linear.x = 0;
+      twist_msg.angular.z = 0;
     }
-    vTaskDelay(50 / portTICK_PERIOD_MS);
+    vTaskDelay(100 / portTICK_PERIOD_MS);
   }
 }
 
