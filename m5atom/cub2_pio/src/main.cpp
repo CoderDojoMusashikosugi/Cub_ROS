@@ -59,6 +59,11 @@ Receiver Receiv;
 // M5Stackのモジュールによって対応するRX,TXのピン番号が違うためM5製品とRS485モジュールに対応させてください
 auto motor_handler = MotorHandler(33, 23); // Cub2 ATOM(33, 23) Cub1 RX,TX ATOM(32, 26) DDSM210 ATOM S3(2,1)
 
+uint16_t right_wheel_position1 = 0;
+uint16_t right_wheel_position2 = 0;
+uint16_t left_wheel_position1 = 0;
+uint16_t left_wheel_position2 = 0;
+
 int last_num_sign[2] = {0,0};
 const int16_t SPEED_MAX = 115;  //DDSM115 115rpm = max11
 const int16_t SPEED_MIN = -115;
@@ -139,8 +144,22 @@ void imu_timer_callback(rcl_timer_t * imu_timer, int64_t last_call_time) {
 void motor_exec(){
   for(int i=0;i<4;i++){
     motor_handler.Control_Motor(Speed[i], i+1, Acce, brake, &Receiv);//スピード0：モーター停止
-    debug_message("i = %d send speed %d receiver id %d temp %d err %d", i, Speed[i], Receiv.ID, Receiv.Temp, Receiv.ErrCode);
+    // debug_message("i = %d send speed %d receiver id %d temp %d err %d", i, Speed[i], Receiv.ID, Receiv.Temp, Receiv.ErrCode);
     delay(5);//1回の通信ごとに5msのWaitが必要（RS485の半二重通信の問題と思われる）
+    switch (i)
+    {
+    case 0:
+      left_wheel_position2 = Receiv.Position;
+      break;
+    case 1:
+      right_wheel_position1 = Receiv.Position;
+    case 2:
+      left_wheel_position1 = Receiv.Position;
+    case 3:
+      right_wheel_position2 = Receiv.Position;
+    default:
+      break;
+    }
   }
 }
 
@@ -162,7 +181,7 @@ void vehicle_run(int right, int left){
   Speed[0]=Speed[2]=-right;
   Speed[1]=Speed[3]=left;
   brake = Brake_Disable;
-  debug_message("vehicle run value %d %d", right, left);
+  // debug_message("vehicle run value %d %d", right, left);
   motor_exec();
 } 
 
@@ -175,27 +194,21 @@ int16_t get_motor_pos(uint32_t id){
 const float cub_d = 110;  // [mm] distance between center and wheel
 float motor_vel_unit = 1;  //[rpm]
 const float diameter = 150; // [mm] diameter of wheel
-int32_t l_motor_pos = 0;
-int32_t r_motor_pos = 0;
+uint16_t l_motor_pos = 0;
+uint16_t r_motor_pos = 0;
 
 void wh_pos_timer_callback(rcl_timer_t * wh_pos_timer, int64_t last_call_time) {
   RCLC_UNUSED(last_call_time);
   
   if (wh_pos_timer != NULL) {
-    int32_t right_wheel_position1 = (int32_t)get_motor_pos(0);
-    delay(5);
-    int32_t right_wheel_position2 = (int32_t)get_motor_pos(2);
-    delay(5);
-    int32_t left_wheel_position1 = (int32_t)get_motor_pos[1];
-    delay(5);
-    int32_t left_wheel_position2 =  (int32_t)get_motor_pos[2];
-    delay(5);
+    
+    debug_message("rightpos left pos %d, %d, %d, %d", right_wheel_position1, right_wheel_position2, left_wheel_position1, left_wheel_position2);
 
     // メッセージデータの設定
-    wheel_positions_msg.data.data[0] = left_wheel_position1;
-    wheel_positions_msg.data.data[1] = right_wheel_position1;
-    wheel_positions_msg.data.data[2] = left_wheel_position2;
-    wheel_positions_msg.data.data[3] = right_wheel_position2;
+    wheel_positions_msg.data.data[0] = static_cast<int32_t>(left_wheel_position1);
+    wheel_positions_msg.data.data[1] = static_cast<int32_t>(right_wheel_position1);
+    wheel_positions_msg.data.data[2] = static_cast<int32_t>(left_wheel_position2);
+    wheel_positions_msg.data.data[3] = static_cast<int32_t>(right_wheel_position2);
 
     // メッセージのパブリッシュ
     RCCHECK(rcl_publish(&wh_pos_publisher, &wheel_positions_msg, NULL));
@@ -217,7 +230,6 @@ void motor_controll_callback(rcl_timer_t * motor_callback_timer, int64_t last_ca
   int r_goal_vel = (int)(r_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit); // right goal velocity[rpm] # TODO: check whether need to add dvidid by motor_velocity_unit
   int l_goal_vel = (int)(l_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit); // left goal velocity[rpm]
 
-  debug_message("goal velocity (r,l)=(%d, %d)", r_goal_vel, l_goal_vel);
   vehicle_run(r_goal_vel, l_goal_vel);
 }
 
