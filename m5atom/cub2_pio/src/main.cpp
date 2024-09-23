@@ -43,7 +43,7 @@ rcl_timer_t imu_timer;
 rcl_timer_t wh_pos_timer;
 rcl_timer_t motor_controll_timer;
 rcl_init_options_t init_options; // Humble
-size_t domain_id = 1;
+size_t domain_id = 0;
 
 
 // for cub motor valiable
@@ -166,15 +166,15 @@ void vehicle_run(int right, int left){
   motor_exec();
 } 
 
-void get_motor_pos(uint32_t id){
-  motor_handoler.Get_Motor(id+1, &Receiv);
+int16_t get_motor_pos(uint32_t id){
+  motor_handler.Get_Motor(id+1, &Receiv);
   return Receiv.Position;
 }
 
 // caluclate velocity for each dinamixel from twist value
-const float cub_d = 800;  // [mm] distance between center and wheel
-float motor_vel_unit = 0.01;  //[rpm]
-const float diameter = 550; // [mm] diameter of wheel
+const float cub_d = 110;  // [mm] distance between center and wheel
+float motor_vel_unit = 1;  //[rpm]
+const float diameter = 150; // [mm] diameter of wheel
 int32_t l_motor_pos = 0;
 int32_t r_motor_pos = 0;
 
@@ -182,17 +182,13 @@ void wh_pos_timer_callback(rcl_timer_t * wh_pos_timer, int64_t last_call_time) {
   RCLC_UNUSED(last_call_time);
   
   if (wh_pos_timer != NULL) {
-    // buffur clear
-    while(DXL_SERIAL.available() > 0){
-      DXL_SERIAL.read();
-    }
-    int32_t right_wheel_position1 = get_motor_pos(0);
+    int32_t right_wheel_position1 = (int32_t)get_motor_pos(0);
     delay(5);
-    int32_t right_wheel_position2 = get_motor_pos(2)
+    int32_t right_wheel_position2 = (int32_t)get_motor_pos(2);
     delay(5);
-    int32_t left_wheel_position1 = get_motor_pos[1];
+    int32_t left_wheel_position1 = (int32_t)get_motor_pos[1];
     delay(5);
-    int32_t left_wheel_position2 =  get_motor_pos[2];
+    int32_t left_wheel_position2 =  (int32_t)get_motor_pos[2];
     delay(5);
 
     // メッセージデータの設定
@@ -226,7 +222,6 @@ void motor_controll_callback(rcl_timer_t * motor_callback_timer, int64_t last_ca
 }
 
 void remote_control(){
-  geometry_msgs__msg__Twist twist_msg;
   float default_linear = 0.3;
   float default_angular = 2.0;
   while(1){
@@ -242,7 +237,8 @@ void remote_control(){
           twist_msg.linear.x = default_linear * (ps5.LStickY()) / 127.0;
           twist_msg.angular.z = - default_angular * (ps5.LStickX()) / 127.0;
         }
-        twist_callback(&twist_msg);
+        rcl_timer_t *temp_timer = nullptr;
+        motor_controll_callback(temp_timer, 0);
       } else if (ps5.Share() && ps5.Options()) {
         ESP.restart();
       }
