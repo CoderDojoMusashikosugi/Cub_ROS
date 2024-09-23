@@ -172,7 +172,6 @@ void wh_pos_timer_callback(rcl_timer_t * wh_pos_timer, int64_t last_call_time) {
 void twist_callback(const void * msgin)
 {
   prev_cmd_time = millis();
-  delay(100);
 }
 
 void motor_controll_callback(rcl_timer_t * motor_callback_timer, int64_t last_call_time)
@@ -420,7 +419,6 @@ void setup() {
 }
 
 void loop() {
-  delay(50);
   RCSOFTCHECK(rclc_executor_spin_some(&executor, RCL_MS_TO_NS(100)));  // threadセーフではないことに注意
   RCSOFTCHECK(rclc_executor_spin_some(&sub_executor, RCL_MS_TO_NS(100)));  // threadセーフではないことに注意
 }

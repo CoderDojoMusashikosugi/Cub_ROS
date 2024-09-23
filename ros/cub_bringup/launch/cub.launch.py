@@ -16,7 +16,7 @@ def generate_launch_description():
             package='micro_ros_agent',
             executable='micro_ros_agent',
             name='micro_ros_agent',
-            arguments=["serial", "--dev", "/dev/ttyATOM", "-b", "115200", "-v6"]
+            arguments=["serial", "--dev", "/dev/ttyATOM", "-b", "1500000", "-v6"]
         ),
 
         IncludeLaunchDescription(
