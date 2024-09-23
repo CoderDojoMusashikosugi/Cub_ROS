@@ -9,8 +9,8 @@
 #include <std_msgs/msg/string.h>
 #include <sensor_msgs/msg/imu.h>
 #include <geometry_msgs/msg/twist.h>
-#include <nav_msgs/msg/odometry.h>
 #include <rosidl_runtime_c/message_type_support_struct.h>
+#include <std_msgs/msg/int32_multi_array.h>
 
 #include <DDT_Motor_M15M06.h>
 
@@ -25,21 +25,23 @@
 
 // micro-ros valiable
 rcl_publisher_t imu_publisher;
-rcl_publisher_t odom_publisher;
+rcl_publisher_t wh_pos_publisher;
 rcl_publisher_t debug_publisher;
 rcl_subscription_t subscriber;
 std_msgs__msg__String debug_msg;
 sensor_msgs__msg__Imu imu_msg;
 geometry_msgs__msg__Twist twist_msg;
-nav_msgs__msg__Odometry odom_msg;
-
+std_msgs__msg__Int32MultiArray wheel_positions_msg;
+unsigned long prev_cmd_time = 0;
 
 rclc_executor_t executor;
+rclc_executor_t sub_executor;
 rclc_support_t support;
 rcl_allocator_t allocator;
 rcl_node_t node;
 rcl_timer_t imu_timer;
-rcl_timer_t odom_timer;
+rcl_timer_t wh_pos_timer;
+rcl_timer_t motor_controll_timer;
 rcl_init_options_t init_options; // Humble
 size_t domain_id = 1;
 
@@ -66,9 +68,9 @@ CRGB leds[NUM_LEDS];
 
 // for PS5 valiable
 #include <ps5Controller.h>
-// #include <EspEasyTask.h>
+#include <EspEasyTask.h>
 
-// EspEasyTask ps5task;
+EspEasyTask ps5task;
 
 void connect_dualsense(){
   ps5.begin("e8:47:3a:34:44:a6"); //replace with your MAC address
@@ -76,33 +78,36 @@ void connect_dualsense(){
   esp_log_level_set("ps5_SPP", ESP_LOG_VERBOSE);  
 }
 
-#define RCCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){error_loop();}}
+void debug_message(const char* format, ...);
+
+#define RCCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){error_loop(temp_rc);}}
 #define RCSOFTCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){}}
 
 // Error handle loop
-void error_loop() {
-  printf("Error at line %d: %s\n", __LINE__, rcl_get_error_string().str);
-  while(1) {
-    delay(100);
-  }
+void error_loop(rcl_ret_t temp_rc) {
+  leds[24] = CRGB::Red;
+  FastLED.show();
+  vTaskDelay(1000 / portTICK_PERIOD_MS);
+  debug_message("Error at line %d: error value %d \n %s\n", __LINE__, (int32_t)temp_rc, rcl_get_error_string().str);
+
+  rcl_reset_error();
+  leds[24] = CRGB::Black;
+  FastLED.show();
 }
 
-char message_buffer[100];
 // デバッグメッセージを出力する関数
+char message_buffer[255];
 void debug_message(const char* format, ...) {
   va_list args;
   va_start(args, format);
   vsnprintf(message_buffer, sizeof(message_buffer), format, args);
   va_end(args);
 
-  // シリアルモニタに出力
-  // Serial.println(message_buffer);
-
   // ROSトピックにパブリッシュ
   debug_msg.data.data = message_buffer;
   debug_msg.data.size = strlen(message_buffer);
   debug_msg.data.capacity = sizeof(message_buffer);
-  rcl_publish(&debug_publisher, &debug_msg, NULL);
+  RCCHECK(rcl_publish(&debug_publisher, &debug_msg, NULL));
 }
 
 void imu_timer_callback(rcl_timer_t * imu_timer, int64_t last_call_time) {
@@ -161,121 +166,66 @@ void vehicle_run(int right, int left){
   motor_exec();
 } 
 
+void get_motor_pos(uint32_t id){
+  motor_handoler.Get_Motor(id+1, &Receiv);
+  return Receiv.Position;
+}
+
 // caluclate velocity for each dinamixel from twist value
 const float cub_d = 800;  // [mm] distance between center and wheel
-float motor_vel_unit = 0.001;  //[rpm]
+float motor_vel_unit = 0.01;  //[rpm]
 const float diameter = 550; // [mm] diameter of wheel
 int32_t l_motor_pos = 0;
 int32_t r_motor_pos = 0;
-// オドメトリ情報
-double odom_x = 0.0;
-double odom_y = 0.0;
-double odom_theta = 0.0;
 
-
-void update_odometry(int32_t left_position, int32_t right_position, double dt, double &x, double &y, double &theta, double &vx, double &vtheta) {
-    // エンコーダのカウント差分を計算
-    int32_t delta_left = left_position - l_motor_pos;
-    int32_t delta_right = right_position - r_motor_pos;
-
-   if (delta_left < 2*10^9){
-      delta_left += 2147483647;
-    } else if (delta_left > 2*10^9){
-      delta_left -= 2147483648;
-    }
-    if (delta_right < 2*10^9){
-      delta_right += 2147483647;
-    } else if (delta_right > 2*10^9){
-      delta_right -= 2147483648;
-    }
-
-    // 前の位置を更新
-    l_motor_pos = left_position;
-    r_motor_pos = right_position;
-
-    // エンコーダのカウントをメートルに変換
-    double d_left = delta_left * (2.0 * M_PI * diameter);
-    double d_right = delta_right * (2.0 * M_PI * diameter);
-
-    // 距離の平均と回転角を計算
-    double d_center = (d_left + d_right) / 2.0;
-    double d_theta = (d_right - d_left) / cub_d;
-
-    // ロボットの姿勢を更新
-    x += d_center * cos(theta);
-    y += d_center * sin(theta);
-    theta += d_theta;
-
-    // 速度を計算
-    vx = d_center / dt;
-    vtheta = d_theta / dt;
-}
-
-void odom_timer_callback(rcl_timer_t * odom_timer, int64_t last_call_time) {
+void wh_pos_timer_callback(rcl_timer_t * wh_pos_timer, int64_t last_call_time) {
   RCLC_UNUSED(last_call_time);
-  static rcl_time_point_value_t last_time;
-  rcl_time_point_value_t now_time;
-  // 現在の時間を取得
-  rcl_clock_t clock;
-  RCCHECK(rcl_clock_init(RCL_ROS_TIME, &clock, &allocator));
+  
+  if (wh_pos_timer != NULL) {
+    // buffur clear
+    while(DXL_SERIAL.available() > 0){
+      DXL_SERIAL.read();
+    }
+    int32_t right_wheel_position1 = get_motor_pos(0);
+    delay(5);
+    int32_t right_wheel_position2 = get_motor_pos(2)
+    delay(5);
+    int32_t left_wheel_position1 = get_motor_pos[1];
+    delay(5);
+    int32_t left_wheel_position2 =  get_motor_pos[2];
+    delay(5);
 
-  RCCHECK(rcl_clock_get_now(&clock, &now_time));
-  double dt = (now_time - last_time) / 1e9;  // 秒に変換
-  last_time = now_time;
+    // メッセージデータの設定
+    wheel_positions_msg.data.data[0] = left_wheel_position1;
+    wheel_positions_msg.data.data[1] = right_wheel_position1;
+    wheel_positions_msg.data.data[2] = left_wheel_position2;
+    wheel_positions_msg.data.data[3] = right_wheel_position2;
 
-  if (odom_timer != NULL) {
-
-    // 前のモータ位置情報
-    int32_t l_motor_pos = 0;
-    int32_t r_motor_pos = 0;
-
-    // 速度情報
-    double vx = 0.0;
-    double vy = 0.0;
-    double vtheta = 0.0;
-    
-    // int32_t r_cur_pos = dxl.getPresentPosition(DXL1_ID);
-    // int32_t l_cur_pos = dxl.getPresentPosition(DXL2_ID);
-
-    // オドメトリを更新
-    // update_odometry(l_cur_pos, r_cur_pos, dt, odom_x, odom_y, odom_theta, vx, vtheta);
-
-    // オドメトリメッセージを作成
-    nav_msgs__msg__Odometry odom_msg;
-    odom_msg.pose.pose.position.x = odom_x;
-    odom_msg.pose.pose.position.y = odom_y;
-    odom_msg.pose.pose.orientation.z = sin(odom_theta / 2.0);
-    odom_msg.pose.pose.orientation.w = cos(odom_theta / 2.0);
-    odom_msg.twist.twist.linear.x = vx;
-    odom_msg.twist.twist.angular.z = vtheta;
-
-    // オドメトリをパブリッシュ
-    RCSOFTCHECK(rcl_publish(&odom_publisher, &odom_msg, NULL));
+    // メッセージのパブリッシュ
+    RCCHECK(rcl_publish(&wh_pos_publisher, &wheel_positions_msg, NULL));
   }
 }
 
 void twist_callback(const void * msgin)
 {
-  const geometry_msgs__msg__Twist * twist_msg = (const geometry_msgs__msg__Twist *)msgin;
-  debug_message("Received Twist message:");
-  debug_message("Linear: x=%.2f, y=%.2f, z=%.2f", twist_msg->linear.x, twist_msg->linear.y, twist_msg->linear.z);
-  debug_message("Angular: x=%.2f, y=%.2f, z=%.2f", twist_msg->angular.x, twist_msg->angular.y, twist_msg->angular.z);
-  double r_vel_m = twist_msg->linear.x + cub_d * twist_msg->angular.z / 1000.0; // [m/s]
-  double l_vel_m = twist_msg->linear.x - cub_d * twist_msg->angular.z / 1000.0; // [m/s]
+  prev_cmd_time = millis();
+}
+
+void motor_controll_callback(rcl_timer_t * motor_callback_timer, int64_t last_call_time)
+{
+  RCLC_UNUSED(last_call_time);
+  double r_vel_m = twist_msg.linear.x + cub_d * twist_msg.angular.z / 1000.0; // [m/s]
+  double l_vel_m = twist_msg.linear.x - cub_d * twist_msg.angular.z / 1000.0; // [m/s]
   double r_vel_r = r_vel_m / (diameter / 1000.0 / 2.0); // [rad/s]
   double l_vel_r = l_vel_m / (diameter / 1000.0 / 2.0); // [rad/s]
-  int r_goal_vel = (int)(r_vel_r / (2 * M_PI) * 60.0); // right goal velocity[rpm]
-  int l_goal_vel = (int)(l_vel_r / (2 * M_PI) * 60.0); // left goal velocity[rpm]
+  int r_goal_vel = (int)(r_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit); // right goal velocity[rpm] # TODO: check whether need to add dvidid by motor_velocity_unit
+  int l_goal_vel = (int)(l_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit); // left goal velocity[rpm]
 
   debug_message("goal velocity (r,l)=(%d, %d)", r_goal_vel, l_goal_vel);
   vehicle_run(r_goal_vel, l_goal_vel);
-  // dxl.setGoalVelocity(DXL1_ID, r_goal_vel);
-  // delay(20);
-  // dxl.setGoalVelocity(DXL2_ID, l_goal_vel);
 }
 
 void remote_control(){
-  // Serial.println("ps5 loop");
   geometry_msgs__msg__Twist twist_msg;
   float default_linear = 0.3;
   float default_angular = 2.0;
@@ -298,7 +248,7 @@ void remote_control(){
       }
     } else {
     }
-    delay(50);
+    vTaskDelay(50 / portTICK_PERIOD_MS);
   }
 }
 
@@ -309,7 +259,7 @@ void setup() {
   // auto motor_handler = MotorHandler(33, 23); // Cub2 ATOM(33, 23) Cub1 RX,TX ATOM(32, 26) DDSM210 ATOM S3(2,1)
 
   // Configure serial transport
-  Serial.begin(115200);
+  Serial.begin(1500000);
   set_microros_serial_transports(Serial);
   delay(2000);
 
@@ -326,9 +276,14 @@ void setup() {
 
   // initialize PS5
   connect_dualsense();
-  // ps5task.begin(remote_control, 2, 2);
+  ps5task.begin(remote_control, 2, 2);
 
-  leds[5] = CRGB::White;
+  // メッセージの初期化
+  std_msgs__msg__Int32MultiArray__init(&wheel_positions_msg);
+  wheel_positions_msg.data.capacity = 4;
+  wheel_positions_msg.data.size = 4;
+  wheel_positions_msg.data.data = (int32_t*) malloc(4 * sizeof(int32_t));
+ leds[5] = CRGB::White;
   FastLED.show();
   
   // initialize micro-ros
@@ -363,19 +318,20 @@ void setup() {
     ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, Imu),
     "pub_imu"));
 
-  // create odom_publisher
+  // create wh_pos_publisher
   RCCHECK(rclc_publisher_init_default(
-    &odom_publisher,
+    &wh_pos_publisher,
     &node,
-    ROSIDL_GET_MSG_TYPE_SUPPORT(nav_msgs, msg, Odometry),
-    "odom"));
+    ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int32MultiArray),
+    "wheel_positions"));
+
 
   // create subscliber
   RCCHECK(rclc_subscription_init_default(
     &subscriber,
     &node,
     ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Twist),
-    "set_twist"));
+    "cmd_vel"));
 
   // create imu_timer,
   // const unsigned int timer_timeout = 1000;
@@ -385,29 +341,37 @@ void setup() {
   //   RCL_MS_TO_NS(timer_timeout),
   //   imu_timer_callback));
   
-  // RCCHECK(rclc_timer_init_default(
-  //   &odom_timer,
-  //   &support,
-  //   RCL_MS_TO_NS(timer_timeout),
-  //   odom_timer_callback));
+  RCCHECK(rclc_timer_init_default(
+    &wh_pos_timer,
+    &support,
+    RCL_MS_TO_NS(100),
+    wh_pos_timer_callback));
+  
+  // create motor controll timer
+  RCCHECK(rclc_timer_init_default(
+    &motor_controll_timer,
+    &support,
+    RCL_MS_TO_NS(100),
+    motor_controll_callback));
 
   leds[2] = CRGB::White;
   FastLED.show();
 
   // create executor
-  RCCHECK(rclc_executor_init(&executor, &support.context, 1, &allocator));
+  RCCHECK(rclc_executor_init(&executor, &support.context, 2, &allocator));
+  RCCHECK(rclc_executor_init(&sub_executor, &support.context, 1, &allocator));
   // RCCHECK(rclc_executor_add_timer(&executor, &imu_timer));
-  // RCCHECK(rclc_executor_add_timer(&executor, &odom_timer));
+  RCCHECK(rclc_executor_add_timer(&executor, &wh_pos_timer));
+  RCCHECK(rclc_executor_add_timer(&executor, &motor_controll_timer));
 
-  RCCHECK(rclc_executor_add_subscription(&executor, &subscriber, &twist_msg, &twist_callback, ON_NEW_DATA));
+  RCCHECK(rclc_executor_add_subscription(&sub_executor, &subscriber, &twist_msg, &twist_callback, ON_NEW_DATA));
 
   leds[3] = CRGB::White;
   FastLED.show();
   delay(10);
 }
 
-
 void loop() {
-  delay(100);
-  RCSOFTCHECK(rclc_executor_spin_some(&executor, RCL_MS_TO_NS(100)));
+  RCSOFTCHECK(rclc_executor_spin_some(&executor, RCL_MS_TO_NS(100)));  // threadセーフではないことに注意
+  RCSOFTCHECK(rclc_executor_spin_some(&sub_executor, RCL_MS_TO_NS(100)));  // threadセーフではないことに注意
 }
