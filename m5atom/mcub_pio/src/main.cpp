@@ -65,6 +65,25 @@ const float DXL_PROTOCOL_VERSION = 2.0; //プロトコルのバージョン
 const uint8_t DXL1_ID = 1;
 const uint8_t DXL2_ID = 2;
 
+enum states {
+  WAITING_AGENT,
+  AGENT_AVAILABLE,
+  AGENT_CONNECTED,
+  AGENT_DISCONNECTED
+} state;
+
+#define EXECUTE_EVERY_N_MS(MS, X)      \
+  do {                                 \
+    static volatile int64_t init = -1; \
+    if (init == -1) {                  \
+      init = uxr_millis();             \
+    }                                  \
+    if (uxr_millis() - init > MS) {    \
+      X;                               \
+      init = uxr_millis();             \
+    }                                  \
+  } while (0)
+
 // for LED valiable
 CRGB leds[NUM_LEDS];
 
@@ -90,8 +109,8 @@ void error_loop(rcl_ret_t temp_rc) {
   leds[24] = CRGB::Red;
   FastLED.show();
   vTaskDelay(1000 / portTICK_PERIOD_MS);
-  debug_message("Error at line %d: error value %d \n %s\n", __LINE__, (int32_t)temp_rc, rcl_get_error_string().str);
 
+  
   rcl_reset_error();
   leds[24] = CRGB::Black;
   FastLED.show();
@@ -191,7 +210,6 @@ void motor_controll_callback(rcl_timer_t * motor_callback_timer, int64_t last_ca
 }
 
 void remote_control(){
-  geometry_msgs__msg__Twist twist_msg;
   float default_linear = 0.3;
   float default_angular = 2.0;
   while(1){
@@ -207,7 +225,8 @@ void remote_control(){
           twist_msg.linear.x = default_linear * (ps5.LStickY()) / 127.0;
           twist_msg.angular.z = - default_angular * (ps5.LStickX()) / 127.0;
         }
-        twist_callback(&twist_msg);
+        rcl_timer_t* temp_timer = nullptr;
+        motor_controll_callback(temp_timer, 0);
       } else if (ps5.Share() && ps5.Options()) {
         ESP.restart();
       }
@@ -216,6 +235,108 @@ void remote_control(){
     vTaskDelay(50 / portTICK_PERIOD_MS);
   }
 }
+
+bool create_entities() {
+  // initialize micro-ros
+  allocator = rcl_get_default_allocator();
+
+  /* Humble */
+  // create init_options
+  init_options = rcl_get_zero_initialized_init_options();
+  RCCHECK(rcl_init_options_init(&init_options, allocator)); 
+  // Set ROS domain id
+  RCCHECK(rcl_init_options_set_domain_id(&init_options, domain_id));
+  // Setup support structure.
+  RCCHECK(rclc_support_init_with_options(&support, 0, NULL, &init_options, &allocator));
+  
+
+  // create node
+  RCCHECK(rclc_node_init_default(&node, "micro_ros_platformio_node", "", &support));
+
+  // create debug_publisher
+  RCCHECK(rclc_publisher_init_default(
+    &debug_publisher,
+    &node,
+    ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, String),
+    "mros_debug_topic"));
+
+  // create imu_publisher
+  RCCHECK(rclc_publisher_init_default(
+    &imu_publisher,
+    &node,
+    ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, Imu),
+    "pub_imu"));
+
+  // create wh_pos_publisher
+  RCCHECK(rclc_publisher_init_default(
+    &wh_pos_publisher,
+    &node,
+    ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int32MultiArray),
+    "wheel_positions"));
+
+
+  // create subscliber
+  RCCHECK(rclc_subscription_init_default(
+    &subscriber,
+    &node,
+    ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Twist),
+    "cmd_vel"));
+    
+  // create imu_timer,
+  const unsigned int timer_timeout = 1000;
+  RCCHECK(rclc_timer_init_default(
+    &imu_timer,
+    &support,
+    RCL_MS_TO_NS(timer_timeout),
+    imu_timer_callback));
+  
+  // create wh_pos_timer
+  RCCHECK(rclc_timer_init_default(
+    &wh_pos_timer,
+    &support,
+    RCL_MS_TO_NS(100),
+    wh_pos_timer_callback));
+  
+  // create motor controll timer
+  RCCHECK(rclc_timer_init_default(
+    &motor_controll_timer,
+    &support,
+    RCL_MS_TO_NS(100),
+    motor_controll_callback));
+
+  // create executor
+  RCCHECK(rclc_executor_init(&executor, &support.context, 3, &allocator));
+  RCCHECK(rclc_executor_init(&sub_executor, &support.context, 1, &allocator));
+  RCCHECK(rclc_executor_add_timer(&executor, &imu_timer));
+  RCCHECK(rclc_executor_add_timer(&executor, &wh_pos_timer));
+  RCCHECK(rclc_executor_add_timer(&executor, &motor_controll_timer));
+
+  RCCHECK(rclc_executor_add_subscription(&sub_executor, &subscriber, &twist_msg, &twist_callback, ON_NEW_DATA));
+  
+  return true;
+}
+
+void destroy_entities() {
+  rmw_context_t* rmw_context = rcl_context_get_rmw_context(&support.context);
+  (void)rmw_uros_set_context_entity_destroy_session_timeout(rmw_context, 0);
+  // free(wheel_positions_msg.data.data);
+  // std_msgs__msg__Int32MultiArray__destroy(&wheel_positions_msg);
+
+  rcl_publisher_fini(&debug_publisher, &node);
+  rcl_publisher_fini(&imu_publisher, &node);
+  rcl_publisher_fini(&wh_pos_publisher, &node);
+  rcl_subscription_fini(&subscriber, &node);
+  rcl_timer_fini(&imu_timer);
+  rcl_timer_fini(&wh_pos_timer);
+  rcl_timer_fini(&motor_controll_timer);
+  rclc_executor_fini(&executor);
+  rclc_executor_fini(&sub_executor);
+  rcl_node_fini(&node);
+  rclc_support_fini(&support);
+  rcl_init_options_fini(&init_options);
+}
+
+
 
 void setup() {
   auto cfg = M5.config();
@@ -236,13 +357,12 @@ void setup() {
   // initialize PS5
   connect_dualsense();
   ps5task.begin(remote_control, 2, 2);
-
+  
   // メッセージの初期化
   std_msgs__msg__Int32MultiArray__init(&wheel_positions_msg);
   wheel_positions_msg.data.capacity = 2;
   wheel_positions_msg.data.size = 2;
   wheel_positions_msg.data.data = (int32_t*) malloc(2 * sizeof(int32_t));
-
 
   // initialize dynamixel
   DXL_SERIAL.begin(57600, SERIAL_8N1, RX_SERVO, TX_SERVO);
@@ -332,93 +452,46 @@ void setup() {
   FastLED.show();
   delay(5);
 
-  // initialize micro-ros
-  allocator = rcl_get_default_allocator();
-
-  /* Humble */
-  // create init_options
-  init_options = rcl_get_zero_initialized_init_options();
-  RCCHECK(rcl_init_options_init(&init_options, allocator)); 
-  // Set ROS domain id
-  RCCHECK(rcl_init_options_set_domain_id(&init_options, domain_id));
-  // Setup support structure.
-  RCCHECK(rclc_support_init_with_options(&support, 0, NULL, &init_options, &allocator));
-
-  // create node
-  RCCHECK(rclc_node_init_default(&node, "micro_ros_platformio_node", "", &support));
-
-  leds[1] = CRGB::White;
-  FastLED.show();
-
-  // create debug_publisher
-  RCCHECK(rclc_publisher_init_default(
-    &debug_publisher,
-    &node,
-    ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, String),
-    "mros_debug_topic"));
-
-  // create imu_publisher
-  RCCHECK(rclc_publisher_init_default(
-    &imu_publisher,
-    &node,
-    ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, Imu),
-    "pub_imu"));
-
-  // create wh_pos_publisher
-  RCCHECK(rclc_publisher_init_default(
-    &wh_pos_publisher,
-    &node,
-    ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int32MultiArray),
-    "wheel_positions"));
-
-
-  // create subscliber
-  RCCHECK(rclc_subscription_init_default(
-    &subscriber,
-    &node,
-    ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Twist),
-    "cmd_vel"));
-    
-  // create imu_timer,
-  const unsigned int timer_timeout = 1000;
-  RCCHECK(rclc_timer_init_default(
-    &imu_timer,
-    &support,
-    RCL_MS_TO_NS(timer_timeout),
-    imu_timer_callback));
-  
-  // create wh_pos_timer
-  RCCHECK(rclc_timer_init_default(
-    &wh_pos_timer,
-    &support,
-    RCL_MS_TO_NS(100),
-    wh_pos_timer_callback));
-  
-  // create motor controll timer
-  RCCHECK(rclc_timer_init_default(
-    &motor_controll_timer,
-    &support,
-    RCL_MS_TO_NS(100),
-    motor_controll_callback));
-
-  leds[2] = CRGB::White;
-  FastLED.show();
-
-  // create executor
-  RCCHECK(rclc_executor_init(&executor, &support.context, 3, &allocator));
-  RCCHECK(rclc_executor_init(&sub_executor, &support.context, 1, &allocator));
-  RCCHECK(rclc_executor_add_timer(&executor, &imu_timer));
-  RCCHECK(rclc_executor_add_timer(&executor, &wh_pos_timer));
-  RCCHECK(rclc_executor_add_timer(&executor, &motor_controll_timer));
-
-  RCCHECK(rclc_executor_add_subscription(&sub_executor, &subscriber, &twist_msg, &twist_callback, ON_NEW_DATA));
-  
-  leds[3] = CRGB::White;
-  FastLED.show();
   delay(10);
 }
 
 void loop() {
-  RCSOFTCHECK(rclc_executor_spin_some(&executor, RCL_MS_TO_NS(100)));  // threadセーフではないことに注意
-  RCSOFTCHECK(rclc_executor_spin_some(&sub_executor, RCL_MS_TO_NS(100)));  // threadセーフではないことに注意
+  switch (state) {
+    case WAITING_AGENT:
+      EXECUTE_EVERY_N_MS(500,
+                         state = (RMW_RET_OK == rmw_uros_ping_agent(100, 1))
+                                     ? AGENT_AVAILABLE
+                                     : WAITING_AGENT;);
+      break;
+    case AGENT_AVAILABLE:
+      state = (true == create_entities()) ? AGENT_CONNECTED : WAITING_AGENT;
+      if (state == WAITING_AGENT) {
+        destroy_entities();
+      };
+      break;
+    case AGENT_CONNECTED:
+      EXECUTE_EVERY_N_MS(200,
+                         state = (RMW_RET_OK == rmw_uros_ping_agent(100, 1))
+                                     ? AGENT_CONNECTED
+                                     : AGENT_DISCONNECTED;);
+      if (state == AGENT_CONNECTED) {
+        RCSOFTCHECK(rclc_executor_spin_some(&executor, RCL_MS_TO_NS(100)));  // threadセーフではないことに注意
+        RCSOFTCHECK(rclc_executor_spin_some(&sub_executor, RCL_MS_TO_NS(100)));  // threadセーフではないことに注意
+      }
+      break;
+    case AGENT_DISCONNECTED:
+      destroy_entities();
+      state = WAITING_AGENT;
+      break;
+    default:
+      break;
+  }
+
+  if (state == AGENT_CONNECTED) {
+    leds[0] = CRGB::Green;
+    FastLED.show();
+  } else {
+    leds[0] = CRGB::Red;
+    FastLED.show();
+  }
 }
