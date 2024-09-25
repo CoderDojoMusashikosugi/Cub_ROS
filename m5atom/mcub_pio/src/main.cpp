@@ -67,6 +67,8 @@ const uint8_t DXL2_ID = 2;
 
 // Mutexの宣言
 SemaphoreHandle_t mutex;
+// タイマーのハンドル
+TimerHandle_t motorControlTimer;
 
 enum states {
   WAITING_AGENT,
@@ -199,9 +201,8 @@ void twist_callback(const void * msgin)
   prev_cmd_time = millis();
 }
 
-void motor_controll_callback(rcl_timer_t * motor_callback_timer, int64_t last_call_time)
+void motor_controll_callback(TimerHandle_t xTimer)
 {
-  RCLC_UNUSED(last_call_time);
   double r_vel_m = twist_msg.linear.x + cub_d * twist_msg.angular.z / 1000.0; // [m/s]
   double l_vel_m = twist_msg.linear.x - cub_d * twist_msg.angular.z / 1000.0; // [m/s]
   double r_vel_r = r_vel_m / (diameter / 1000.0 / 2.0); // [rad/s]
@@ -234,8 +235,6 @@ void remote_control(){
           twist_msg.linear.x = default_linear * (ps5.LStickY()) / 127.0;
           twist_msg.angular.z = - default_angular * (ps5.LStickX()) / 127.0;
         }
-        rcl_timer_t* temp_timer = nullptr;
-        motor_controll_callback(temp_timer, 0);
       } else if (ps5.Share() && ps5.Options()) {
         ESP.restart();
       }
@@ -306,19 +305,11 @@ bool create_entities() {
     RCL_MS_TO_NS(100),
     wh_pos_timer_callback));
   
-  // create motor controll timer
-  RCCHECK(rclc_timer_init_default(
-    &motor_controll_timer,
-    &support,
-    RCL_MS_TO_NS(100),
-    motor_controll_callback));
-
   // create executor
-  RCCHECK(rclc_executor_init(&executor, &support.context, 3, &allocator));
+  RCCHECK(rclc_executor_init(&executor, &support.context, 2, &allocator));
   RCCHECK(rclc_executor_init(&sub_executor, &support.context, 1, &allocator));
   RCCHECK(rclc_executor_add_timer(&executor, &imu_timer));
   RCCHECK(rclc_executor_add_timer(&executor, &wh_pos_timer));
-  RCCHECK(rclc_executor_add_timer(&executor, &motor_controll_timer));
 
   RCCHECK(rclc_executor_add_subscription(&sub_executor, &subscriber, &twist_msg, &twist_callback, ON_NEW_DATA));
   
@@ -335,7 +326,6 @@ void destroy_entities() {
   RCCHECK(rcl_subscription_fini(&subscriber, &node));
   RCCHECK(rcl_timer_fini(&imu_timer));
   RCCHECK(rcl_timer_fini(&wh_pos_timer));
-  RCCHECK(rcl_timer_fini(&motor_controll_timer));
   RCCHECK(rclc_executor_fini(&executor));
   RCCHECK(rclc_executor_fini(&sub_executor));
   RCCHECK(rcl_node_fini(&node));
@@ -462,6 +452,25 @@ void setup() {
   delay(5);
 
   delay(10);
+  // タイマーを作成（20ms周期）
+  motorControlTimer = xTimerCreate("MotorControlTimer",     // タイマーの名前
+                                   pdMS_TO_TICKS(20),       // タイマー周期 (20ms)
+                                   pdTRUE,                  // 自動リロード
+                                   (void *)0,               // タイマーID
+                                   motor_controll_callback  // コールバック関数
+                                   );
+  if (motorControlTimer == NULL) {
+    leds[1] = CRGB::Red;
+    FastLED.show();
+  } else {
+    leds[1] = CRGB::Blue;
+    FastLED.show();
+    // タイマーのスタート
+    if (xTimerStart(motorControlTimer, 0) != pdPASS) {
+      leds[1] = CRGB::Green;
+      FastLED.show();
+    }
+  }
 }
 
 void loop() {
