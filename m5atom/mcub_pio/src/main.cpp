@@ -65,6 +65,9 @@ const float DXL_PROTOCOL_VERSION = 2.0; //プロトコルのバージョン
 const uint8_t DXL1_ID = 1;
 const uint8_t DXL2_ID = 2;
 
+// Mutexの宣言
+SemaphoreHandle_t mutex;
+
 enum states {
   WAITING_AGENT,
   AGENT_AVAILABLE,
@@ -169,16 +172,19 @@ int32_t r_motor_pos = 0;
 void wh_pos_timer_callback(rcl_timer_t * wh_pos_timer, int64_t last_call_time) {
   RCLC_UNUSED(last_call_time);
   
+  int32_t right_wheel_position;
+  int32_t left_wheel_position;
   if (wh_pos_timer != NULL) {
-    // buffur clear
-    while(DXL_SERIAL.available() > 0){
-      DXL_SERIAL.read();
+    if (xSemaphoreTake(mutex, portMAX_DELAY)) {
+      while(DXL_SERIAL.available() > 0){
+        DXL_SERIAL.read();
+      }
+      right_wheel_position = dxl.getPresentPosition(DXL1_ID);
+      vTaskDelay(5 / portTICK_PERIOD_MS);
+      left_wheel_position = dxl.getPresentPosition(DXL2_ID);
+      vTaskDelay(5 / portTICK_PERIOD_MS);
+      xSemaphoreGive(mutex);
     }
-    int32_t right_wheel_position = dxl.getPresentPosition(DXL1_ID);
-    vTaskDelay(5 / portTICK_PERIOD_MS);
-    int32_t left_wheel_position = dxl.getPresentPosition(DXL2_ID);
-    vTaskDelay(5 / portTICK_PERIOD_MS);
-
     // メッセージデータの設定
     wheel_positions_msg.data.data[0] = left_wheel_position;
     wheel_positions_msg.data.data[1] = right_wheel_position;
@@ -203,10 +209,13 @@ void motor_controll_callback(rcl_timer_t * motor_callback_timer, int64_t last_ca
   int32_t r_goal_vel = (int32_t)(r_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit); // right goal velocity
   int32_t l_goal_vel = (int32_t)(l_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit); // left goal velocity
 
-  dxl.setGoalVelocity(DXL1_ID, r_goal_vel);
-  vTaskDelay(5 / portTICK_PERIOD_MS);
-  dxl.setGoalVelocity(DXL2_ID, l_goal_vel);
-  vTaskDelay(5 / portTICK_PERIOD_MS);
+  if (xSemaphoreTake(mutex, portMAX_DELAY)) {
+    dxl.setGoalVelocity(DXL1_ID, r_goal_vel);
+    vTaskDelay(5 / portTICK_PERIOD_MS);
+    dxl.setGoalVelocity(DXL2_ID, l_goal_vel);
+    vTaskDelay(5 / portTICK_PERIOD_MS);
+    xSemaphoreGive(mutex);
+  }
 }
 
 void remote_control(){
@@ -319,21 +328,19 @@ bool create_entities() {
 void destroy_entities() {
   rmw_context_t* rmw_context = rcl_context_get_rmw_context(&support.context);
   (void)rmw_uros_set_context_entity_destroy_session_timeout(rmw_context, 0);
-  // free(wheel_positions_msg.data.data);
-  // std_msgs__msg__Int32MultiArray__destroy(&wheel_positions_msg);
 
-  rcl_publisher_fini(&debug_publisher, &node);
-  rcl_publisher_fini(&imu_publisher, &node);
-  rcl_publisher_fini(&wh_pos_publisher, &node);
-  rcl_subscription_fini(&subscriber, &node);
-  rcl_timer_fini(&imu_timer);
-  rcl_timer_fini(&wh_pos_timer);
-  rcl_timer_fini(&motor_controll_timer);
-  rclc_executor_fini(&executor);
-  rclc_executor_fini(&sub_executor);
-  rcl_node_fini(&node);
-  rclc_support_fini(&support);
-  rcl_init_options_fini(&init_options);
+  RCCHECK(rcl_publisher_fini(&debug_publisher, &node));
+  RCCHECK(rcl_publisher_fini(&imu_publisher, &node));
+  RCCHECK(rcl_publisher_fini(&wh_pos_publisher, &node));
+  RCCHECK(rcl_subscription_fini(&subscriber, &node));
+  RCCHECK(rcl_timer_fini(&imu_timer));
+  RCCHECK(rcl_timer_fini(&wh_pos_timer));
+  RCCHECK(rcl_timer_fini(&motor_controll_timer));
+  RCCHECK(rclc_executor_fini(&executor));
+  RCCHECK(rclc_executor_fini(&sub_executor));
+  RCCHECK(rcl_node_fini(&node));
+  RCCHECK(rclc_support_fini(&support));
+  RCCHECK(rcl_init_options_fini(&init_options));
 }
 
 
@@ -341,6 +348,8 @@ void destroy_entities() {
 void setup() {
   auto cfg = M5.config();
   M5.begin(cfg);
+
+  mutex = xSemaphoreCreateMutex();
 
   // Configure serial transport
   Serial.begin(1500000);
