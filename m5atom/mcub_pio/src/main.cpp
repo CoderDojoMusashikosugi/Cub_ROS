@@ -24,6 +24,8 @@
 #define LED_DATA_PIN 27
 #define NUM_LEDS 25
 
+#define EMERGENCY_MONITOR (GPIO_NUM_19)
+
 #if !defined(MICRO_ROS_TRANSPORT_ARDUINO_SERIAL)
 #error This example is only avaliable for Arduino framework with serial transport.
 #endif
@@ -37,9 +39,11 @@ rcl_publisher_t debug_publisher;
 rcl_subscription_t subscriber;
 std_msgs__msg__String debug_msg;
 sensor_msgs__msg__Imu imu_msg;
-geometry_msgs__msg__Twist twist_msg;
+geometry_msgs__msg__Twist send_twist_msg;
+geometry_msgs__msg__Twist remote_twist_msg;
+geometry_msgs__msg__Twist subscribe_twist_msg;
 std_msgs__msg__Int32MultiArray wheel_positions_msg;
-unsigned long prev_cmd_time = 0;
+unsigned long prev_msg_time = 0;
 
 rclc_executor_t executor;
 rclc_executor_t sub_executor;
@@ -70,12 +74,20 @@ SemaphoreHandle_t mutex;
 // タイマーのハンドル
 TimerHandle_t motorControlTimer;
 
-enum states {
+enum uros_states {
   WAITING_AGENT,
   AGENT_AVAILABLE,
   AGENT_CONNECTED,
   AGENT_DISCONNECTED
-} state;
+} uros_state;
+
+enum robo_modes{
+  EMERGENCY,
+  IDLE,
+  REMOTE_CTRL,
+  AUTONOMOUS
+} robo_mode;
+
 
 #define EXECUTE_EVERY_N_MS(MS, X)      \
   do {                                 \
@@ -94,10 +106,6 @@ CRGB leds[NUM_LEDS];
 
 // for PS5 valiable
 #include <ps5Controller.h>
-#include <EspEasyTask.h>
-
-EspEasyTask ps5task;
-
 void connect_dualsense(){
   ps5.begin("e8:47:3a:34:44:a6"); //replace with your MAC address
   esp_log_level_set("ps5_L2CAP", ESP_LOG_VERBOSE);
@@ -114,7 +122,6 @@ void error_loop(rcl_ret_t temp_rc) {
   leds[24] = CRGB::Red;
   FastLED.show();
   vTaskDelay(1000 / portTICK_PERIOD_MS);
-
   
   rcl_reset_error();
   leds[24] = CRGB::Black;
@@ -171,13 +178,24 @@ const float ang_res = 0.088; // [deg/pluse] motor pluse resolution
 int32_t l_motor_pos = 0;
 int32_t r_motor_pos = 0;
 
+geometry_msgs__msg__Twist vehicle_stop_msg() {
+  geometry_msgs__msg__Twist twist_msg;
+  twist_msg.linear.x = 0;
+  twist_msg.linear.y = 0;
+  twist_msg.linear.z = 0;
+  twist_msg.angular.x = 0;
+  twist_msg.angular.y = 0;
+  twist_msg.angular.z = 0;
+  return twist_msg;
+}
+
 void wh_pos_timer_callback(rcl_timer_t * wh_pos_timer, int64_t last_call_time) {
   RCLC_UNUSED(last_call_time);
   
   int32_t right_wheel_position;
   int32_t left_wheel_position;
   if (wh_pos_timer != NULL) {
-    if (xSemaphoreTake(mutex, portMAX_DELAY)) {
+    if (xSemaphoreTake(mutex, pdMS_TO_TICKS(10))) {
       while(DXL_SERIAL.available() > 0){
         DXL_SERIAL.read();
       }
@@ -186,6 +204,8 @@ void wh_pos_timer_callback(rcl_timer_t * wh_pos_timer, int64_t last_call_time) {
       left_wheel_position = dxl.getPresentPosition(DXL2_ID);
       vTaskDelay(5 / portTICK_PERIOD_MS);
       xSemaphoreGive(mutex);
+    } else {
+      return;
     }
     // メッセージデータの設定
     wheel_positions_msg.data.data[0] = left_wheel_position;
@@ -198,19 +218,44 @@ void wh_pos_timer_callback(rcl_timer_t * wh_pos_timer, int64_t last_call_time) {
 
 void twist_callback(const void * msgin)
 {
-  prev_cmd_time = millis();
+  prev_msg_time = millis();
 }
 
 void motor_controll_callback(TimerHandle_t xTimer)
 {
-  double r_vel_m = twist_msg.linear.x + cub_d * twist_msg.angular.z / 1000.0; // [m/s]
-  double l_vel_m = twist_msg.linear.x - cub_d * twist_msg.angular.z / 1000.0; // [m/s]
+  switch (robo_mode)
+  {
+  case IDLE:
+    send_twist_msg = vehicle_stop_msg();
+    break;
+  case REMOTE_CTRL:
+    send_twist_msg = remote_twist_msg;
+    break;
+  case AUTONOMOUS:
+    if (millis() - prev_msg_time > 3000) {
+      robo_mode = IDLE;
+      subscribe_twist_msg = vehicle_stop_msg();
+    }
+    send_twist_msg = subscribe_twist_msg;
+    break;
+  case EMERGENCY:
+    remote_twist_msg = vehicle_stop_msg();
+    subscribe_twist_msg = vehicle_stop_msg();
+    send_twist_msg = vehicle_stop_msg();
+    break;
+  default:
+    send_twist_msg = vehicle_stop_msg();
+    break;
+  }
+
+  double r_vel_m = send_twist_msg.linear.x + cub_d * send_twist_msg.angular.z / 1000.0; // [m/s]
+  double l_vel_m = send_twist_msg.linear.x - cub_d * send_twist_msg.angular.z / 1000.0; // [m/s]
   double r_vel_r = r_vel_m / (diameter / 1000.0 / 2.0); // [rad/s]
   double l_vel_r = l_vel_m / (diameter / 1000.0 / 2.0); // [rad/s]
   int32_t r_goal_vel = (int32_t)(r_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit); // right goal velocity
   int32_t l_goal_vel = (int32_t)(l_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit); // left goal velocity
 
-  if (xSemaphoreTake(mutex, portMAX_DELAY)) {
+  if (xSemaphoreTake(mutex, pdMS_TO_TICKS(10))) {
     dxl.setGoalVelocity(DXL1_ID, r_goal_vel);
     vTaskDelay(5 / portTICK_PERIOD_MS);
     dxl.setGoalVelocity(DXL2_ID, l_goal_vel);
@@ -222,25 +267,42 @@ void motor_controll_callback(TimerHandle_t xTimer)
 void remote_control(){
   float default_linear = 0.3;
   float default_angular = 2.0;
-  while(1){
-    if (ps5.isConnected()) {
-      ps5.setLed(0, 255, 0);
-      ps5.setFlashRate(100, 100);
-      ps5.sendToController();
-      if (ps5.L2()){
-        if ((abs(ps5.LStickX()) < 5) && (abs(ps5.LStickY()) < 5)){
-          twist_msg.linear.x = 0;
-          twist_msg.angular.z = 0;
-        } else {
-          twist_msg.linear.x = default_linear * (ps5.LStickY()) / 127.0;
-          twist_msg.angular.z = - default_angular * (ps5.LStickX()) / 127.0;
-        }
-      } else if (ps5.Share() && ps5.Options()) {
-        ESP.restart();
-      }
-    } else {
+  if (ps5.isConnected()) {
+    if (robo_mode == IDLE) robo_mode = REMOTE_CTRL;
+
+    leds[2] = CRGB::Green;
+    ps5.setLed(0, 255, 0);
+    ps5.setFlashRate(100, 100);
+    ps5.sendToController();
+    if (ps5.Cross()) {
+      remote_twist_msg = vehicle_stop_msg();
+      robo_mode = EMERGENCY;
     }
-    vTaskDelay(50 / portTICK_PERIOD_MS);
+
+    if (ps5.L2()) {
+      int val_LStickX = ps5.LStickX();
+      int val_LStickY = ps5.LStickY();
+      if (abs(val_LStickX) < 16) val_LStickX = 0;
+      if (abs(val_LStickY) < 16) val_LStickY = 0;
+      remote_twist_msg.linear.x = default_linear * (val_LStickY) / 127.0;
+      remote_twist_msg.angular.z = - default_angular * (val_LStickX) / 127.0;
+    } else if (ps5.Share() && ps5.Options()) {
+      ESP.restart();
+    } else if (ps5.Options()){ //自律走行モード
+        robo_mode = AUTONOMOUS;
+      }
+      else if (ps5.Share()){
+        robo_mode = REMOTE_CTRL; //遠隔操作モード
+      }
+    else {
+      remote_twist_msg = vehicle_stop_msg();
+    }
+  } else {
+    leds[2] = CRGB::Red;
+    if (robo_mode == EMERGENCY) return;
+    
+    if (uros_state == AGENT_CONNECTED) robo_mode = AUTONOMOUS;
+    else robo_mode = IDLE;
   }
 }
 
@@ -311,7 +373,7 @@ bool create_entities() {
   RCCHECK(rclc_executor_add_timer(&executor, &imu_timer));
   RCCHECK(rclc_executor_add_timer(&executor, &wh_pos_timer));
 
-  RCCHECK(rclc_executor_add_subscription(&sub_executor, &subscriber, &twist_msg, &twist_callback, ON_NEW_DATA));
+  RCCHECK(rclc_executor_add_subscription(&sub_executor, &subscriber, &subscribe_twist_msg, &twist_callback, ON_NEW_DATA));
   
   return true;
 }
@@ -336,6 +398,9 @@ void destroy_entities() {
 
 
 void setup() {
+  robo_mode = IDLE;
+  pinMode(EMERGENCY_MONITOR, INPUT); 
+  // gpio_pulldown_dis(EMERGENCY_MONITOR);
   auto cfg = M5.config();
   M5.begin(cfg);
 
@@ -355,7 +420,6 @@ void setup() {
 
   // initialize PS5
   connect_dualsense();
-  ps5task.begin(remote_control, 2, 2);
   
   // メッセージの初期化
   std_msgs__msg__Int32MultiArray__init(&wheel_positions_msg);
@@ -467,6 +531,9 @@ void setup() {
     FastLED.show();
     // タイマーのスタート
     if (xTimerStart(motorControlTimer, 0) != pdPASS) {
+      leds[1] = CRGB::Purple;
+      FastLED.show();
+    } else {
       leds[1] = CRGB::Green;
       FastLED.show();
     }
@@ -474,42 +541,63 @@ void setup() {
 }
 
 void loop() {
-  switch (state) {
+  if (digitalRead(EMERGENCY_MONITOR) == HIGH) {
+    robo_mode = EMERGENCY;
+    leds[4] = CRGB::Red;
+    FastLED.show();
+    return;
+  } else {
+    if (robo_mode == EMERGENCY) robo_mode = IDLE;
+  }
+
+  EXECUTE_EVERY_N_MS(50, remote_control());
+
+  if (robo_mode == REMOTE_CTRL) {
+    leds[4] = CRGB::Yellow;
+  } else if (robo_mode == AUTONOMOUS) {
+    leds[4] = CRGB::Green;
+  } else if (robo_mode == IDLE) {
+    leds[4] = CRGB::Blue;
+  }
+
+  switch (uros_state) {
     case WAITING_AGENT:
       EXECUTE_EVERY_N_MS(500,
-                         state = (RMW_RET_OK == rmw_uros_ping_agent(100, 1))
+                         uros_state = (RMW_RET_OK == rmw_uros_ping_agent(100, 1))
                                      ? AGENT_AVAILABLE
                                      : WAITING_AGENT;);
       break;
     case AGENT_AVAILABLE:
-      state = (true == create_entities()) ? AGENT_CONNECTED : WAITING_AGENT;
-      if (state == WAITING_AGENT) {
+      uros_state = (true == create_entities()) ? AGENT_CONNECTED : WAITING_AGENT;
+      if (uros_state == WAITING_AGENT) {
         destroy_entities();
       };
       break;
     case AGENT_CONNECTED:
       EXECUTE_EVERY_N_MS(200,
-                         state = (RMW_RET_OK == rmw_uros_ping_agent(100, 1))
+                         uros_state = (RMW_RET_OK == rmw_uros_ping_agent(100, 1))
                                      ? AGENT_CONNECTED
                                      : AGENT_DISCONNECTED;);
-      if (state == AGENT_CONNECTED) {
-        RCSOFTCHECK(rclc_executor_spin_some(&executor, RCL_MS_TO_NS(100)));  // threadセーフではないことに注意
-        RCSOFTCHECK(rclc_executor_spin_some(&sub_executor, RCL_MS_TO_NS(100)));  // threadセーフではないことに注意
+      if (uros_state == AGENT_CONNECTED) {
+        RCSOFTCHECK(rclc_executor_spin_some(&executor, RCL_MS_TO_NS(20)));  // threadセーフではないことに注意
+        RCSOFTCHECK(rclc_executor_spin_some(&sub_executor, RCL_MS_TO_NS(20)));  // threadセーフではないことに注意
       }
       break;
     case AGENT_DISCONNECTED:
       destroy_entities();
-      state = WAITING_AGENT;
+      uros_state = WAITING_AGENT;
       break;
     default:
       break;
   }
 
-  if (state == AGENT_CONNECTED) {
-    leds[0] = CRGB::Green;
-    FastLED.show();
-  } else {
-    leds[0] = CRGB::Red;
+  EVERY_N_MILLISECONDS(200) {
+    if (uros_state == AGENT_CONNECTED) {
+      leds[0] = CRGB::Green;
+    } else {
+      leds[0] = CRGB::Red;
+    }
     FastLED.show();
   }
+  vTaskDelay(10 / portTICK_PERIOD_MS);
 }
