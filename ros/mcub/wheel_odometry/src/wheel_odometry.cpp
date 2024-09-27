@@ -48,8 +48,42 @@ private:
             last_right_wheel_position_ = right_wheel_position;
         }
 
+#ifdef CUB_TARGET_CUB2
+        int32_t delta_left_pos;   // pulse
+        int32_t delta_right_pos;  // pulse
+        // オーバーフロー処理 left
+        if (last_left_wheel_position_ > 30000 && left_wheel_position < 3000) {
+            // 正方向にオーバーフロー
+            delta_left_pos = (32767 - last_left_wheel_position_) + left_wheel_position + 1;
+        } 
+        // アンダーフロー処理
+        else if (last_left_wheel_position_ < 3000 && left_wheel_position > 30000) {
+            // 逆方向にアンダーフロー
+            delta_left_pos = -((32767 - left_wheel_position) + last_left_wheel_position_ + 1);
+        } 
+        // 通常の範囲内の変化
+        else {
+            delta_left_pos = left_wheel_position - last_left_wheel_position_;
+        }
+
+        // オーバーフロー処理 right
+        if (last_right_wheel_position_ > 30000 && right_wheel_position < 3000) {
+            // 正方向にオーバーフロー
+            delta_right_pos = (32767 - last_right_wheel_position_) + right_wheel_position + 1;
+        } 
+        // アンダーフロー処理
+        else if (last_right_wheel_position_ < 3000 && right_wheel_position > 30000) {
+            // 逆方向にアンダーフロー
+            delta_right_pos = -((32767 - right_wheel_position) + last_right_wheel_position_ + 1);
+        } 
+        // 通常の範囲内の変化
+        else {
+            delta_right_pos = right_wheel_position - last_right_wheel_position_;
+        }
+#elif defined(CUB_TARGET_MCUB)
         int32_t delta_left_pos = (left_wheel_position - last_left_wheel_position_);     // pulse
         int32_t delta_right_pos = (right_wheel_position - last_right_wheel_position_);  // pulse
+#endif
         double delta_left = delta_left_pos * pulse2meter_param_;    // [m]
         double delta_right = delta_right_pos * pulse2meter_param_;  // [m]
         double delta_center = (delta_left + delta_right) / 2.0; //[m]
@@ -104,9 +138,20 @@ private:
     int32_t last_right_wheel_position_;
 
     // オドメトリの計算
+#ifdef CUB_TARGET_CUB2
+    // CUB_TARGET が cub2 の場合のコード
+    std::cout << "CUB_TARGET is cub2" << std::endl;
+    const double wheel_distance_ = 110.0 / 1000.0;   // 車輪間距離 [mm]
+    const double wheel_circumference_ = 150 * M_PI / 1000.0;       // 車輪の円周 [mm]　直径 * pi
+    const double ang_res_ = 1;    // [deg/pulse] motor pluse resolution
+    const int16_t POS_MAX = 32767; //車輪のエンコーダーの最大値
+#elif defined(CUB_TARGET_MCUB)
+    // CUB_TARGET が mcub の場合のコード
     const double wheel_distance_ = 125.0 / 1000.0;   // 車輪間距離 [mm]
     const double wheel_circumference_ = 40 * M_PI / 1000.0;       // 車輪の円周 [mm]　直径 * pi
     const double ang_res_ = 0.088;    // [deg/pulse] motor pluse resolution
+#endif
+
     const double pulse2meter_param_ = ang_res_ * wheel_circumference_ / 360.0;
 
     double x_, y_, theta_; // 現在のオドメトリの位置と角度
