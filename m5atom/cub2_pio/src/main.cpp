@@ -22,7 +22,7 @@
 // for control LED
 #include <FastLED.h>
 #define LED_DATA_PIN 27
-#define LANE_LED_DATA_PIN 22
+#define LANE_LED_DATA_PIN 26
 #define NUM_LEDS 25
 #define NUM_LANE_LEDS 24
 
@@ -482,7 +482,7 @@ void setup() {
 
   // initialize LED
   FastLED.addLeds<WS2812, LED_DATA_PIN, GRB>(leds, NUM_LEDS);
-  // FastLED.addLeds<NEOPIXEL, LANE_LED_DATA_PIN>(lane_led, NUM_LANE_LEDS);
+  FastLED.addLeds<NEOPIXEL, LANE_LED_DATA_PIN>(lane_led, NUM_LANE_LEDS);
   FastLED.setBrightness(200);
   leds[0] = CRGB::White;
   fill_solid(lane_led, NUM_LANE_LEDS, CRGB( 255, 255, 255));
