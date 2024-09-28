@@ -24,7 +24,7 @@
 #define LED_DATA_PIN 27
 #define LANE_LED_DATA_PIN 22
 #define NUM_LEDS 25
-#define NUM_LANE_LEDS 36
+#define NUM_LANE_LEDS 24
 
 #define EMERGENCY_MONITOR (GPIO_NUM_19)
 
@@ -121,10 +121,10 @@ CRGB lane_led[NUM_LANE_LEDS];
 #include <ps5Controller.h>
 #include <EspEasyTask.h>
 
-EspEasyTask ps5task;
+EspEasyTask subsc_task;
 
 void connect_dualsense(){
-  ps5.begin("e8:47:3a:34:44:a6"); //replace with your MAC address
+  ps5.begin("4C:B9:9B:64:76:1A"); //replace with your MAC address
   esp_log_level_set("ps5_L2CAP", ESP_LOG_VERBOSE);
   esp_log_level_set("ps5_SPP", ESP_LOG_VERBOSE);  
 }
@@ -160,6 +160,15 @@ void debug_message(const char* format, ...) {
   debug_msg.data.capacity = sizeof(message_buffer);
   RCCHECK(rcl_publish(&debug_publisher, &debug_msg, NULL));
   #endif
+}
+
+void subsc_loop() {
+  while(1) {
+    if (uros_state == AGENT_CONNECTED) {
+      RCSOFTCHECK(rclc_executor_spin_some(&sub_executor, RCL_MS_TO_NS(20)));  // threadセーフではないことに注意
+    }
+    vTaskDelay(20 / portTICK_PERIOD_MS);
+  }
 }
 
 void imu_timer_callback(rcl_timer_t * imu_timer, int64_t last_call_time) {
@@ -234,6 +243,14 @@ void vehicle_run(int right, int left){
   brake = Brake_Disable;
   motor_exec();
 } 
+
+void emergency_stop() {
+    motor_brake();
+    robo_mode = EMERGENCY;
+    leds[4] = CRGB::Red;
+    fill_solid(lane_led, NUM_LANE_LEDS, CRGB::Red);
+    FastLED.show();
+}
 
 
 // caluclate velocity for each dinamixel from twist value
@@ -319,7 +336,7 @@ void motor_controll_callback(TimerHandle_t xTimer)
 }
 
 void remote_control(){
-  float default_linear = 0.3;
+  float default_linear = 1.2;
   float default_angular = 2.0;
   if (ps5.isConnected()) {
     if (robo_mode == IDLE) robo_mode = REMOTE_CTRL;
@@ -451,6 +468,7 @@ void destroy_entities() {
 void setup() {
   robo_mode = IDLE;
   pinMode(EMERGENCY_MONITOR, INPUT); 
+  // attachInterrupt(EMERGENCY_MONITOR, emergency_stop, RISING);
   // gpio_pulldown_dis(EMERGENCY_MONITOR);
   
   // auto cfg = M5.config();
@@ -464,9 +482,11 @@ void setup() {
 
   // initialize LED
   FastLED.addLeds<WS2812, LED_DATA_PIN, GRB>(leds, NUM_LEDS);
-  FastLED.addLeds<WS2812, LANE_LED_DATA_PIN, GRB>(lane_led, NUM_LANE_LEDS);
-  FastLED.setBrightness(100);
+  // FastLED.addLeds<NEOPIXEL, LANE_LED_DATA_PIN>(lane_led, NUM_LANE_LEDS);
+  FastLED.setBrightness(200);
   leds[0] = CRGB::White;
+  fill_solid(lane_led, NUM_LANE_LEDS, CRGB( 255, 255, 255));
+  lane_led[3] = CRGB::Aqua;
   FastLED.show();
   delay(10);
 
@@ -483,9 +503,9 @@ void setup() {
   wheel_positions_msg.data.size = 4;
   wheel_positions_msg.data.data = (int32_t*) malloc(4 * sizeof(int32_t));
   
-  // タイマーを作成（20ms周期）
+  // タイマーを作成（40ms周期）
   motorControlTimer = xTimerCreate("MotorControlTimer",     // タイマーの名前
-                                   pdMS_TO_TICKS(20),       // タイマー周期 (20ms)
+                                   pdMS_TO_TICKS(40),       // タイマー周期 (20ms)
                                    pdTRUE,                  // 自動リロード
                                    (void *)0,               // タイマーID
                                    motor_controll_callback  // コールバック関数

@@ -59,4 +59,5 @@ CATKIN_IGNORE
 !docker/home/.profile
 !docker/home/.fastrtps_whitelist.xml
 !docker/home/colcon_ws/src/cub/.gitkeep
+!docker/home/rosbag/.gitkeep
 target.env

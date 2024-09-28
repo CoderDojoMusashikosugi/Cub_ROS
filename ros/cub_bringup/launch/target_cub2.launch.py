@@ -5,6 +5,8 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import PathJoinSubstitution
 from launch_ros.substitutions import FindPackageShare
 from ament_index_python.packages import get_package_share_directory
+from launch.actions import TimerAction
+from launch_ros.actions import PushRosNamespace
 import os
 
 def generate_launch_description():
@@ -26,6 +28,7 @@ def generate_launch_description():
             'frame_id': "SLC1L",
         }.items()
     )
+    sllidar_L_launch_delayed = TimerAction(period=1.0, actions=[sllidar_L_launch])
     
     # R側の設定
     sllidar_R_launch = IncludeLaunchDescription(
@@ -37,6 +40,7 @@ def generate_launch_description():
             'frame_id': "SLC1R",
         }.items()
     )
+    sllidar_R_launch_delayed = TimerAction(period=3.0, actions=[sllidar_R_launch])
     
     # GPSのlaunchファイル
     gps_launch = IncludeLaunchDescription(
@@ -55,12 +59,12 @@ def generate_launch_description():
     
     # LIDARのGroupAction
     slc_L_group = GroupAction(
-        actions=[sllidar_L_launch],
+        actions=[PushRosNamespace('sllidar_l'),sllidar_L_launch_delayed],
         scoped=True
     )
 
     slc_R_group = GroupAction(
-        actions=[sllidar_R_launch],
+        actions=[PushRosNamespace('sllidar_r'),sllidar_R_launch_delayed],
         scoped=True
     )
     
@@ -97,8 +101,8 @@ def generate_launch_description():
         ),
 
         # グループアクション
-        slc_L_group,
-        slc_R_group,
+        # slc_L_group,
+        # slc_R_group,
 
         # GPS launch
         gps_launch,

@@ -33,12 +33,12 @@ def generate_launch_description():
             condition=IfCondition("true" if cub_target == 'mcub' else "false")
         ),
 
-        Node(
-            package='joy_linux',
-            executable='joy_linux_node',
-        ),
-        Node(
-            package='cub_bringup',
-            executable='teleop_joy',
-        ),    
+        # Node(
+        #     package='joy_linux',
+        #     executable='joy_linux_node',
+        # ),
+        # Node(
+        #     package='cub_bringup',
+        #     executable='teleop_joy',
+        # ),    
     ])
