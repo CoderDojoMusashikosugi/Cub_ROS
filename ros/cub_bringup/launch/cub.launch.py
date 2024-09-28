@@ -12,6 +12,7 @@ def generate_launch_description():
     print("launch target:", cub_target)
 
     return LaunchDescription([
+        #cub2だと起動しないので、修正して欲しいですー
         Node(
             package='micro_ros_agent',
             executable='micro_ros_agent',
