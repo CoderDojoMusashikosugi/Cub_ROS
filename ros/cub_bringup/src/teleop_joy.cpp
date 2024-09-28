@@ -40,6 +40,11 @@ class TeleopJoy : public rclcpp::Node
       subscription_ = this->create_subscription<sensor_msgs::msg::Joy>(
       "/joy", 10, std::bind(&TeleopJoy::topic_callback, this, _1));
       publisher_ = this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
+      cmd_vel_timer_ = this->create_wall_timer(
+      std::chrono::milliseconds(50),
+      std::bind(&TeleopJoy::publishCmdVel, this)
+);
+
     }
 
   private:
@@ -53,6 +58,9 @@ class TeleopJoy : public rclcpp::Node
     double linear_step = 0.1;
     double angular = radians(60.0);
     double angular_step = radians(20.0);
+    
+    geometry_msgs::msg::Twist cmd_vel_;
+
     void topic_callback(const sensor_msgs::msg::Joy & msg)
     {
       joy.update(msg);
@@ -73,14 +81,18 @@ class TeleopJoy : public rclcpp::Node
         angular = clamp(angular - angular_step,angular_step,radians(360.0));
         RCLCPP_INFO(this->get_logger(), "angular: %f", degrees(angular));
       }
-      
-      geometry_msgs::msg::Twist cmd_vel;
-      cmd_vel.linear.x = linear*joy.lx();
-      cmd_vel.angular.z = angular*joy.ly();
-      publisher_->publish(cmd_vel);
+      cmd_vel_.linear.x = linear*joy.lx();
+      cmd_vel_.angular.z = angular*joy.ly();
     }
+
+    void publishCmdVel()
+    {
+      publisher_->publish(cmd_vel_);
+    }
+
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr subscription_;
-    rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr publisher_;
+    rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr publisher_; 
+    rclcpp::TimerBase::SharedPtr cmd_vel_timer_;
 };
 
 int main(int argc, char * argv[])
