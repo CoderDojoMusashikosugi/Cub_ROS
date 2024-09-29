@@ -8,3 +8,7 @@
 [submodule "ros/sllidar_ros2"]
 	path = ros/sllidar_ros2
 	url = https://github.com/Slamtec/sllidar_ros2.git
+[submodule "ros/lidarslam_ros2"]
+	path = ros/lidarslam_ros2
+	url = https://github.com/rsasaki0109/lidarslam_ros2.git
+	branch = humble
