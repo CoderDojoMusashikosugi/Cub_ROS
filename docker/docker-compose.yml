@@ -28,7 +28,6 @@ x-template: &cub_ros_common_setting # デフォルト設定。この値は下に
     - HOST_GID                    # コンテナ内で使うユーザーのgid受け渡し用。値の定義はrun.shにある。
     - USER_NAME=${USER_NAME:-cub} # コンテナ内で使うユーザー名(&パスワード)。値の定義はdocker/.envにある。
     - DISPLAY                     # X11用の設定。値の定義はホスト環境のもの、Macだけrun.shにある。
-    - ENABLE_REMOTE_VNC           # 主にMAC環境向けで、rviz等をVNCで表示するか否かの設定。値の定義はrun.shにある。
     - CUB_TARGET                  # どの機体向けに実行するかの設置を読み込む。値の定義はtarget.envにある。
     - INPUT_GROUP_ID              # inputグループをdockerコンテナ内に共有する用の設定。値の定義はdocker/internal/docker_util.shにある。
 
@@ -82,7 +81,6 @@ services:
       - HOST_GID                    # コンテナ内で使うユーザーのgid受け渡し用。値の定義はrun.shにある。
       - USER_NAME=${USER_NAME:-cub} # コンテナ内で使うユーザー名(&パスワード)。値の定義はdocker/.envにある。
       # - DISPLAY                     # X11用の設定。値の定義はホスト環境のもの、Macだけrun.shにある。
-      - ENABLE_REMOTE_VNC           # 主にMAC環境向けで、rviz等をVNCで表示するか否かの設定。値の定義はrun.shにある。
       - CUB_TARGET                  # どの機体向けに実行するかの設置を読み込む。値の定義はtarget.envにある。
       - INPUT_GROUP_ID              # inputグループをdockerコンテナ内に共有する用の設定。値の定義はdocker/internal/docker_util.shにある。
       - DISPLAY=:1                  # VNC環境向けの設定 リストのマージが出来ないので上記の通り変更分以外も記載
