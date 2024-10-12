@@ -11,7 +11,7 @@ if [ ${1:-update} != "stay" ]; then
     export VER_VNC=`date "+%Y%m%d_%H%M%S"`
 fi
 
-$docker_compose --profile runtime_vnc build
+$docker_compose build cub_ros_vnc
 
 if [ ${1:-update} != "stay" ]; then
     echo VER_VNC=$VER_VNC > docker/ver_vnc.env

@@ -129,3 +129,4 @@ cbs(){
   colcon build --symlink-install --packages-select $1
   cd - > /dev/null 2>&1
 }
+source /usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash
