@@ -1,11 +1,11 @@
 #!/bin/bash
 
 # Create User
-USER=${USER:-root}
+USER=${USER_NAME:-root}
 HOME=/root
 if [ "$USER" != "root" ]; then
-    echo "* enable custom user: $USER"
-    useradd --create-home --shell /bin/bash --user-group --groups adm,sudo,dialout,docker,plugdev,root $USER
+    echo "* enable custom user $USER as UID $HOST_UID and GID $HOST_GID"
+    useradd --create-home --shell /bin/bash --groups adm,sudo,dialout,docker,plugdev,root -u $HOST_UID -g $HOST_GID $USER
     echo "$USER ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
     if [ -z "$PASSWORD" ]; then
         echo "  set default password to \"ubuntu\""
