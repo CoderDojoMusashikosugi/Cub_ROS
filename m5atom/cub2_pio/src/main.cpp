@@ -17,13 +17,17 @@
 #include <rosidl_runtime_c/message_type_support_struct.h>
 #include <std_msgs/msg/int32_multi_array.h>
 
+#ifdef CUB_TARGET_CUB2
 #include <DDT_Motor_M15M06.h>
+#elif defined(CUB_TARGET_MCUB)
+#include <Dynamixel2Arduino.h>
+#endif
 
 // for control LED
 #include <FastLED.h>
 #define LED_DATA_PIN 27
-#define LANE_LED_DATA_PIN 26
 #define NUM_LEDS 25
+#define LANE_LED_DATA_PIN 26
 #define NUM_LANE_LEDS 24
 
 #define EMERGENCY_MONITOR (GPIO_NUM_19)
@@ -56,6 +60,8 @@ rcl_timer_t imu_timer;
 rcl_timer_t wh_pos_timer;
 rcl_timer_t motor_controll_timer;
 rcl_init_options_t init_options; // Humble
+
+#ifdef CUB_TARGET_CUB2
 size_t domain_id = 0;
 
 
@@ -80,6 +86,23 @@ uint16_t left_wheel_position2 = 0;
 int last_num_sign[2] = {0,0};
 const int16_t SPEED_MAX = 115;  //DDSM115 115rpm = max11
 const int16_t SPEED_MIN = -115;
+
+#elif defined(CUB_TARGET_MCUB)
+size_t domain_id = 1; // ros Domain ID
+
+// for dynamixel valiable
+/* DRIVE_MODE*/
+const uint8_t ADDR_DRIVE_MODE = 10;
+const uint8_t NORMAL_MODE = 0;
+const uint8_t REVERSE_MODE = 1;
+HardwareSerial& DXL_SERIAL  = Serial2; // 使うシリアル系統
+Dynamixel2Arduino dxl;
+const uint8_t RX_SERVO = 23;
+const uint8_t TX_SERVO = 33;
+const float DXL_PROTOCOL_VERSION = 2.0; //プロトコルのバージョン
+const uint8_t DXL1_ID = 1;
+const uint8_t DXL2_ID = 2;
+#endif
 
 // Mutexの宣言
 SemaphoreHandle_t mutex;
@@ -196,7 +219,7 @@ void imu_timer_callback(rcl_timer_t * imu_timer, int64_t last_call_time) {
   }
 }
 
-
+#ifdef CUB_TARGET_CUB2
 void motor_exec(){
   for(int i=0;i<4;i++){
     motor_handler.Control_Motor(Speed[i], i+1, Acce, brake, &Receiv);//スピード0：モーター停止
@@ -251,14 +274,113 @@ void emergency_stop() {
     fill_solid(lane_led, NUM_LANE_LEDS, CRGB::Red);
     FastLED.show();
 }
+#elif defined(CUB_TARGET_MCUB)
+void initialize_dynamixel() {
+    // initialize dynamixel
+  DXL_SERIAL.begin(57600, SERIAL_8N1, RX_SERVO, TX_SERVO);
+  dxl = Dynamixel2Arduino(DXL_SERIAL); //Dynamixel用ライブラリのインスタンス化
+  dxl.begin(57600); // デフォルトのbaudrate. 必要に応じてサーボの設定にあわせる.
+  dxl.setPortProtocolVersion(DXL_PROTOCOL_VERSION);
+  leds[5] = CRGB::White;
+  FastLED.show();
+  
+  if (dxl.ping(DXL1_ID) &&  dxl.ping(DXL2_ID)) {
+    leds[5] = CRGB::Green;
+  } else {
+    leds[5] = CRGB::Red;
+  }
+  delay(5);
 
+
+  if (dxl.torqueOff(DXL1_ID)){
+    leds[5] = CRGB::Red;
+  } else {
+    leds[5] = CRGB::Green;
+  }
+  FastLED.show();
+  delay(5);
+  
+  if (!dxl.write(DXL1_ID, ADDR_DRIVE_MODE, (uint8_t*)&REVERSE_MODE, 1)){
+    leds[6] = CRGB::Red;
+  } else {
+    leds[6] = CRGB::Green;
+  }
+  delay(5);
+
+  if (!dxl.setOperatingMode(DXL1_ID, OP_VELOCITY)){
+    leds[7] = CRGB::Red;
+  } else {
+    leds[7] = CRGB::Green;
+  }
+  FastLED.show();
+  delay(5);
+  
+  if (!dxl.torqueOn(DXL1_ID)) {
+    leds[8] = CRGB::Red;
+  } else {
+    leds[8] = CRGB::Green;
+  }
+  FastLED.show();
+  delay(5);
+
+  if (!dxl.torqueOff(DXL2_ID)){
+    leds[10] = CRGB::Red;
+  } else {
+    leds[10] = CRGB::Green;
+  }
+  FastLED.show();
+  delay(5);
+  
+  if (!dxl.write(DXL2_ID, ADDR_DRIVE_MODE, (uint8_t*)&NORMAL_MODE, 1)){
+    leds[11] = CRGB::Red;
+  } else {
+    leds[11] = CRGB::Green;
+  }
+  delay(5);
+
+  if (!dxl.setOperatingMode(DXL2_ID, OP_VELOCITY)) {
+    leds[12] = CRGB::Red;
+  } else {
+    leds[12] = CRGB::Green;
+  }
+  FastLED.show();
+  delay(5);
+
+  if (!dxl.torqueOn(DXL2_ID)) {
+    leds[13] = CRGB::Red;
+  } else {
+    leds[13] = CRGB::Green;
+  }
+  delay(5);
+
+  // buffur clear
+  while(DXL_SERIAL.available() > 0){
+    DXL_SERIAL.read();
+  }
+
+  r_motor_pos = dxl.getPresentPosition(DXL1_ID);
+  delay(5);
+  l_motor_pos = dxl.getPresentPosition(DXL2_ID);
+  FastLED.show();
+  delay(5);
+}
+#endif
 
 // caluclate velocity for each dinamixel from twist value
+#ifdef CUB_TARGET_CUB2
 const float cub_d = 110;  // [mm] distance between center and wheel
 float motor_vel_unit = 1;  //[rpm]
 const float diameter = 150; // [mm] diameter of wheel
 uint16_t l_motor_pos = 0;
 uint16_t r_motor_pos = 0;
+#elif defined(CUB_TARGET_MCUB)
+const float cub_d = 62.5;  // [mm] distance between center and wheel
+const float motor_vel_unit = 0.229;  //[rpm]
+const float diameter = 40; // [mm] diameter of wheel
+const float ang_res = 0.088; // [deg/pluse] motor pluse resolution
+int32_t l_motor_pos = 0;
+int32_t r_motor_pos = 0;
+#endif
 
 geometry_msgs__msg__Twist vehicle_stop_msg() {
   geometry_msgs__msg__Twist twist_msg;
@@ -276,13 +398,31 @@ void wh_pos_timer_callback(rcl_timer_t * wh_pos_timer, int64_t last_call_time) {
   
   if (wh_pos_timer != NULL) {
     
-    debug_message("rightpos left pos %d, %d, %d, %d", right_wheel_position1, right_wheel_position2, left_wheel_position1, left_wheel_position2);
-
     // メッセージデータの設定
+#ifdef CUB_TARGET_CUB2
     wheel_positions_msg.data.data[0] = static_cast<int32_t>(left_wheel_position1);
     wheel_positions_msg.data.data[1] = static_cast<int32_t>(right_wheel_position1);
     wheel_positions_msg.data.data[2] = static_cast<int32_t>(left_wheel_position2);
     wheel_positions_msg.data.data[3] = static_cast<int32_t>(right_wheel_position2);
+#elif defined(CUB_TARGET_MCUB)
+    int32_t right_wheel_position;
+    int32_t left_wheel_position;
+    if (wh_pos_timer != NULL) {
+      if (xSemaphoreTake(mutex, pdMS_TO_TICKS(10))) {
+        while(DXL_SERIAL.available() > 0){
+          DXL_SERIAL.read();
+        }
+        right_wheel_position = dxl.getPresentPosition(DXL1_ID);
+        vTaskDelay(5 / portTICK_PERIOD_MS);
+        left_wheel_position = dxl.getPresentPosition(DXL2_ID);
+        vTaskDelay(5 / portTICK_PERIOD_MS);
+        xSemaphoreGive(mutex);
+      } else {
+        return;
+      }
+      wheel_positions_msg.data.data[0] = left_wheel_position;
+      wheel_positions_msg.data.data[1] = right_wheel_position;
+#endif
 
     // メッセージのパブリッシュ
     RCCHECK(rcl_publish(&wh_pos_publisher, &wheel_positions_msg, NULL));
@@ -299,7 +439,9 @@ void motor_controll_callback(TimerHandle_t xTimer)
   switch (robo_mode)
   {
   case IDLE:
+#ifdef CUB_TARGET_CUB2
     motor_stop();
+#endif
     send_twist_msg = vehicle_stop_msg();
     break;
   case REMOTE_CTRL:
@@ -308,19 +450,25 @@ void motor_controll_callback(TimerHandle_t xTimer)
   case AUTONOMOUS:
     if (millis() - prev_msg_time > 3000) {
       robo_mode = IDLE;
+#ifdef CUB_TARGET_CUB2
       motor_stop();
+#endif
       subscribe_twist_msg = vehicle_stop_msg();
     }
     send_twist_msg = subscribe_twist_msg;
     break;
   case EMERGENCY:
+#ifdef CUB_TARGET_CUB2
     motor_brake();
+#endif
     remote_twist_msg = vehicle_stop_msg();
     subscribe_twist_msg = vehicle_stop_msg();
     send_twist_msg = vehicle_stop_msg();
     break;
   default:
+#ifdef CUB_TARGET_CUB2
     motor_stop();
+#endif
     send_twist_msg = vehicle_stop_msg();
     break;
   }
@@ -329,14 +477,31 @@ void motor_controll_callback(TimerHandle_t xTimer)
   double l_vel_m = send_twist_msg.linear.x - cub_d * send_twist_msg.angular.z / 1000.0; // [m/s]
   double r_vel_r = r_vel_m / (diameter / 1000.0 / 2.0); // [rad/s]
   double l_vel_r = l_vel_m / (diameter / 1000.0 / 2.0); // [rad/s]
+#ifdef CUB_TARGET_CUB2
   int r_goal_vel = (int)(r_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit); // right goal velocity[rpm] # TODO: check whether need to add dvidid by motor_velocity_unit
   int l_goal_vel = (int)(l_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit); // left goal velocity[rpm]
 
   vehicle_run(r_goal_vel, l_goal_vel);
+#elif defined(CUB_TARGET_MCUB)
+  int32_t r_goal_vel = (int32_t)(r_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit); // right goal velocity
+  int32_t l_goal_vel = (int32_t)(l_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit); // left goal velocity
+
+  if (xSemaphoreTake(mutex, pdMS_TO_TICKS(10))) {
+    dxl.setGoalVelocity(DXL1_ID, r_goal_vel);
+    vTaskDelay(5 / portTICK_PERIOD_MS);
+    dxl.setGoalVelocity(DXL2_ID, l_goal_vel);
+    vTaskDelay(5 / portTICK_PERIOD_MS);
+    xSemaphoreGive(mutex);
+  }
+#endif
 }
 
 void remote_control(){
+#ifdef CUB_TARGET_CUB2
   float default_linear = 1.2;
+#elif defined(CUB_TARGET_MCUB)
+  float default_linear = 0.3;
+#endif
   float default_angular = 2.0;
   if (ps5.isConnected()) {
     if (robo_mode == IDLE) robo_mode = REMOTE_CTRL;
@@ -401,12 +566,14 @@ bool create_entities() {
     ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, String),
     "mros_debug_topic"));
     
+#ifdef CUB_TARGET_MCUB
   // create imu_publisher
-  // RCCHECK(rclc_publisher_init_default(
-  //   &imu_publisher,
-  //   &node,
-  //   ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, Imu),
-  //   "pub_imu"));
+  RCCHECK(rclc_publisher_init_default(
+    &imu_publisher,
+    &node,
+    ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, Imu),
+    "pub_imu"));
+#endif
 
   // create wh_pos_publisher
   RCCHECK(rclc_publisher_init_default(
@@ -423,13 +590,15 @@ bool create_entities() {
     ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Twist),
     "cmd_vel"));
 
+#ifdef CUB_TARGET_MCUB
   // create imu_timer,
-  // const unsigned int timer_timeout = 1000;
-  // RCCHECK(rclc_timer_init_default(
-  //   &imu_timer,
-  //   &support,
-  //   RCL_MS_TO_NS(timer_timeout),
-  //   imu_timer_callback));
+  const unsigned int timer_timeout = 1000;
+  RCCHECK(rclc_timer_init_default(
+    &imu_timer,
+    &support,
+    RCL_MS_TO_NS(timer_timeout),
+    imu_timer_callback));
+#endif
   
   // create wh_pos_timer
   RCCHECK(rclc_timer_init_default(
@@ -440,7 +609,9 @@ bool create_entities() {
   // create executor
   RCCHECK(rclc_executor_init(&executor, &support.context, 2, &allocator));
   RCCHECK(rclc_executor_init(&sub_executor, &support.context, 1, &allocator));
-  // RCCHECK(rclc_executor_add_timer(&executor, &imu_timer));
+#ifdef CUB_TARGET_MCUB
+  RCCHECK(rclc_executor_add_timer(&executor, &imu_timer));
+#endif
   RCCHECK(rclc_executor_add_timer(&executor, &wh_pos_timer));
 
   RCCHECK(rclc_executor_add_subscription(&sub_executor, &subscriber, &subscribe_twist_msg, &twist_callback, ON_NEW_DATA));
@@ -453,10 +624,14 @@ void destroy_entities() {
   (void)rmw_uros_set_context_entity_destroy_session_timeout(rmw_context, 0);
 
   RCCHECK(rcl_publisher_fini(&debug_publisher, &node));
-  // RCCHECK(rcl_publisher_fini(&imu_publisher, &node));
+#ifdef CUB_TARGET_MCUB
+  RCCHECK(rcl_publisher_fini(&imu_publisher, &node));
+#endif
   RCCHECK(rcl_publisher_fini(&wh_pos_publisher, &node));
   RCCHECK(rcl_subscription_fini(&subscriber, &node));
-  // RCCHECK(rcl_timer_fini(&imu_timer));
+#ifdef CUB_TARGET_MCUB
+  RCCHECK(rcl_timer_fini(&imu_timer));
+#endif
   RCCHECK(rcl_timer_fini(&wh_pos_timer));
   RCCHECK(rclc_executor_fini(&executor));
   RCCHECK(rclc_executor_fini(&sub_executor));
@@ -471,9 +646,12 @@ void setup() {
   // attachInterrupt(EMERGENCY_MONITOR, emergency_stop, RISING);
   // gpio_pulldown_dis(EMERGENCY_MONITOR);
   
-  // auto cfg = M5.config();
-  // M5.begin(cfg);
-  // auto motor_handler = MotorHandler(33, 23); // Cub2 ATOM(33, 23) Cub1 RX,TX ATOM(32, 26) DDSM210 ATOM S3(2,1)
+#ifdef CUB_TARGET_MCUB
+  auto cfg = M5.config();
+  M5.begin(cfg);
+
+  mutex = xSemaphoreCreateMutex();
+#endif
 
   // Configure serial transport
   Serial.begin(1500000);
@@ -482,26 +660,40 @@ void setup() {
 
   // initialize LED
   FastLED.addLeds<WS2812, LED_DATA_PIN, GRB>(leds, NUM_LEDS);
+#ifdef CUB_TARGET_CUB
   FastLED.addLeds<NEOPIXEL, LANE_LED_DATA_PIN>(lane_led, NUM_LANE_LEDS);
   FastLED.setBrightness(200);
-  leds[0] = CRGB::White;
   fill_solid(lane_led, NUM_LANE_LEDS, CRGB( 255, 255, 255));
-  lane_led[3] = CRGB::Aqua;
+#elif defined(CUB_TARGET_MCUB)
+  FastLED.setBrightness(20);
+#endif
+  leds[0] = CRGB::White;
   FastLED.show();
   delay(10);
 
+#ifdef CUB_TARGET_CUB
   for(int i=1;i<=4;i++){
     motor_handler.Control_Motor(0, i, Acce, Brake_P, &Receiv); //4つのモーター
   }
+#elif defined(CUB_TARGET_MCUB)
+  initialize_dynamixel();
+#endif
 
   // initialize PS5
   connect_dualsense();
 
   // メッセージの初期化
   std_msgs__msg__Int32MultiArray__init(&wheel_positions_msg);
+#ifdef CUB_TARGET_CUB2
   wheel_positions_msg.data.capacity = 4;
   wheel_positions_msg.data.size = 4;
   wheel_positions_msg.data.data = (int32_t*) malloc(4 * sizeof(int32_t));
+#elif defined(CUB_TARGET_MCUB)
+  wheel_positions_msg.data.capacity = 2;
+  wheel_positions_msg.data.size = 2;
+  wheel_positions_msg.data.data = (int32_t*) malloc(2 * sizeof(int32_t));
+#endif
+
   
   // タイマーを作成（40ms周期）
   motorControlTimer = xTimerCreate("MotorControlTimer",     // タイマーの名前
@@ -529,10 +721,12 @@ void setup() {
 
 void loop() {
   if (digitalRead(EMERGENCY_MONITOR) == HIGH) {
+#ifdef CUB_TARGET_CUB2
     motor_brake();
+    fill_solid(lane_led, NUM_LANE_LEDS, CRGB::Red);
+#endif
     robo_mode = EMERGENCY;
     leds[4] = CRGB::Red;
-    fill_solid(lane_led, NUM_LANE_LEDS, CRGB::Red);
     FastLED.show();
     return;
   } else {
@@ -543,13 +737,19 @@ void loop() {
 
   if (robo_mode == REMOTE_CTRL) {
     leds[4] = CRGB::Yellow;
+#ifdef CUB_TARGET_CUB2
     fill_solid(lane_led, NUM_LANE_LEDS, CRGB::Yellow);
+#endif
   } else if (robo_mode == AUTONOMOUS) {
     leds[4] = CRGB::Green;
+#ifdef CUB_TARGET_CUB2
     fill_solid(lane_led, NUM_LANE_LEDS, CRGB::Green);
+#endif
   } else if (robo_mode == IDLE) {
     leds[4] = CRGB::Blue;
+#ifdef CUB_TARGET_CUB2
     fill_solid(lane_led, NUM_LANE_LEDS, CRGB::Blue);
+#endif
   }
 
   switch (uros_state) {
@@ -571,7 +771,7 @@ void loop() {
                                      ? AGENT_CONNECTED
                                      : AGENT_DISCONNECTED;);
       if (uros_state == AGENT_CONNECTED) {
-        RCSOFTCHECK(rclc_executor_spin_some(&sub_executor, RCL_MS_TO_NS(20)));  // threadセーフではないことに注意
+        RCSOFTCHECK(rcl_executor_spin_some(&sub_executor, RCL_MS_TO_NS(20)));  // threadセーフではないことに注意
         RCSOFTCHECK(rclc_executor_spin_some(&executor, RCL_MS_TO_NS(20)));  // threadセーフではないことに注意
       }
       break;
