@@ -147,7 +147,7 @@ CRGB lane_led[NUM_LANE_LEDS];
 EspEasyTask subsc_task;
 
 void connect_dualsense(){
-  ps5.begin("4C:B9:9B:64:76:1A"); //replace with your MAC address
+  ps5.begin("e8:47:3a:34:44:a6"); //replace with your MAC address
   esp_log_level_set("ps5_L2CAP", ESP_LOG_VERBOSE);
   esp_log_level_set("ps5_SPP", ESP_LOG_VERBOSE);  
 }
@@ -352,17 +352,6 @@ void initialize_dynamixel() {
     leds[13] = CRGB::Green;
   }
   delay(5);
-
-  // buffur clear
-  while(DXL_SERIAL.available() > 0){
-    DXL_SERIAL.read();
-  }
-
-  r_motor_pos = dxl.getPresentPosition(DXL1_ID);
-  delay(5);
-  l_motor_pos = dxl.getPresentPosition(DXL2_ID);
-  FastLED.show();
-  delay(5);
 }
 #endif
 
@@ -407,21 +396,20 @@ void wh_pos_timer_callback(rcl_timer_t * wh_pos_timer, int64_t last_call_time) {
 #elif defined(CUB_TARGET_MCUB)
     int32_t right_wheel_position;
     int32_t left_wheel_position;
-    if (wh_pos_timer != NULL) {
-      if (xSemaphoreTake(mutex, pdMS_TO_TICKS(10))) {
-        while(DXL_SERIAL.available() > 0){
-          DXL_SERIAL.read();
-        }
-        right_wheel_position = dxl.getPresentPosition(DXL1_ID);
-        vTaskDelay(5 / portTICK_PERIOD_MS);
-        left_wheel_position = dxl.getPresentPosition(DXL2_ID);
-        vTaskDelay(5 / portTICK_PERIOD_MS);
-        xSemaphoreGive(mutex);
-      } else {
-        return;
+    if (xSemaphoreTake(mutex, pdMS_TO_TICKS(10))) {
+      while(DXL_SERIAL.available() > 0){
+        DXL_SERIAL.read();
       }
-      wheel_positions_msg.data.data[0] = left_wheel_position;
-      wheel_positions_msg.data.data[1] = right_wheel_position;
+      right_wheel_position = dxl.getPresentPosition(DXL1_ID);
+      vTaskDelay(5 / portTICK_PERIOD_MS);
+      left_wheel_position = dxl.getPresentPosition(DXL2_ID);
+      vTaskDelay(5 / portTICK_PERIOD_MS);
+      xSemaphoreGive(mutex);
+    } else {
+      return;
+    }
+    wheel_positions_msg.data.data[0] = left_wheel_position;
+    wheel_positions_msg.data.data[1] = right_wheel_position;
 #endif
 
     // メッセージのパブリッシュ
@@ -492,6 +480,28 @@ void motor_controll_callback(TimerHandle_t xTimer)
     dxl.setGoalVelocity(DXL2_ID, l_goal_vel);
     vTaskDelay(5 / portTICK_PERIOD_MS);
     xSemaphoreGive(mutex);
+    if (send_twist_msg.linear.x > 0) {
+      leds[7] = CRGB::Blue;
+      leds[17] = CRGB::Black;
+    } else if (send_twist_msg.linear.x < 0) {
+      leds[7] = CRGB::Black;
+      leds[17] = CRGB::Blue;
+    } else {
+      leds[7] = CRGB::Black;
+      leds[17] = CRGB::Blue;
+    }
+
+    if (send_twist_msg.angular.z > 0) {
+      leds[11] = CRGB::Black;
+      leds[13] = CRGB::Blue;
+    } else if (send_twist_msg.angular.z < 0) {
+      leds[11] = CRGB::Blue;
+      leds[13] = CRGB::Black;
+    } else {
+      leds[11] = CRGB::Black;
+      leds[13] = CRGB::Black;
+    }
+    FastLED.show();
   }
 #endif
 }
@@ -615,6 +625,7 @@ bool create_entities() {
   RCCHECK(rclc_executor_add_timer(&executor, &wh_pos_timer));
 
   RCCHECK(rclc_executor_add_subscription(&sub_executor, &subscriber, &subscribe_twist_msg, &twist_callback, ON_NEW_DATA));
+  // RCCHECK(rclc_executor_set_trigger(&executor, rclc_executor_trigger_one, &wh_pos_timer));
   
   return true;
 }
@@ -771,7 +782,7 @@ void loop() {
                                      ? AGENT_CONNECTED
                                      : AGENT_DISCONNECTED;);
       if (uros_state == AGENT_CONNECTED) {
-        RCSOFTCHECK(rcl_executor_spin_some(&sub_executor, RCL_MS_TO_NS(20)));  // threadセーフではないことに注意
+        RCSOFTCHECK(rclc_executor_spin_some(&sub_executor, RCL_MS_TO_NS(20)));  // threadセーフではないことに注意
         RCSOFTCHECK(rclc_executor_spin_some(&executor, RCL_MS_TO_NS(20)));  // threadセーフではないことに注意
       }
       break;
