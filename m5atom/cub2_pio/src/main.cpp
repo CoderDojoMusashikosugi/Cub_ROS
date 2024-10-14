@@ -480,6 +480,7 @@ void motor_controll_callback(TimerHandle_t xTimer)
     dxl.setGoalVelocity(DXL2_ID, l_goal_vel);
     vTaskDelay(5 / portTICK_PERIOD_MS);
     xSemaphoreGive(mutex);
+#ifdef DEBUG
     if (send_twist_msg.linear.x > 0) {
       leds[7] = CRGB::Blue;
       leds[17] = CRGB::Black;
@@ -488,22 +489,23 @@ void motor_controll_callback(TimerHandle_t xTimer)
       leds[17] = CRGB::Blue;
     } else {
       leds[7] = CRGB::Black;
-      leds[17] = CRGB::Blue;
+      leds[17] = CRGB::Black;
     }
 
     if (send_twist_msg.angular.z > 0) {
-      leds[11] = CRGB::Black;
-      leds[13] = CRGB::Blue;
-    } else if (send_twist_msg.angular.z < 0) {
       leds[11] = CRGB::Blue;
       leds[13] = CRGB::Black;
+    } else if (send_twist_msg.angular.z < 0) {
+      leds[11] = CRGB::Black;
+      leds[13] = CRGB::Blue;
     } else {
       leds[11] = CRGB::Black;
       leds[13] = CRGB::Black;
     }
     FastLED.show();
+#endif // DEBUG
   }
-#endif
+#endif // CUB_TARGET
 }
 
 void remote_control(){
