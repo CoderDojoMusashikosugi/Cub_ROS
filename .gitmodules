@@ -19,3 +19,6 @@
 [submodule "ros/bno055"]
 	path = ros/bno055
 	url = https://github.com/flynneva/bno055.git
+[submodule "ros/turtlebot3_simulations"]
+	path = ros/turtlebot3_simulations
+	url = https://github.com/ROBOTIS-GIT/turtlebot3_simulations.git
