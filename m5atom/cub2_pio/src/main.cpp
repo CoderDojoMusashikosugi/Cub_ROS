@@ -44,7 +44,6 @@ sensor_msgs__msg__Imu imu_msg;
 geometry_msgs__msg__Twist send_twist_msg;
 geometry_msgs__msg__Twist remote_twist_msg;
 geometry_msgs__msg__Twist subscribe_twist_msg;
-geometry_msgs__msg__Twist subsc_cpy_twist_msg;
 std_msgs__msg__Int32MultiArray wheel_positions_msg;
 unsigned long prev_msg_time = 0;
 
@@ -101,7 +100,7 @@ const uint8_t DXL2_ID = 2;
 #endif
 
 // Mutexの宣言
-SemaphoreHandle_t mutex;
+volatile SemaphoreHandle_t mutex;
 // タイマーのハンドル
 TimerHandle_t motorControlTimer;
 
@@ -112,7 +111,7 @@ enum uros_states {
   AGENT_DISCONNECTED
 } uros_state;
 
-enum robo_modes{
+volatile enum robo_modes{
   EMERGENCY,
   IDLE,
   REMOTE_CTRL,
@@ -142,8 +141,6 @@ CRGB lane_led[NUM_LANE_LEDS];
 
 void connect_dualsense(){
   ps5.begin("e8:47:3a:34:44:a6"); //replace with your MAC address
-  esp_log_level_set("ps5_L2CAP", ESP_LOG_VERBOSE);
-  esp_log_level_set("ps5_SPP", ESP_LOG_VERBOSE);  
 }
 
 void debug_message(const char* format, ...);
@@ -367,177 +364,183 @@ geometry_msgs__msg__Twist vehicle_stop_msg() {
   return twist_msg;
 }
 
-void wh_pos_timer_callback(rcl_timer_t * wh_pos_timer, int64_t last_call_time) {
-  RCLC_UNUSED(last_call_time);
+void wh_pos_timer_callback() {
   
-  if (wh_pos_timer != NULL) {
-    
     // メッセージデータの設定
 #ifdef CUB_TARGET_CUB2
-    wheel_positions_msg.data.data[0] = static_cast<int32_t>(left_wheel_position1);
-    wheel_positions_msg.data.data[1] = static_cast<int32_t>(right_wheel_position1);
-    wheel_positions_msg.data.data[2] = static_cast<int32_t>(left_wheel_position2);
-    wheel_positions_msg.data.data[3] = static_cast<int32_t>(right_wheel_position2);
+  wheel_positions_msg.data.data[0] = static_cast<int32_t>(left_wheel_position1);
+  wheel_positions_msg.data.data[1] = static_cast<int32_t>(right_wheel_position1);
+  wheel_positions_msg.data.data[2] = static_cast<int32_t>(left_wheel_position2);
+  wheel_positions_msg.data.data[3] = static_cast<int32_t>(right_wheel_position2);
 #elif defined(CUB_TARGET_MCUB)
-    int32_t right_wheel_position;
-    int32_t left_wheel_position;
-    if (xSemaphoreTake(mutex, pdMS_TO_TICKS(10))) {
-      while(DXL_SERIAL.available() > 0){
-        DXL_SERIAL.read();
-      }
-      right_wheel_position = dxl.getPresentPosition(DXL1_ID);
-      vTaskDelay(5 / portTICK_PERIOD_MS);
-      left_wheel_position = dxl.getPresentPosition(DXL2_ID);
-      vTaskDelay(5 / portTICK_PERIOD_MS);
-      xSemaphoreGive(mutex);
-    } else {
-      return;
+  int32_t right_wheel_position;
+  int32_t left_wheel_position;
+  if (xSemaphoreTake(mutex, pdMS_TO_TICKS(10))) {
+    while(DXL_SERIAL.available() > 0){
+      DXL_SERIAL.read();
     }
-    wheel_positions_msg.data.data[0] = left_wheel_position;
-    wheel_positions_msg.data.data[1] = right_wheel_position;
+    right_wheel_position = dxl.getPresentPosition(DXL1_ID);
+    vTaskDelay(5 / portTICK_PERIOD_MS);
+    left_wheel_position = dxl.getPresentPosition(DXL2_ID);
+    vTaskDelay(5 / portTICK_PERIOD_MS);
+    xSemaphoreGive(mutex);
+  } else {
+    return;
+  }
+  wheel_positions_msg.data.data[0] = left_wheel_position;
+  wheel_positions_msg.data.data[1] = right_wheel_position;
 #endif
 
-    // メッセージのパブリッシュ
-    RCCHECK(rcl_publish(&wh_pos_publisher, &wheel_positions_msg, NULL));
-  }
+  // メッセージのパブリッシュ
+  RCCHECK(rcl_publish(&wh_pos_publisher, &wheel_positions_msg, NULL));
 }
 
 void twist_callback(const void * msgin)
 {
   if (msgin == NULL) return;
   prev_msg_time = millis();
-  subsc_cpy_twist_msg = *(const geometry_msgs__msg__Twist *)msgin;
+  delay(100);
 }
 
-void motor_controll_callback(TimerHandle_t xTimer = nullptr)
+void motor_control_callback(void *pvParameters = nullptr) 
 {
-  switch (robo_mode)
-  {
-  case IDLE:
-#ifdef CUB_TARGET_CUB2
-    motor_stop();
-#endif
-    send_twist_msg = vehicle_stop_msg();
-    break;
-  case REMOTE_CTRL:
-    send_twist_msg = remote_twist_msg;
-    break;
-  case AUTONOMOUS:
-    if (millis() - prev_msg_time > 3000) {
-      robo_mode = IDLE;
-#ifdef CUB_TARGET_CUB2
+  while(1) {
+    switch (robo_mode)
+    {
+    case IDLE:
+  #ifdef CUB_TARGET_CUB2
       motor_stop();
-#endif
-      subsc_cpy_twist_msg = vehicle_stop_msg();
+  #endif
+      send_twist_msg = vehicle_stop_msg();
+      break;
+    case REMOTE_CTRL:
+      send_twist_msg = remote_twist_msg;
+      break;
+    case AUTONOMOUS:
+      if (millis() - prev_msg_time > 3000) {
+        robo_mode = IDLE;
+  #ifdef CUB_TARGET_CUB2
+        motor_stop();
+  #endif
+        subscribe_twist_msg = vehicle_stop_msg();
+      }
+        send_twist_msg = subscribe_twist_msg;
+      break;
+    case EMERGENCY:
+  #ifdef CUB_TARGET_CUB2
+      motor_brake();
+  #endif
+      remote_twist_msg = vehicle_stop_msg();
+      subscribe_twist_msg = vehicle_stop_msg();
+      send_twist_msg = vehicle_stop_msg();
+      break;
+    default:
+  #ifdef CUB_TARGET_CUB2
+      motor_stop();
+  #endif
+      send_twist_msg = vehicle_stop_msg();
+      break;
     }
-    send_twist_msg = subsc_cpy_twist_msg;
-    break;
-  case EMERGENCY:
-#ifdef CUB_TARGET_CUB2
-    motor_brake();
-#endif
-    remote_twist_msg = vehicle_stop_msg();
-    subsc_cpy_twist_msg = vehicle_stop_msg();
-    send_twist_msg = vehicle_stop_msg();
-    break;
-  default:
-#ifdef CUB_TARGET_CUB2
-    motor_stop();
-#endif
-    send_twist_msg = vehicle_stop_msg();
-    break;
-  }
 
   double r_vel_m = send_twist_msg.linear.x + cub_d * send_twist_msg.angular.z / 1000.0; // [m/s]
   double l_vel_m = send_twist_msg.linear.x - cub_d * send_twist_msg.angular.z / 1000.0; // [m/s]
   double r_vel_r = r_vel_m / (diameter / 1000.0 / 2.0); // [rad/s]
   double l_vel_r = l_vel_m / (diameter / 1000.0 / 2.0); // [rad/s]
-#ifdef CUB_TARGET_CUB2
-  int r_goal_vel = (int)(r_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit); // right goal velocity[rpm] # TODO: check whether need to add dvidid by motor_velocity_unit
-  int l_goal_vel = (int)(l_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit); // left goal velocity[rpm]
+  #ifdef CUB_TARGET_CUB2
+    int r_goal_vel = (int)(r_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit); // right goal velocity[rpm] # TODO: check whether need to add dvidid by motor_velocity_unit
+    int l_goal_vel = (int)(l_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit); // left goal velocity[rpm]
 
-  vehicle_run(r_goal_vel, l_goal_vel);
-#elif defined(CUB_TARGET_MCUB)
+    vehicle_run(r_goal_vel, l_goal_vel);
+  #elif defined(CUB_TARGET_MCUB)
   int32_t r_goal_vel = (int32_t)(r_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit); // right goal velocity
   int32_t l_goal_vel = (int32_t)(l_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit); // left goal velocity
 
-  if (xSemaphoreTake(mutex, pdMS_TO_TICKS(10))) {
-    dxl.setGoalVelocity(DXL1_ID, r_goal_vel);
-    vTaskDelay(5 / portTICK_PERIOD_MS);
-    dxl.setGoalVelocity(DXL2_ID, l_goal_vel);
-    vTaskDelay(5 / portTICK_PERIOD_MS);
-    xSemaphoreGive(mutex);
-#ifdef DEBUG
-    if (send_twist_msg.linear.x > 0) {
-      leds[7] = CRGB::Blue;
-      leds[17] = CRGB::Black;
-    } else if (send_twist_msg.linear.x < 0) {
-      leds[7] = CRGB::Black;
-      leds[17] = CRGB::Blue;
-    } else {
-      leds[7] = CRGB::Black;
-      leds[17] = CRGB::Black;
-    }
+    if (xSemaphoreTake(mutex, pdMS_TO_TICKS(10))) {
+      dxl.setGoalVelocity(DXL1_ID, r_goal_vel);
+      delay(5);
+      dxl.setGoalVelocity(DXL2_ID, l_goal_vel);
+      delay(5);
+      xSemaphoreGive(mutex);
+  #ifdef DEBUG
+      if (send_twist_msg.linear.x > 0) {
+        leds[7] = CRGB::Blue;
+        leds[17] = CRGB::Black;
+      } else if (send_twist_msg.linear.x < 0) {
+        leds[7] = CRGB::Black;
+        leds[17] = CRGB::Blue;
+      } else {
+        leds[7] = CRGB::Black;
+        leds[17] = CRGB::Black;
+      }
 
-    if (send_twist_msg.angular.z > 0) {
-      leds[11] = CRGB::Blue;
-      leds[13] = CRGB::Black;
-    } else if (send_twist_msg.angular.z < 0) {
-      leds[11] = CRGB::Black;
-      leds[13] = CRGB::Blue;
-    } else {
-      leds[11] = CRGB::Black;
-      leds[13] = CRGB::Black;
+      if (send_twist_msg.angular.z > 0) {
+        leds[11] = CRGB::Blue;
+        leds[13] = CRGB::Black;
+      } else if (send_twist_msg.angular.z < 0) {
+        leds[11] = CRGB::Black;
+        leds[13] = CRGB::Blue;
+      } else {
+        leds[11] = CRGB::Black;
+        leds[13] = CRGB::Black;
+      }
+      FastLED.show();
+  #endif // DEBUG
     }
-    FastLED.show();
-#endif // DEBUG
+  #endif // CUB_TARGET
+  if (uros_state == AGENT_CONNECTED) {
+    wh_pos_timer_callback();
   }
-#endif // CUB_TARGET
+    delay(30);
+  }
 }
 
-void remote_control(){
-#ifdef CUB_TARGET_CUB2
-  float default_linear = 1.2;
-#elif defined(CUB_TARGET_MCUB)
-  float default_linear = 0.3;
-#endif
-  float default_angular = 2.0;
-  if (ps5.isConnected()) {
-    if (robo_mode == IDLE) robo_mode = REMOTE_CTRL;
-    leds[2] = CRGB::Green;
+void remote_control(void *pvParameters){
+  // initialize PS5
+  connect_dualsense();
+  
+  while(1) {
+  #ifdef CUB_TARGET_CUB2
+    float default_linear = 1.2;
+  #elif defined(CUB_TARGET_MCUB)
+    float default_linear = 0.3;
+  #endif
+    float default_angular = 2.0;
+    if (ps5.isConnected()) {
+      if (robo_mode == IDLE) robo_mode = REMOTE_CTRL;
+      leds[2] = CRGB::Green;
 
-    ps5.setLed(0, 255, 0);
-    ps5.setFlashRate(100, 100);
-    ps5.sendToController();
-    if (ps5.Cross()) {
-      remote_twist_msg = vehicle_stop_msg();
-      robo_mode = EMERGENCY;
-    }
+      ps5.setLed(0, 255, 0);
+      ps5.setFlashRate(100, 100);
+      ps5.sendToController();
+      if (ps5.Cross()) {
+        remote_twist_msg = vehicle_stop_msg();
+        robo_mode = EMERGENCY;
+      }
 
-    if (ps5.L2()) {
-      int val_LStickX = ps5.LStickX();
-      int val_LStickY = ps5.LStickY();
-      if (abs(val_LStickX) < 16) val_LStickX = 0;
-      if (abs(val_LStickY) < 16) val_LStickY = 0;
-      remote_twist_msg.linear.x = default_linear * (val_LStickY) / 127.0;
-      remote_twist_msg.angular.z = - default_angular * (val_LStickX) / 127.0;
-    } else if (ps5.Share() && ps5.Options()) {
-      ESP.restart();
-    } else if (ps5.Options()){ //自律走行モード
-        robo_mode = AUTONOMOUS;
+      if (ps5.L2()) {
+        int val_LStickX = ps5.LStickX();
+        int val_LStickY = ps5.LStickY();
+        if (abs(val_LStickX) < 16) val_LStickX = 0;
+        if (abs(val_LStickY) < 16) val_LStickY = 0;
+        remote_twist_msg.linear.x = default_linear * (val_LStickY) / 127.0;
+        remote_twist_msg.angular.z = - default_angular * (val_LStickX) / 127.0;
+      } else if (ps5.Share() && ps5.Options()) {
+        ESP.restart();
+      } else if (ps5.Options()){ //自律走行モード
+          robo_mode = AUTONOMOUS;
+      } else if (ps5.Share()){
+          robo_mode = REMOTE_CTRL; //遠隔操作モード
+      } else {
+        remote_twist_msg = vehicle_stop_msg();
       }
-      else if (ps5.Share()){
-        robo_mode = REMOTE_CTRL; //遠隔操作モード
-      }
-    else {
-      remote_twist_msg = vehicle_stop_msg();
-    }
-  } else {
-    leds[2] = CRGB::Red;
-    if (robo_mode == EMERGENCY) return;
+    } else {
+      leds[2] = CRGB::Red;
+      if (robo_mode == EMERGENCY) return;
     
-    if (uros_state == AGENT_CONNECTED) robo_mode = AUTONOMOUS;
-    else robo_mode = IDLE;
+      if (uros_state == AGENT_CONNECTED) robo_mode = AUTONOMOUS;
+      else robo_mode = IDLE;
+    }
+    delay(100);
   }
 }
 
@@ -599,21 +602,13 @@ bool create_entities() {
     imu_timer_callback));
 #endif
   
-  // create wh_pos_timer
-  RCCHECK(rclc_timer_init_default(
-    &wh_pos_timer,
-    &support,
-    RCL_MS_TO_NS(100),
-    wh_pos_timer_callback));
   // create executor
   RCCHECK(rclc_executor_init(&executor, &support.context, 3, &allocator));
   RCCHECK(rclc_executor_add_subscription(&executor, &subscriber, &subscribe_twist_msg, &twist_callback, ON_NEW_DATA));
 #ifdef CUB_TARGET_MCUB
   // RCCHECK(rclc_executor_add_timer(&executor, &imu_timer));
 #endif
-  RCCHECK(rclc_executor_add_timer(&executor, &wh_pos_timer));
-
-  RCCHECK(rclc_executor_set_trigger(&executor, rclc_executor_trigger_one, &wh_pos_timer));
+ 
   // select semantics
   RCCHECK(rclc_executor_set_semantics(&executor, RCLCPP_EXECUTOR));
 
@@ -633,7 +628,6 @@ void destroy_entities() {
 #ifdef CUB_TARGET_MCUB
   RCCHECK(rcl_timer_fini(&imu_timer));
 #endif
-  RCCHECK(rcl_timer_fini(&wh_pos_timer));
   RCCHECK(rclc_executor_fini(&executor));
   RCCHECK(rcl_node_fini(&node));
   RCCHECK(rclc_support_fini(&support));
@@ -679,9 +673,6 @@ void setup() {
   initialize_dynamixel();
 #endif
 
-  // initialize PS5
-  connect_dualsense();
-
   // メッセージの初期化
   std_msgs__msg__Int32MultiArray__init(&wheel_positions_msg);
 #ifdef CUB_TARGET_CUB2
@@ -694,6 +685,8 @@ void setup() {
   wheel_positions_msg.data.data = (int32_t*) malloc(2 * sizeof(int32_t));
 #endif
 
+  xTaskCreatePinnedToCore(motor_control_callback, "motor_control_callback", 4048, NULL, 3, NULL, PRO_CPU_NUM);
+  xTaskCreatePinnedToCore(remote_control, "remote_control", 4048, NULL, 2, NULL, APP_CPU_NUM);
 }
 
 void loop() {
@@ -709,9 +702,6 @@ void loop() {
   } else {
     if (robo_mode == EMERGENCY) robo_mode = IDLE;
   }
-
-  EXECUTE_EVERY_N_MS(50, motor_controll_callback());
-  EXECUTE_EVERY_N_MS(100, remote_control());
 
   if (robo_mode == REMOTE_CTRL) {
     leds[4] = CRGB::Yellow;
@@ -768,5 +758,5 @@ void loop() {
     }
     FastLED.show();
   }
-  delay(10);
+  delay(50);
 }
