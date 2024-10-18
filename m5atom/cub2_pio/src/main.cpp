@@ -52,8 +52,6 @@ rclc_support_t support;
 rcl_allocator_t allocator;
 rcl_node_t node;
 rcl_timer_t imu_timer;
-rcl_timer_t wh_pos_timer;
-rcl_timer_t motor_controll_timer;
 rcl_init_options_t init_options; // Humble
 
 #ifdef CUB_TARGET_CUB2
@@ -395,6 +393,57 @@ void wh_pos_timer_callback() {
   RCCHECK(rcl_publish(&wh_pos_publisher, &wheel_positions_msg, NULL));
 }
 
+void control_motor(const geometry_msgs__msg__Twist* arg_twist) {
+  double r_vel_m = arg_twist->linear.x + cub_d * arg_twist->angular.z / 1000.0; // [m/s]
+  double l_vel_m = arg_twist->linear.x - cub_d * arg_twist->angular.z / 1000.0; // [m/s]
+  double r_vel_r = r_vel_m / (diameter / 1000.0 / 2.0); // [rad/s]
+  double l_vel_r = l_vel_m / (diameter / 1000.0 / 2.0); // [rad/s]
+  #ifdef CUB_TARGET_CUB2
+    int r_goal_vel = (int)(r_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit); // right goal velocity[rpm] # TODO: check whether need to add dvidid by motor_velocity_unit
+    int l_goal_vel = (int)(l_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit); // left goal velocity[rpm]
+
+    vehicle_run(r_goal_vel, l_goal_vel);
+  #elif defined(CUB_TARGET_MCUB)
+  int32_t r_goal_vel = (int32_t)(r_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit); // right goal velocity
+  int32_t l_goal_vel = (int32_t)(l_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit); // left goal velocity
+
+    if (xSemaphoreTake(mutex, pdMS_TO_TICKS(10))) {
+      dxl.setGoalVelocity(DXL1_ID, r_goal_vel);
+      delay(5);
+      dxl.setGoalVelocity(DXL2_ID, l_goal_vel);
+      delay(5);
+      xSemaphoreGive(mutex);
+  #ifdef DEBUG
+      if (arg_twist->linear.x > 0) {
+        leds[7] = CRGB::Blue;
+        leds[17] = CRGB::Black;
+      } else if (arg_twist->linear.x < 0) {
+        leds[7] = CRGB::Black;
+        leds[17] = CRGB::Blue;
+      } else {
+        leds[7] = CRGB::Black;
+        leds[17] = CRGB::Black;
+      }
+
+      if (arg_twist->angular.z > 0) {
+        leds[11] = CRGB::Blue;
+        leds[13] = CRGB::Black;
+      } else if (arg_twist->angular.z < 0) {
+        leds[11] = CRGB::Black;
+        leds[13] = CRGB::Blue;
+      } else {
+        leds[11] = CRGB::Black;
+        leds[13] = CRGB::Black;
+      }
+      FastLED.show();
+  #endif // DEBUG
+    }
+  #endif // CUB_TARGET
+  if (uros_state == AGENT_CONNECTED) {
+    wh_pos_timer_callback();
+  }
+}
+
 void twist_callback(const void * msgin)
 {
   if (msgin == NULL) return;
@@ -402,7 +451,7 @@ void twist_callback(const void * msgin)
   delay(100);
 }
 
-void motor_control_callback(void *pvParameters = nullptr) 
+void motor_control_loop(void *pvParameters = nullptr) 
 {
   while(1) {
     switch (robo_mode)
@@ -441,60 +490,14 @@ void motor_control_callback(void *pvParameters = nullptr)
       send_twist_msg = vehicle_stop_msg();
       break;
     }
-
-  double r_vel_m = send_twist_msg.linear.x + cub_d * send_twist_msg.angular.z / 1000.0; // [m/s]
-  double l_vel_m = send_twist_msg.linear.x - cub_d * send_twist_msg.angular.z / 1000.0; // [m/s]
-  double r_vel_r = r_vel_m / (diameter / 1000.0 / 2.0); // [rad/s]
-  double l_vel_r = l_vel_m / (diameter / 1000.0 / 2.0); // [rad/s]
-  #ifdef CUB_TARGET_CUB2
-    int r_goal_vel = (int)(r_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit); // right goal velocity[rpm] # TODO: check whether need to add dvidid by motor_velocity_unit
-    int l_goal_vel = (int)(l_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit); // left goal velocity[rpm]
-
-    vehicle_run(r_goal_vel, l_goal_vel);
-  #elif defined(CUB_TARGET_MCUB)
-  int32_t r_goal_vel = (int32_t)(r_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit); // right goal velocity
-  int32_t l_goal_vel = (int32_t)(l_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit); // left goal velocity
-
-    if (xSemaphoreTake(mutex, pdMS_TO_TICKS(10))) {
-      dxl.setGoalVelocity(DXL1_ID, r_goal_vel);
-      delay(5);
-      dxl.setGoalVelocity(DXL2_ID, l_goal_vel);
-      delay(5);
-      xSemaphoreGive(mutex);
-  #ifdef DEBUG
-      if (send_twist_msg.linear.x > 0) {
-        leds[7] = CRGB::Blue;
-        leds[17] = CRGB::Black;
-      } else if (send_twist_msg.linear.x < 0) {
-        leds[7] = CRGB::Black;
-        leds[17] = CRGB::Blue;
-      } else {
-        leds[7] = CRGB::Black;
-        leds[17] = CRGB::Black;
-      }
-
-      if (send_twist_msg.angular.z > 0) {
-        leds[11] = CRGB::Blue;
-        leds[13] = CRGB::Black;
-      } else if (send_twist_msg.angular.z < 0) {
-        leds[11] = CRGB::Black;
-        leds[13] = CRGB::Blue;
-      } else {
-        leds[11] = CRGB::Black;
-        leds[13] = CRGB::Black;
-      }
-      FastLED.show();
-  #endif // DEBUG
-    }
-  #endif // CUB_TARGET
-  if (uros_state == AGENT_CONNECTED) {
-    wh_pos_timer_callback();
-  }
+    
+    control_motor(&send_twist_msg);
+    
     delay(30);
   }
 }
 
-void remote_control(void *pvParameters){
+void remote_control_loop(void *pvParameters){
   // initialize PS5
   connect_dualsense();
   
@@ -586,11 +589,22 @@ bool create_entities() {
 
 
   // create subscliber
-  RCCHECK(rclc_subscription_init_best_effort(
+  rmw_qos_profile_t minimum_qos = {
+    RMW_QOS_POLICY_HISTORY_KEEP_LAST,
+    1,
+    RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT,
+    RMW_QOS_POLICY_DURABILITY_VOLATILE,
+    RMW_QOS_DEADLINE_DEFAULT,
+    RMW_QOS_LIFESPAN_DEFAULT,
+    RMW_QOS_POLICY_LIVELINESS_SYSTEM_DEFAULT,
+    RMW_QOS_LIVELINESS_LEASE_DURATION_DEFAULT,
+    false
+  };
+  RCCHECK(rclc_subscription_init(
     &subscriber,
     &node,
     ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Twist),
-    "cmd_vel"));
+    "cmd_vel", &minimum_qos));
 
 #ifdef CUB_TARGET_MCUB
   // create imu_timer,
@@ -685,8 +699,8 @@ void setup() {
   wheel_positions_msg.data.data = (int32_t*) malloc(2 * sizeof(int32_t));
 #endif
 
-  xTaskCreatePinnedToCore(motor_control_callback, "motor_control_callback", 4048, NULL, 3, NULL, PRO_CPU_NUM);
-  xTaskCreatePinnedToCore(remote_control, "remote_control", 4048, NULL, 2, NULL, APP_CPU_NUM);
+  xTaskCreatePinnedToCore(motor_control_loop, "motor_control_loop", 4048, NULL, 3, NULL, PRO_CPU_NUM);
+  xTaskCreatePinnedToCore(remote_control_loop, "remote_control_loop", 4048, NULL, 2, NULL, APP_CPU_NUM);
 }
 
 void loop() {
