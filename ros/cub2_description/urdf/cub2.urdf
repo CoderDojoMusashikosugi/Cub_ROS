@@ -1,0 +1,147 @@
+<?xml version="1.0"?>
+<robot name="cub2_robot" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- ベースリンク -->
+  <link name="base_link">
+     <visual>
+      <geometry>
+        <mesh filename="file://$(find cub2_description)/meshes/Cub2URDF241001.dae" scale="1 1 1"/>
+      </geometry>
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 1.57"/>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="file://$(find cub2_description)/meshes/Cub2URDF241001.dae" scale="1 1 1"/>
+      </geometry>
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+    </collision>
+  </link>
+
+  <!-- base_footprint -->
+  <link name="base_footprint">
+    <visual>
+      <geometry>
+        <cylinder radius="0.05" length="0.01"/>
+      </geometry>
+      <material name="gray">
+        <color rgba="0.5 0.5 0.5 1"/>
+      </material>
+    </visual>
+  </link>
+
+  <!-- GPSリンク -->
+  <link name="gps_link">
+    <visual>
+      <geometry>
+        <sphere radius="0.05"/>
+      </geometry>
+      <material name="white">
+        <color rgba="1 1 1 1"/>
+      </material>
+    </visual>
+  </link>
+
+  <!-- Velodyne LiDAR -->
+  <link name="velodyne_link">
+    <visual>
+      <geometry>
+        <cylinder radius="0.05" length="0.1"/>
+      </geometry>
+      <material name="green">
+        <color rgba="0 1 0 1"/>
+      </material>
+    </visual>
+  </link>
+
+  <!-- IMU -->
+  <link name="imu_link">
+    <visual>
+      <geometry>
+        <box size="0.05 0.05 0.02"/>
+      </geometry>
+      <material name="yellow">
+        <color rgba="1 1 0 1"/>
+      </material>
+    </visual>
+  </link>
+
+  <!-- SLCL (左センサー) -->
+  <link name="SLCL_link">
+    <visual>
+      <geometry>
+        <cylinder radius="0.03" length="0.02"/>
+      </geometry>
+      <material name="orange">
+        <color rgba="1 0.65 0 1"/>
+      </material>
+    </visual>
+  </link>
+
+  <!-- SLCR (右センサー) -->
+  <link name="SLCR_link">
+    <visual>
+      <geometry>
+        <cylinder radius="0.03" length="0.02"/>
+      </geometry>
+      <material name="orange">
+        <color rgba="1 0.65 0 1"/>
+      </material>
+    </visual>
+  </link>
+
+  <!-- カメラリンク -->
+  <link name="camera_link">
+    <visual>
+      <geometry>
+        <box size="0.05 0.05 0.02"/>
+      </geometry>
+      <material name="purple">
+        <color rgba="0.5 0 0.5 1"/>
+      </material>
+    </visual>
+  </link>
+
+  <!-- 各リンクの接続 -->
+  <joint name="base_to_footprint" type="fixed">
+    <parent link="base_footprint"/>
+    <child link="base_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <joint name="base_to_gps" type="fixed">
+    <parent link="base_link"/>
+    <child link="gps_link"/>
+    <origin xyz="0.0 0 0.6" rpy="0 0 0"/>
+  </joint>
+
+  <joint name="base_to_velodyne" type="fixed">
+    <parent link="base_link"/>
+    <child link="velodyne_link"/>
+    <origin xyz="0.0 0 0.5" rpy="0 0 0"/>
+  </joint>
+
+  <joint name="base_to_imu" type="fixed">
+    <parent link="base_link"/>
+    <child link="imu_link"/>
+    <origin xyz="0 0 0.1" rpy="0 0 0"/>
+  </joint>
+
+  <joint name="base_to_SLCL" type="fixed">
+    <parent link="base_link"/>
+    <child link="SLCL_link"/>
+    <origin xyz="-0.05 0.1 0.2" rpy="0 0 0"/>
+  </joint>
+
+  <joint name="base_to_SLCR" type="fixed">
+    <parent link="base_link"/>
+    <child link="SLCR_link"/>
+    <origin xyz="-0.05 -0.1 0.2" rpy="0 0 0"/>
+  </joint>
+
+  <joint name="base_to_camera" type="fixed">
+    <parent link="base_link"/>
+    <child link="camera_link"/>
+    <origin xyz="0.0 0 0.4" rpy="0 0 0"/>
+  </joint>
+
+</robot>
