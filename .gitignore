@@ -49,7 +49,7 @@ qtcreator-*
 
 # Catkin custom files
 CATKIN_IGNORE
-
+/ros/cub2_description/meshes/Cub2URDF241001.dae
 .DS_store
 
 # docker env custom files
