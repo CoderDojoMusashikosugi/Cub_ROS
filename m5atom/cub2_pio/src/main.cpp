@@ -157,6 +157,10 @@ void error_loop(rcl_ret_t temp_rc) {
   FastLED.show();
 }
 
+void IRAM_ATTR set_emergency(){
+  robo_mode = EMERGENCY;
+}
+
 // デバッグメッセージを出力する関数
 char message_buffer[255];
 void debug_message(const char* format, ...) {
@@ -453,6 +457,7 @@ void twist_callback(const void * msgin)
 
 void motor_control_loop(void *pvParameters = nullptr) 
 {
+  attachInterrupt(EMERGENCY_MONITOR, set_emergency, RISING);
   while(1) {
     switch (robo_mode)
     {
@@ -654,7 +659,6 @@ void destroy_entities() {
 void setup() {
   robo_mode = IDLE;
   pinMode(EMERGENCY_MONITOR, INPUT); 
-  attachInterrupt(EMERGENCY_MONITOR, emergency_stop, RISING);
   gpio_pulldown_dis(EMERGENCY_MONITOR);
   
 #ifdef CUB_TARGET_MCUB
