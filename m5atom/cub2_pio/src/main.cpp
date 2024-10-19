@@ -138,7 +138,7 @@ CRGB lane_led[NUM_LANE_LEDS];
 // #include <EspEasyTask.h>
 
 void connect_dualsense(){
-  ps5.begin("e8:47:3a:34:44:a6"); //replace with your MAC address
+  ps5.begin("4C:B9:9B:64:76:1A"); //replace with your MAC address
 }
 
 void debug_message(const char* format, ...);
@@ -502,6 +502,10 @@ void remote_control_loop(void *pvParameters){
   connect_dualsense();
   
   while(1) {
+    if (robo_mode == EMERGENCY) {
+      delay(100);
+      continue;
+    }
   #ifdef CUB_TARGET_CUB2
     float default_linear = 1.2;
   #elif defined(CUB_TARGET_MCUB)
@@ -538,7 +542,6 @@ void remote_control_loop(void *pvParameters){
       }
     } else {
       leds[2] = CRGB::Red;
-      if (robo_mode == EMERGENCY) return;
     
       if (uros_state == AGENT_CONNECTED) robo_mode = AUTONOMOUS;
       else robo_mode = IDLE;
@@ -651,8 +654,8 @@ void destroy_entities() {
 void setup() {
   robo_mode = IDLE;
   pinMode(EMERGENCY_MONITOR, INPUT); 
-  // attachInterrupt(EMERGENCY_MONITOR, emergency_stop, RISING);
-  // gpio_pulldown_dis(EMERGENCY_MONITOR);
+  attachInterrupt(EMERGENCY_MONITOR, emergency_stop, RISING);
+  gpio_pulldown_dis(EMERGENCY_MONITOR);
   
 #ifdef CUB_TARGET_MCUB
   auto cfg = M5.config();
@@ -668,7 +671,7 @@ void setup() {
 
   // initialize LED
   FastLED.addLeds<WS2812, LED_DATA_PIN, GRB>(leds, NUM_LEDS);
-#ifdef CUB_TARGET_CUB
+#ifdef CUB_TARGET_CUB2
   FastLED.addLeds<NEOPIXEL, LANE_LED_DATA_PIN>(lane_led, NUM_LANE_LEDS);
   FastLED.setBrightness(200);
   fill_solid(lane_led, NUM_LANE_LEDS, CRGB( 255, 255, 255));
@@ -679,7 +682,7 @@ void setup() {
   FastLED.show();
   delay(10);
 
-#ifdef CUB_TARGET_CUB
+#ifdef CUB_TARGET_CUB2
   for(int i=1;i<=4;i++){
     motor_handler.Control_Motor(0, i, Acce, Brake_P, &Receiv); //4つのモーター
   }
