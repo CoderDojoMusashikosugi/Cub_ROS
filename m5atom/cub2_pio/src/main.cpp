@@ -205,28 +205,13 @@ void imu_timer_callback(rcl_timer_t * imu_timer, int64_t last_call_time) {
 
 #ifdef CUB_TARGET_CUB2
 void motor_exec(){
-  for(int i=0;i<4;i++){
-    motor_handler.Control_Motor(Speed[i], i+1, Acce, brake, &Receiv[i]);//スピード0：モーター停止
-    // debug_message("i = %d send speed %d receiver id %d temp %d err %d", i, Speed[i], Receiv.ID, Receiv.Temp, Receiv.ErrCode);
-    vTaskDelay(5 / portTICK_PERIOD_MS);//1回の通信ごとに5msのWaitが必要（RS485の半二重通信の問題と思われる）
-    
-    switch (i)
-    {
-    case 0:
-      rear_left_wheel_position = Receiv[i].Position;
-      break;
-    case 1:
-      front_left_wheel_position = Receiv[i].Position;
-      break;
-    case 2:
-      front_left_wheel_position = Receiv[i].Position;
-      break;
-    case 3:
-      rear_left_wheel_position = Receiv[i].Position;
-      break;
-    default:
-      break;
+  if (xSemaphoreTake(mutex, pdMS_TO_TICKS(100))) {
+    for(int i=0;i<4;i++){
+      motor_handler.Control_Motor(Speed[i], i+1, Acce, brake, &Receiv[i]);//スピード0：モーター停止
+      // debug_message("i = %d send speed %d receiver id %d temp %d err %d", i, Speed[i], Receiv.ID, Receiv.Temp, Receiv.ErrCode);
+      vTaskDelay(5 / portTICK_PERIOD_MS);//1回の通信ごとに5msのWaitが必要（RS485の半二重通信の問題と思われる） 
     }
+    xSemaphoreGive(mutex);
   }
 }
 
@@ -244,11 +229,21 @@ void motor_brake(){
   motor_exec();
 }
 
+unsigned int vehicle_stop_exe_count = 0;
 void vehicle_run(int right, int left){
   Speed[0]=Speed[2]=-right;
   Speed[1]=Speed[3]=left;
-  brake = Brake_Disable;
+  if(vehicle_stop_exe_count > 10) {
+    brake = Brake_Enable;
+  } else {
+    brake = Brake_Disable;
+  }
   motor_exec();
+  if((right == 0) && (left == 0)) {
+    ++vehicle_stop_exe_count;
+  } else {
+    vehicle_stop_exe_count = 0;
+  }
 } 
 
 int16_t get_max_motor_speed()
@@ -384,10 +379,30 @@ void wh_pos_timer_callback() {
   
     // メッセージデータの設定
 #ifdef CUB_TARGET_CUB2
+  for(int i=0;i<4;i++) {
+    switch (i)
+    {
+    case 0:
+      rear_left_wheel_position = Receiv[i].Position;
+      break;
+    case 1:
+      front_left_wheel_position = Receiv[i].Position;
+      break;
+    case 2:
+      front_left_wheel_position = Receiv[i].Position;
+      break;
+    case 3:
+      rear_left_wheel_position = Receiv[i].Position;
+      break;
+    default:
+      break;
+    }
+  }
   wheel_positions_msg.data.data[0] = static_cast<int32_t>(front_left_wheel_position);
   wheel_positions_msg.data.data[1] = static_cast<int32_t>(front_right_wheel_position);
   wheel_positions_msg.data.data[2] = static_cast<int32_t>(rear_left_wheel_position);
   wheel_positions_msg.data.data[3] = static_cast<int32_t>(rear_right_wheel_position);
+  
 #elif defined(CUB_TARGET_MCUB)
   int32_t right_wheel_position;
   int32_t left_wheel_position;
@@ -417,45 +432,45 @@ void control_motor(const geometry_msgs__msg__Twist* arg_twist) {
   double r_vel_r = r_vel_m / (diameter / 1000.0 / 2.0); // [rad/s]
   double l_vel_r = l_vel_m / (diameter / 1000.0 / 2.0); // [rad/s]
   #ifdef CUB_TARGET_CUB2
-    int r_goal_vel = (int)(r_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit); // right goal velocity[rpm] # TODO: check whether need to add dvidid by motor_velocity_unit
-    int l_goal_vel = (int)(l_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit); // left goal velocity[rpm]
+  int r_goal_vel = (int)(r_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit); // right goal velocity[rpm] # TODO: check whether need to add dvidid by motor_velocity_unit
+  int l_goal_vel = (int)(l_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit); // left goal velocity[rpm]
 
-    vehicle_run(r_goal_vel, l_goal_vel);
+  vehicle_run(r_goal_vel, l_goal_vel);
   #elif defined(CUB_TARGET_MCUB)
   int32_t r_goal_vel = (int32_t)(r_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit); // right goal velocity
   int32_t l_goal_vel = (int32_t)(l_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit); // left goal velocity
 
-    if (xSemaphoreTake(mutex, pdMS_TO_TICKS(10))) {
-      dxl.setGoalVelocity(DXL1_ID, r_goal_vel);
-      delay(5);
-      dxl.setGoalVelocity(DXL2_ID, l_goal_vel);
-      delay(5);
-      xSemaphoreGive(mutex);
+  if (xSemaphoreTake(mutex, pdMS_TO_TICKS(10))) {
+    dxl.setGoalVelocity(DXL1_ID, r_goal_vel);
+    delay(5);
+    dxl.setGoalVelocity(DXL2_ID, l_goal_vel);
+    delay(5);
+    xSemaphoreGive(mutex);
   #ifdef DEBUG
-      if (arg_twist->linear.x > 0) {
-        leds[7] = CRGB::Blue;
-        leds[17] = CRGB::Black;
-      } else if (arg_twist->linear.x < 0) {
-        leds[7] = CRGB::Black;
-        leds[17] = CRGB::Blue;
-      } else {
-        leds[7] = CRGB::Black;
-        leds[17] = CRGB::Black;
-      }
-
-      if (arg_twist->angular.z > 0) {
-        leds[11] = CRGB::Blue;
-        leds[13] = CRGB::Black;
-      } else if (arg_twist->angular.z < 0) {
-        leds[11] = CRGB::Black;
-        leds[13] = CRGB::Blue;
-      } else {
-        leds[11] = CRGB::Black;
-        leds[13] = CRGB::Black;
-      }
-      FastLED.show();
-  #endif // DEBUG
+    if (arg_twist->linear.x > 0) {
+      leds[7] = CRGB::Blue;
+      leds[17] = CRGB::Black;
+    } else if (arg_twist->linear.x < 0) {
+      leds[7] = CRGB::Black;
+      leds[17] = CRGB::Blue;
+    } else {
+      leds[7] = CRGB::Black;
+      leds[17] = CRGB::Black;
     }
+
+    if (arg_twist->angular.z > 0) {
+      leds[11] = CRGB::Blue;
+      leds[13] = CRGB::Black;
+    } else if (arg_twist->angular.z < 0) {
+      leds[11] = CRGB::Black;
+      leds[13] = CRGB::Blue;
+    } else {
+      leds[11] = CRGB::Black;
+      leds[13] = CRGB::Black;
+    }
+    FastLED.show();
+  #endif // DEBUG
+  }
   #endif // CUB_TARGET
   if (uros_state == AGENT_CONNECTED) {
     wh_pos_timer_callback();
@@ -496,7 +511,7 @@ void motor_control_loop(void *pvParameters = nullptr)
       break;
     case EMERGENCY:
   #ifdef CUB_TARGET_CUB2
-      motor_brake();
+      emergency_stop();
   #endif
       remote_twist_msg = vehicle_stop_msg();
       subscribe_twist_msg = vehicle_stop_msg();
@@ -541,9 +556,7 @@ void remote_control_loop(void *pvParameters){
       if (ps5.Cross()) {
         remote_twist_msg = vehicle_stop_msg();
         robo_mode = EMERGENCY;
-      }
-
-      if (ps5.L2()) {
+      } else if (ps5.L2()) {
         int val_LStickX = ps5.LStickX();
         int val_LStickY = ps5.LStickY();
         if (abs(val_LStickX) < 16) val_LStickX = 0;
@@ -678,9 +691,9 @@ void setup() {
 #ifdef CUB_TARGET_MCUB
   auto cfg = M5.config();
   M5.begin(cfg);
+#endif
 
   mutex = xSemaphoreCreateMutex();
-#endif
 
   // Configure serial transport
   Serial.begin(115200);
@@ -727,15 +740,19 @@ void setup() {
 void loop() {
   if (digitalRead(EMERGENCY_MONITOR) == HIGH) {
 #ifdef CUB_TARGET_CUB2
-    motor_brake();
+    emergency_stop();
     fill_solid(lane_led, NUM_LANE_LEDS, CRGB::Red);
 #endif
     robo_mode = EMERGENCY;
     leds[4] = CRGB::Red;
     FastLED.show();
-    return;
   } else {
-    if (robo_mode == EMERGENCY) robo_mode = IDLE;
+    if ((robo_mode == EMERGENCY) && (!ps5.Cross())) robo_mode = IDLE;
+  }
+
+  if (robo_mode == EMERGENCY){
+    delay(100);
+    return;
   }
 
   if (robo_mode == REMOTE_CTRL) {
