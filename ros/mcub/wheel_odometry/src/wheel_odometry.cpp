@@ -21,8 +21,13 @@ public:
         odometry_publisher_ = this->create_publisher<nav_msgs::msg::Odometry>("odom", 10);
 
         // サブスクライバーの初期化
+        custom_qos_profile.depth = 10;
+        custom_qos_profile.history = rmw_qos_history_policy_t::RMW_QOS_POLICY_HISTORY_KEEP_LAST;
+        custom_qos_profile.reliability = rmw_qos_reliability_policy_t::RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT;
+        custom_qos_profile.durability = rmw_qos_durability_policy_t::RMW_QOS_POLICY_DURABILITY_VOLATILE;
+        rclcpp::QoS qos_profile(rclcpp::KeepLast(10), custom_qos_profile);
         wheel_position_subscription_ = this->create_subscription<std_msgs::msg::Int32MultiArray>(
-            "wheel_positions", 10, std::bind(&WheelOdometryNode::wheelPositionCallback, this, std::placeholders::_1));
+            "wheel_positions", qos_profile, std::bind(&WheelOdometryNode::wheelPositionCallback, this, std::placeholders::_1));
 
         // TFブロードキャスターの初期化
         tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
@@ -176,6 +181,7 @@ private:
 
     rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odometry_publisher_;
     rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr wheel_position_subscription_;
+    rmw_qos_profile_t custom_qos_profile = rmw_qos_profile_default;
     std::shared_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
 
     int32_t last_left_wheel_pos_;
