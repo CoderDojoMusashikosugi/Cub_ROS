@@ -67,14 +67,14 @@ uint8_t Brake_P = 0; // Brake position of motor
 uint8_t ID = 1;      // ID of Motor (default:1)
 uint8_t brake = Brake_Disable;
 const int16_t POS_MAX = 32767; //車輪のエンコーダーの最大値
-Receiver Receiv;
+Receiver Receiv[4]; // 0:rear left, 1:front right, 2:front left, 3:rear right
 // M5Stackのモジュールによって対応するRX,TXのピン番号が違うためM5製品とRS485モジュールに対応させてください
 auto motor_handler = MotorHandler(33, 23); // Cub2 ATOM(33, 23) Cub1 RX,TX ATOM(32, 26) DDSM210 ATOM S3(2,1)
 
-uint16_t right_wheel_position1 = 0;
-uint16_t right_wheel_position2 = 0;
-uint16_t left_wheel_position1 = 0;
-uint16_t left_wheel_position2 = 0;
+uint16_t front_right_wheel_position = 0;
+uint16_t rear_right_wheel_position = 0;
+uint16_t front_left_wheel_position = 0;
+uint16_t rear_left_wheel_position = 0;
 
 int last_num_sign[2] = {0,0};
 const int16_t SPEED_MAX = 115;  //DDSM115 115rpm = max11
@@ -206,23 +206,23 @@ void imu_timer_callback(rcl_timer_t * imu_timer, int64_t last_call_time) {
 #ifdef CUB_TARGET_CUB2
 void motor_exec(){
   for(int i=0;i<4;i++){
-    motor_handler.Control_Motor(Speed[i], i+1, Acce, brake, &Receiv);//スピード0：モーター停止
+    motor_handler.Control_Motor(Speed[i], i+1, Acce, brake, &Receiv[i]);//スピード0：モーター停止
     // debug_message("i = %d send speed %d receiver id %d temp %d err %d", i, Speed[i], Receiv.ID, Receiv.Temp, Receiv.ErrCode);
     vTaskDelay(5 / portTICK_PERIOD_MS);//1回の通信ごとに5msのWaitが必要（RS485の半二重通信の問題と思われる）
     
     switch (i)
     {
     case 0:
-      left_wheel_position2 = Receiv.Position;
+      rear_left_wheel_position = Receiv[i].Position;
       break;
     case 1:
-      right_wheel_position1 = Receiv.Position;
+      front_left_wheel_position = Receiv[i].Position;
       break;
     case 2:
-      left_wheel_position1 = Receiv.Position;
+      front_left_wheel_position = Receiv[i].Position;
       break;
     case 3:
-      right_wheel_position2 = Receiv.Position;
+      rear_left_wheel_position = Receiv[i].Position;
       break;
     default:
       break;
@@ -251,13 +251,27 @@ void vehicle_run(int right, int left){
   motor_exec();
 } 
 
-void emergency_stop() {
-    motor_brake();
-    robo_mode = EMERGENCY;
-    leds[4] = CRGB::Red;
-    fill_solid(lane_led, NUM_LANE_LEDS, CRGB::Red);
-    FastLED.show();
+int16_t get_max_motor_speed()
+{
+  int16_t max_speed = 0;
+  for(int i=0;i<4;i++){
+    if (max_speed < abs(Receiv[i].BSpeed)) max_speed = abs(Receiv[i].BSpeed);
+  }
+  return max_speed;
 }
+
+void emergency_stop() {
+  robo_mode = EMERGENCY;
+  leds[4] = CRGB::Red;
+  fill_solid(lane_led, NUM_LANE_LEDS, CRGB::Red);
+  FastLED.show();
+  // モータ回転状態でbrakeを入れると、大電流が流れるため安全に停止する
+  while (get_max_motor_speed() > 10) {
+    vehicle_run(0, 0);  
+  }
+  motor_brake();
+}
+
 #elif defined(CUB_TARGET_MCUB)
 void initialize_dynamixel() {
     // initialize dynamixel
@@ -370,10 +384,10 @@ void wh_pos_timer_callback() {
   
     // メッセージデータの設定
 #ifdef CUB_TARGET_CUB2
-  wheel_positions_msg.data.data[0] = static_cast<int32_t>(left_wheel_position1);
-  wheel_positions_msg.data.data[1] = static_cast<int32_t>(right_wheel_position1);
-  wheel_positions_msg.data.data[2] = static_cast<int32_t>(left_wheel_position2);
-  wheel_positions_msg.data.data[3] = static_cast<int32_t>(right_wheel_position2);
+  wheel_positions_msg.data.data[0] = static_cast<int32_t>(front_left_wheel_position);
+  wheel_positions_msg.data.data[1] = static_cast<int32_t>(front_right_wheel_position);
+  wheel_positions_msg.data.data[2] = static_cast<int32_t>(rear_left_wheel_position);
+  wheel_positions_msg.data.data[3] = static_cast<int32_t>(rear_right_wheel_position);
 #elif defined(CUB_TARGET_MCUB)
   int32_t right_wheel_position;
   int32_t left_wheel_position;
@@ -688,7 +702,7 @@ void setup() {
 
 #ifdef CUB_TARGET_CUB2
   for(int i=1;i<=4;i++){
-    motor_handler.Control_Motor(0, i, Acce, Brake_P, &Receiv); //4つのモーター
+    motor_handler.Control_Motor(0, i, Acce, Brake_P, &Receiv[i]); //4つのモーター
   }
 #elif defined(CUB_TARGET_MCUB)
   initialize_dynamixel();
