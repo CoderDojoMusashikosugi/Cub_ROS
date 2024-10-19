@@ -42,7 +42,7 @@
   </link>
 
   <!-- Velodyne LiDAR -->
-  <link name="velodyne_link">
+  <link name="velodyne">
     <visual>
       <geometry>
         <cylinder radius="0.05" length="0.1"/>
@@ -103,8 +103,8 @@
 
   <!-- 各リンクの接続 -->
   <joint name="base_to_footprint" type="fixed">
-    <parent link="base_footprint"/>
-    <child link="base_link"/>
+    <parent link="base_link"/>
+    <child link="base_footprint"/>
     <origin xyz="0 0 0" rpy="0 0 0"/>
   </joint>
 
@@ -116,7 +116,7 @@
 
   <joint name="base_to_velodyne" type="fixed">
     <parent link="base_link"/>
-    <child link="velodyne_link"/>
+    <child link="velodyne"/>
     <origin xyz="0.0 0 0.5" rpy="0 0 0"/>
   </joint>
 

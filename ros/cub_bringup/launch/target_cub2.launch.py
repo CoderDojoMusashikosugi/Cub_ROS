@@ -28,7 +28,7 @@ def generate_launch_description():
             'frame_id': "SLC1L",
         }.items()
     )
-    sllidar_L_launch_delayed = TimerAction(period=1.0, actions=[sllidar_L_launch])
+    sllidar_L_launch_delayed = TimerAction(period=3.0, actions=[sllidar_L_launch])
     
     # R側の設定
     sllidar_R_launch = IncludeLaunchDescription(
@@ -56,6 +56,7 @@ def generate_launch_description():
     velodyne_launch=IncludeLaunchDescription(
             PythonLaunchDescriptionSource(velodyne_launch_file_dir)
         )
+    velodyne_launch_delayed = TimerAction(period=10.0,actions=[velodyne_launch])
     
     # LIDARのGroupAction
     slc_L_group = GroupAction(
@@ -101,11 +102,11 @@ def generate_launch_description():
         ),
 
         # グループアクション
-        # slc_L_group,
-        # slc_R_group,
+        slc_L_group,
+        slc_R_group,
 
         # GPS launch
-        gps_launch,
+        #gps_launch,
         # velodyne launch
-        velodyne_launch
+        velodyne_launch_delayed
     ])
