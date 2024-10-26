@@ -42,6 +42,16 @@ def generate_launch_description():
         "/velodyne_packets",
         "/velodyne_points",
         "/wheel_positions",
+        "/navclock",
+        "/navheading",
+        "/navposecef",
+        "/navpvt",
+        "/navrelposned",
+        "/navstate",
+        "/navstatus",
+        "/navsvin",
+        "/fix",
+        "/fix/velocity",
     ]
 
     return LaunchDescription([
