@@ -1,96 +1,27 @@
-# ここにデバイス接続の設定を書く
-
-x-template: &cub_ros_common_setting # デフォルト設定。この値は下にあるカスタム設定で上書きされる場合があるので、編集時はそちらにも注目すべし。
-  build:
-    context: ..
-    network: host
-  image: ghcr.io/coderdojomusashikosugi/cub_ros:${VER:-latest}_${ARCH:-default} # dockerにイメージ名:タグ名を付ける
-  stdin_open: true              # docker compose upでコンテナ立ち上げっぱなしにする用
-  tty: true                     # docker compose upでコンテナ立ち上げっぱなしにする用
-  ipc: host            # コンテナとホストとのDDSの通信のためにホストとIPCを共有
-  privileged: true     # ホストのシリアルポートをコンテナに持ってくる
-  group_add: 
-    - dialout                  # シリアルポートをsudo無しでアクセス可能にする
-    - ${INPUT_GROUP_ID:-input} # joystickをsudo無しでアクセス可能にする
-    - docker                   # dockerコマンドをsudoなしでアクセス可能にする(dood)
-    - plugdev
-    - root                     # 上のmac版
-    - video                    # realsense用
-  volumes:                                                   # ホストにあるディレクトリをコンテナ内部から読み書き出来るようマウントする
-    - ./home:/home/${USER_NAME:-cub}                         # docker/homeに置いているhomeディレクトリをまるごとコンテナ内と接続する
-    - ../ros:/home/${USER_NAME:-cub}/colcon_ws/src/cub       # ./rosに置いたrosパッケージを、cubという名前でコンテナ内に配置する
-    - ../support_tools:/home/${USER_NAME:-cub}/support_tools # ./support_toolsに置いているフォルダ/ファイルをsupport_toolsという名前でコンテナ内に配置する
-    - /var/run/docker.sock:/var/run/docker.sock              # Hostのdockerをコンテナ内から操作可能にする
-    - /dev:/dev                                              # USB-シリアルデバイス等をコンテナ内から操作可能にする
-  # runtime: nvidia
-  working_dir: /home/${USER_NAME:-cub} # シェル起動時はホームディレクトリから開始
-  environment:                  # コンテナ内で使う環境変数の設定
-    # ユーザー設定関連
-    - HOST_UID                    # コンテナ内で使うユーザーのuid受け渡し用。値の定義はrun.shにある。
-    - HOST_GID                    # コンテナ内で使うユーザーのgid受け渡し用。値の定義はrun.shにある。
-    - USER_NAME=${USER_NAME:-cub} # コンテナ内で使うユーザー名(&パスワード)。値の定義はdocker/.envにある。
-    - DISPLAY                     # X11用の設定。値の定義はホスト環境のもの、Macだけrun.shにある。
-    - CUB_TARGET                  # どの機体向けに実行するかの設置を読み込む。値の定義はtarget.envにある。
-    - INPUT_GROUP_ID              # inputグループをdockerコンテナ内に共有する用の設定。値の定義はdocker/internal/docker_util.shにある。
+# ここに通常環境とvnc環境ごとのデバイス接続の設定を書く
+# docker-compose-common.ymlからの差分を書く
 
 services:
   cub_ros:
-    <<: *cub_ros_common_setting
-    build:
-      context: ..
-      network: host
-      dockerfile: docker/Dockerfile
-      args:
-        - BASE_IMAGE_NAME=ghcr.io/coderdojomusashikosugi/cub_ros_base:${VER_BASE:-latest}_${ARCH:-default}
-    image: ghcr.io/coderdojomusashikosugi/cub_ros:${VER:-latest}_${ARCH:-default} # dockerにイメージ名:タグ名を付ける
-    container_name: cub_ros       # コンテナ名を付ける
-    hostname: docker              # ホスト名を付ける。内部のシェルを起動した際のプロンプトに影響する。
-    extra_hosts:
-      - "docker:127.0.0.1"        # ホスト名とlocalhostを対応付けておく。sudoのエラーを消す用。
-    entrypoint: /entrypoint.sh    # コンテナ起動時に最初に実行されるスクリプトの設定
-    network_mode: "host" # ネットワーク関連のアプリを、コンテナ内でもホストと同じ動きが出来るようにする。
-    volumes:                                                   # ホストにあるディレクトリをコンテナ内部から読み書き出来るようマウントする
-      - ./home:/home/${USER_NAME:-cub}                         # docker/homeに置いているhomeディレクトリをまるごとコンテナ内と接続する
-      - ../ros:/home/${USER_NAME:-cub}/colcon_ws/src/cub       # ./rosに置いたrosパッケージを、cubという名前でコンテナ内に配置する
-      - ../support_tools:/home/${USER_NAME:-cub}/support_tools # ./support_toolsに置いているフォルダ/ファイルをsupport_toolsという名前でコンテナ内に配置する
-      - /var/run/docker.sock:/var/run/docker.sock              # Hostのdockerをコンテナ内から操作可能にする
-      - /dev:/dev                                              # USB-シリアルデバイス等をコンテナ内から操作可能にする
-      - /tmp/.X11-unix:/tmp/.X11-unix                          # 画面出力用 リストのマージが出来ないので上記の通り変更分以外も記載
-      - ~/.Xauthority:/home/${USER_NAME:-cub}/.Xauthority      # 画面出力用 リストのマージが出来ないので上記の通り変更分以外も記載
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix                          # 画面出力用
+      - ~/.Xauthority:/home/${USER_NAME:-cub}/.Xauthority      # 画面出力用
 
   cub_ros_vnc:
-    <<: *cub_ros_common_setting
     build:
-      context: ..
-      network: host
       dockerfile: docker/Dockerfile_vnc
       args:
         - BASE_IMAGE_NAME=ghcr.io/coderdojomusashikosugi/cub_ros:${VER:-latest}_${ARCH:-default}
     image: ghcr.io/coderdojomusashikosugi/cub_ros_vnc:${VER_VNC:-latest}_${ARCH:-default}
     network_mode: bridge           # hostだとnoVNCのサーバーが外からアクセスできないためbridgeに。Velodyneとか追加設定必要そう。
     ports:
-      - "6080:80"
-      - "8765:8765"
+      - "6080:80"    # VNC表示ページ用のポート
+      - "8765:8765"  # foxglobe用のポート
     security_opt:
-      - seccomp:unconfined
+      - seccomp:unconfined # VNC環境用の設定
     shm_size: 512M
     container_name: cub_ros_vnc        # コンテナ名を付ける
     hostname: cub_ros_vnc          # ホスト名を付ける。内部のシェルを起動した際のプロンプトに影響する。
     entrypoint: /entrypoint_vnc.sh # コンテナ起動時に最初に実行されるスクリプトの設定
-    environment:                  # コンテナ内で使う環境変数の設定
-      # ユーザー設定関連
-      - HOST_UID                    # コンテナ内で使うユーザーのuid受け渡し用。値の定義はrun.shにある。
-      - HOST_GID                    # コンテナ内で使うユーザーのgid受け渡し用。値の定義はrun.shにある。
-      - USER_NAME=${USER_NAME:-cub} # コンテナ内で使うユーザー名(&パスワード)。値の定義はdocker/.envにある。
-      # - DISPLAY                     # X11用の設定。値の定義はホスト環境のもの、Macだけrun.shにある。
-      - CUB_TARGET                  # どの機体向けに実行するかの設置を読み込む。値の定義はtarget.envにある。
-      - INPUT_GROUP_ID              # inputグループをdockerコンテナ内に共有する用の設定。値の定義はdocker/internal/docker_util.shにある。
-      - DISPLAY=:1                  # VNC環境向けの設定 リストのマージが出来ないので上記の通り変更分以外も記載
-    
-  cub_ros_base: # rosだけ入ってる分のコンテナイメージ生成用
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.base
-      network: host
-    network_mode: "none"
-    image: ghcr.io/coderdojomusashikosugi/cub_ros_base:${VER_BASE:-latest}_${ARCH:-default} # dockerにイメージ名:タグ名を付ける
+    environment:                   # コンテナ内で使う環境変数の設定
+      - DISPLAY=:1                 # VNC環境向けの設定

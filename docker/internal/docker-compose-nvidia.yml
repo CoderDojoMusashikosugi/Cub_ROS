@@ -1,0 +1,9 @@
+# ここにNVIDIAコンテナが可能な場合の設定を書く
+# docker_util.sh でマージして使う
+
+services:
+  cub_ros:
+    runtime: nvidia
+
+  cub_ros_vnc:
+    runtime: nvidia
