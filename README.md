@@ -105,3 +105,34 @@ VNCのDocker環境というのは、RViz等OpenGL関係のアプリをX11で表�
 
 ## mcubの動作方法
 [ros/mcub/README.md](ros/mcub/README.md)を参照
+
+## Turtlebot3のシミュレーション環境の使い方
+### 地図作成
+- シミュレータを起動
+    - `ros2 launch turtlebot3_ignition ignition.launch.py use_sim_time:=True`
+- 地図作成ソフトウェアを起動(上記のシェルは既に使ってるので、別ので実行)
+    - `ros2 launch turtlebot3_cartographer cartographer.launch.py use_sim_time:=True`
+- 地図を保存(上記のシェルは既に全部使ってるので、さらに別ので実行)
+    - 地図を保存するディレクトリを用意、この場合はmap1ディレクトリに地図を突っ込む想定
+        - `mkdir -p ~/maps/map1`
+    - 地図を保存
+        - `ros2 run nav2_map_server map_saver_cli -f ~/maps/map1/map --ros-args -p save_map_timeout:=1000.0`
+        - ~/maps/map1/ 以下に、map.pgmとmap.yamlが生成される
+        - map.pgmはgimp等で編集可能な画像ファイル
+- 終了
+    - 全部のターミナルでCtrl+Cを押して、プロセスを落として回る。
+
+### 自律走行
+- シミュレータを起動
+    - `ros2 launch turtlebot3_ignition ignition.launch.py use_sim_time:=True`
+- 自律走行ソフトウェアを起動(上記のシェルは既に使ってるので、別ので実行)
+    - `ros2 launch turtlebot3_navigation2 navigation2.launch.py use_sim_time:=True map:=/home/cub/maps/map1/map.yaml`
+- mapの方のrvizに地図出ない時は以下を実行(上記のシェルは既に全部使ってるので、さらに別ので実行)
+    - `ros2 lifecycle set map_server configure && ros2 lifecycle set map_server activate`
+- 自律走行
+    - turtlebot3を使ったサンプルはインターネットに沢山あるので、それを参考にするのが楽
+    - 例えば[こちらの記事の「Navigation2の実行」の項目](https://qiita.com/porizou1/items/d63a41fc1e478dfa5ab6#navigation2%E3%81%AE%E5%AE%9F%E8%A1%8C)
+    - ネット上の記事の通り、機体の初期姿勢を指定して、ゴールを指定するとその地点に走る。✌楽しい✌
+- 終了
+    - 全部のターミナルでCtrl+Cを押して、プロセスを落として回る。
+
