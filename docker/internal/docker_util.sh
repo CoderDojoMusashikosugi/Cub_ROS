@@ -1,5 +1,5 @@
 
-docker_compose="docker compose -f docker/docker-compose.yml --env-file docker/.env --env-file docker/ver.env --env-file docker/ver_base.env --env-file docker/ver_vnc.env --env-file target.env"
+docker_compose="docker compose -f docker/docker-compose-common.yml -f docker/docker-compose.yml --env-file docker/.env --env-file docker/ver.env --env-file docker/ver_base.env --env-file docker/ver_vnc.env --env-file target.env"
 
 # アーキテクチャを確認
 UNAME_M=`uname -m`
@@ -9,6 +9,11 @@ elif [ $UNAME_M = "aarch64" ] || [ $UNAME_M = "arm64" ]; then
     export ARCH="arm64"
 else
     export ARCH="wakaran"
+fi
+
+RUNTIME_NVIDIA=`docker info 2>/dev/null | grep nvidia`
+if [ -n "$RUNTIME_NVIDIA" ]; then # runtime: nvidia を指定可能な環境の場合
+    docker_compose=$docker_compose" -f docker/internal/docker-compose-nvidia.yml" # runtime: nvidiaをつける
 fi
 
 # 画面出力の表示先設定
