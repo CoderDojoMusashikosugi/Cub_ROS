@@ -5,6 +5,22 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
+# 環境変数 CUB_TARGET を取得
+if(DEFINED ENV{CUB_TARGET})
+    message(STATUS "CUB_TARGET is set to $ENV{CUB_TARGET}")
+
+    if($ENV{CUB_TARGET} STREQUAL "cub2")
+        add_definitions(-DCUB_TARGET_CUB2)
+    elseif($ENV{CUB_TARGET} STREQUAL "mcub")
+        add_definitions(-DCUB_TARGET_MCUB)
+    else()
+        message(WARNING "CUB_TARGET is set to an unknown value: $ENV{CUB_TARGET}")
+    endif()
+else()
+    message(FATAL_ERROR "CUB_TARGET environment variable is not set")
+endif()
+
+
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)

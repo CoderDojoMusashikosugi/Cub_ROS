@@ -11,7 +11,13 @@ import os
 
 def generate_launch_description():
     # sllidar_ros2パッケージの共有ディレクトリを取得
+    state_launch_file_dir = os.path.join(
+        get_package_share_directory('cub2_description'),
+        'launch',
+        'display.launch.py'
+    )
     sllidar_ros2_share_dir = FindPackageShare('sllidar_ros2').find('sllidar_ros2')
+    
     velodyne_launch_file_dir = os.path.join(
         get_package_share_directory('velodyne'),
         'launch',
@@ -43,15 +49,17 @@ def generate_launch_description():
     sllidar_R_launch_delayed = TimerAction(period=3.0, actions=[sllidar_R_launch])
     
     # GPSのlaunchファイル
-    gps_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            os.path.join(
-                FindPackageShare('nmea_navsat_driver').find('nmea_navsat_driver'),
-                'launch',
-                'nmea_serial_driver.launch.py'
-            )
-        )
-    )
+    # gps_launch = IncludeLaunchDescription(
+    #     PythonLaunchDescriptionSource(
+    #         os.path.join(
+    #             FindPackageShare('nmea_navsat_driver').find('nmea_navsat_driver'),
+    #             'launch',
+    #             'nmea_serial_driver.launch.py'
+    #         )
+    #     )
+    # )
+    # state_publisherの起動
+    state_publisher_launch = IncludeLaunchDescription(PythonLaunchDescriptionSource(state_launch_file_dir))
     # velodyneの起動
     velodyne_launch=IncludeLaunchDescription(
             PythonLaunchDescriptionSource(velodyne_launch_file_dir)
@@ -101,11 +109,12 @@ def generate_launch_description():
         ),
 
         # グループアクション
-        # slc_L_group,
-        # slc_R_group,
+        slc_L_group,
+        slc_R_group,
 
         # GPS launch
-        gps_launch,
+        #gps_launch,
         # velodyne launch
-        velodyne_launch
+        velodyne_launch,
+        state_publisher_launch,
     ])
