@@ -19,3 +19,6 @@
 [submodule "ros/bno055"]
 	path = ros/bno055
 	url = https://github.com/flynneva/bno055.git
+[submodule "ros/lidarslam_ros2"]
+	path = ros/lidarslam_ros2
+	url = https://github.com/rsasaki0109/lidarslam_ros2.git
