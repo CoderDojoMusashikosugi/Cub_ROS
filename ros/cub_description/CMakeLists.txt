@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(cub2_description)
+project(cub_description)
 
 find_package(ament_cmake REQUIRED)
 find_package(xacro REQUIRED)

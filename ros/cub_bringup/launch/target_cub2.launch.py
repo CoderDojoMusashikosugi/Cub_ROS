@@ -12,7 +12,7 @@ import os
 def generate_launch_description():
     # sllidar_ros2パッケージの共有ディレクトリを取得
     state_launch_file_dir = os.path.join(
-        get_package_share_directory('cub2_description'),
+        get_package_share_directory('cub_description'),
         'launch',
         'display.launch.py'
     )

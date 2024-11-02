@@ -14,7 +14,7 @@ def generate_launch_description():
                 FindExecutable(name='xacro'),
                 ' ',
                 PathJoinSubstitution([
-                    FindPackageShare('cub2_description'),
+                    FindPackageShare('cub_description'),
                     'urdf',
                     'cub2.urdf'
                 ])
