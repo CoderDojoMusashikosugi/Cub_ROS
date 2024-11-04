@@ -386,13 +386,13 @@ void wh_pos_timer_callback() {
       rear_left_wheel_position = Receiv[i].Position;
       break;
     case 1:
-      front_left_wheel_position = Receiv[i].Position;
+      front_right_wheel_position = Receiv[i].Position;
       break;
     case 2:
       front_left_wheel_position = Receiv[i].Position;
       break;
     case 3:
-      rear_left_wheel_position = Receiv[i].Position;
+      rear_right_wheel_position = Receiv[i].Position;
       break;
     default:
       break;
