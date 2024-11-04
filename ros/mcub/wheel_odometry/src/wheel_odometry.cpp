@@ -8,6 +8,7 @@
 #include "nav_msgs/msg/odometry.hpp"
 #include "tf2_ros/transform_broadcaster.h"
 #include "geometry_msgs/msg/transform_stamped.hpp"
+#include <rclcpp/qos.hpp>
 
 using namespace std::chrono_literals;
 
@@ -21,8 +22,10 @@ public:
         odometry_publisher_ = this->create_publisher<nav_msgs::msg::Odometry>("odom", 10);
 
         // サブスクライバーの初期化
+        rclcpp::QoS best_effort(10);
+        best_effort.best_effort();
         wheel_position_subscription_ = this->create_subscription<std_msgs::msg::Int32MultiArray>(
-            "wheel_positions", 10, std::bind(&WheelOdometryNode::wheelPositionCallback, this, std::placeholders::_1));
+        "wheel_positions", best_effort, std::bind(&WheelOdometryNode::wheelPositionCallback, this, std::placeholders::_1));
 
         // TFブロードキャスターの初期化
         tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
