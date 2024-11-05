@@ -3,7 +3,7 @@
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joy.hpp"
 #include "geometry_msgs/msg/twist.hpp"
-#include "cub_bringup/joy_to_dualsense.hpp"
+#include "cub_commander/joy_to_dualsense.hpp"
 #include <math.h>
 #include <algorithm>
 using std::placeholders::_1;
@@ -31,19 +31,19 @@ private:
   bool before=false;
 };
 
-class TeleopJoy : public rclcpp::Node
+class CubCommander : public rclcpp::Node
 {
   public:
-    TeleopJoy()
-    : Node("teleop_joy")
+    CubCommander()
+    : Node("cub_commander_node")
     {
       subscription_ = this->create_subscription<sensor_msgs::msg::Joy>(
-      "/joy", 10, std::bind(&TeleopJoy::topic_callback, this, _1));
+      "/joy", 10, std::bind(&CubCommander::topic_callback, this, _1));
       publisher_ = this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
       cmd_vel_timer_ = this->create_wall_timer(
-      std::chrono::milliseconds(50),
-      std::bind(&TeleopJoy::publishCmdVel, this)
-);
+        std::chrono::milliseconds(50),
+        std::bind(&CubCommander::publishCmdVel, this)
+      );
 
     }
 
@@ -98,7 +98,7 @@ class TeleopJoy : public rclcpp::Node
 int main(int argc, char * argv[])
 {
   rclcpp::init(argc, argv);
-  rclcpp::spin(std::make_shared<TeleopJoy>());
+  rclcpp::spin(std::make_shared<CubCommander>());
   rclcpp::shutdown();
   return 0;
 }

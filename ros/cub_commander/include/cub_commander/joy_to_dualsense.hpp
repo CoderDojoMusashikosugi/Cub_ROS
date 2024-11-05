@@ -1,5 +1,5 @@
-#ifndef CUB_BRINGUP__JOY_TO_DUALENSE_HPP_
-#define CUB_BRINGUP__JOY_TO_DUALENSE_HPP_
+#ifndef CUB_COMMANDER__JOY_TO_DUALENSE_HPP_
+#define CUB_COMMANDER__JOY_TO_DUALENSE_HPP_
 
 #include "sensor_msgs/msg/joy.hpp"
 
@@ -37,4 +37,4 @@ private:
   sensor_msgs::msg::Joy joy;
 };
 
-#endif  // CUB_BRINGUP__JOY_TO_DUALENSE_HPP_
+#endif  // CUB_COMMANDER__JOY_TO_DUALENSE_HPP_
