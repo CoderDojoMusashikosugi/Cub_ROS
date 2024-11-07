@@ -40,5 +40,6 @@ def generate_launch_description():
         Node(
             package='cub_commander',
             executable='cub_commander_node',
+            output='screen',
         ),
     ])

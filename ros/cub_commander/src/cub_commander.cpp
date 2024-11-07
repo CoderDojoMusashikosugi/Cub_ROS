@@ -39,12 +39,15 @@ class CubCommander : public rclcpp::Node
     {
       subscription_ = this->create_subscription<sensor_msgs::msg::Joy>(
       "/joy", 10, std::bind(&CubCommander::topic_callback, this, _1));
-      publisher_ = this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
+      cmd_vel_sub_ = this->create_subscription<geometry_msgs::msg::Twist>(
+      "/cmd_vel", 10, std::bind(&CubCommander::cmd_vel_nav_callback, this, _1));
+      publisher_ = this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel_atom", 10);
       cmd_vel_timer_ = this->create_wall_timer(
         std::chrono::milliseconds(50),
         std::bind(&CubCommander::publishCmdVel, this)
       );
 
+      cmd_vel_stamp_ = this->get_clock()->now();
     }
 
   private:
@@ -60,29 +63,54 @@ class CubCommander : public rclcpp::Node
     double angular_step = radians(20.0);
     
     geometry_msgs::msg::Twist cmd_vel_;
+    rclcpp::Time cmd_vel_stamp_;
+
+    bool autonomous = true;
 
     void topic_callback(const sensor_msgs::msg::Joy & msg)
     {
       joy.update(msg);
 
+      cmd_vel_stamp_ = this->get_clock()->now();
+
+      if(joy.l1() || joy.l2()){
+        autonomous = false;
+      }else{
+        autonomous = true;
+      }
+
+      // 手動操縦関連
       if(upPressed(joy.up())){
         linear = clamp(linear + linear_step,linear_step,1.5);
-        RCLCPP_INFO(this->get_logger(), "linear: %f", linear);
+        // RCLCPP_INFO(this->get_logger(), "linear: %f", linear);
       }
       if(downPressed(joy.down())){
         linear = clamp(linear - linear_step,linear_step,1.5);
-        RCLCPP_INFO(this->get_logger(), "linear: %f", linear);
+        // RCLCPP_INFO(this->get_logger(), "linear: %f", linear);
       }
       if(leftPressed(joy.left())){
         angular = clamp(angular + angular_step,angular_step,radians(360.0));
-        RCLCPP_INFO(this->get_logger(), "angular: %f", degrees(angular));
+        // RCLCPP_INFO(this->get_logger(), "angular: %f", degrees(angular));
       }
       if(rightPressed(joy.right())){
         angular = clamp(angular - angular_step,angular_step,radians(360.0));
-        RCLCPP_INFO(this->get_logger(), "angular: %f", degrees(angular));
+        // RCLCPP_INFO(this->get_logger(), "angular: %f", degrees(angular));
       }
-      cmd_vel_.linear.x = linear*joy.lx();
-      cmd_vel_.angular.z = angular*joy.ly();
+      if(autonomous==false){
+        cmd_vel_.linear.x = linear*joy.lx();
+        cmd_vel_.angular.z = angular*joy.ly();
+      }
+    }
+
+    void cmd_vel_nav_callback(const geometry_msgs::msg::Twist & msg){
+      if((this->now() - cmd_vel_stamp_).seconds() >= 1.0){
+        autonomous = true;
+      }// 一秒以上コントローラの接続が切れたらマニュアルモードを強制終了する。
+
+      if(autonomous){
+        cmd_vel_.linear.x  = msg.linear.x;
+        cmd_vel_.angular.z = msg.angular.z;
+      }
     }
 
     void publishCmdVel()
@@ -91,6 +119,7 @@ class CubCommander : public rclcpp::Node
     }
 
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr subscription_;
+    rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_sub_;
     rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr publisher_; 
     rclcpp::TimerBase::SharedPtr cmd_vel_timer_;
 };

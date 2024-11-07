@@ -639,7 +639,7 @@ bool create_entities() {
     &subscriber,
     &node,
     ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Twist),
-    "cmd_vel", &minimum_qos));
+    "cmd_vel_atom", &minimum_qos));
 
 #ifdef CUB_TARGET_MCUB
   // create imu_timer,
