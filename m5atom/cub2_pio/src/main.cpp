@@ -239,11 +239,11 @@ void vehicle_run(int right, int left){
     brake = Brake_Disable;
   }
   motor_exec();
-  if((right == 0) && (left == 0)) {
-    ++vehicle_stop_exe_count;
-  } else {
-    vehicle_stop_exe_count = 0;
-  }
+  // if((right == 0) && (left == 0)) {
+  //   ++vehicle_stop_exe_count;
+  // } else {
+  //   vehicle_stop_exe_count = 0;
+  // }
 } 
 
 int16_t get_max_motor_speed()
@@ -386,22 +386,22 @@ void wh_pos_timer_callback() {
       rear_left_wheel_position = Receiv[i].Position;
       break;
     case 1:
-      front_left_wheel_position = Receiv[i].Position;
+      front_right_wheel_position = Receiv[i].Position;
       break;
     case 2:
       front_left_wheel_position = Receiv[i].Position;
       break;
     case 3:
-      rear_left_wheel_position = Receiv[i].Position;
+      rear_right_wheel_position = Receiv[i].Position;
       break;
     default:
       break;
     }
   }
-  wheel_positions_msg.data.data[0] = static_cast<int32_t>(front_left_wheel_position);
-  wheel_positions_msg.data.data[1] = static_cast<int32_t>(front_right_wheel_position);
-  wheel_positions_msg.data.data[2] = static_cast<int32_t>(rear_left_wheel_position);
-  wheel_positions_msg.data.data[3] = static_cast<int32_t>(rear_right_wheel_position);
+  wheel_positions_msg.data.data[0] = static_cast<int32_t>(rear_left_wheel_position);
+  wheel_positions_msg.data.data[1] = static_cast<int32_t>(rear_right_wheel_position);
+  wheel_positions_msg.data.data[2] = static_cast<int32_t>(front_left_wheel_position);
+  wheel_positions_msg.data.data[3] = static_cast<int32_t>(front_right_wheel_position);
   
 #elif defined(CUB_TARGET_MCUB)
   int32_t right_wheel_position;
