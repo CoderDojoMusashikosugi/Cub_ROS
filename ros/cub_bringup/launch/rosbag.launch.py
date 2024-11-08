@@ -52,6 +52,18 @@ def generate_launch_description():
         "/navsvin",
         "/fix",
         "/fix/velocity",
+        "/camera/camera/aligned_depth_to_color/camera_info",
+        "/camera/camera/aligned_depth_to_color/image_raw",
+        "/camera/camera/color/camera_info",
+        "/camera/camera/color/image_raw",
+        "/camera/camera/color/metadata",
+        "/camera/camera/depth/camera_info",
+        "/camera/camera/depth/color/points",
+        "/camera/camera/depth/image_rect_raw",
+        "/camera/camera/depth/metadata",
+        "/camera/camera/extrinsics/depth_to_color",
+        "/camera/camera/extrinsics/depth_to_depth",
+        "/camera/camera/rgbd",
     ]
 
     return LaunchDescription([

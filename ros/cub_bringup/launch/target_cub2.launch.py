@@ -23,6 +23,11 @@ def generate_launch_description():
         'launch',
         'velodyne-all-nodes-VLP32C-launch.py'
     )
+
+    realsense_launch_file_dir = os.path.join(
+        get_package_share_directory("realsense2_camera"),
+        'launch'
+    )
     
     # sllidarの起動　LとRで分ける
     sllidar_L_launch = IncludeLaunchDescription(
@@ -64,6 +69,13 @@ def generate_launch_description():
     velodyne_launch=IncludeLaunchDescription(
             PythonLaunchDescriptionSource(velodyne_launch_file_dir)
         )
+    
+    realsense_launch=IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(os.path.join(realsense_launch_file_dir, "rs_launch.py")),
+        launch_arguments={
+            'config_file': os.path.join(realsense_launch_file_dir, "config", "config.yaml"),
+        }.items()
+    )
     
     # LIDARのGroupAction
     slc_L_group = GroupAction(
@@ -116,5 +128,6 @@ def generate_launch_description():
         #gps_launch,
         # velodyne launch
         velodyne_launch,
+        realsense_launch,
         state_publisher_launch,
     ])

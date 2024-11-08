@@ -22,3 +22,9 @@
 [submodule "ros/lidarslam_ros2"]
 	path = ros/lidarslam_ros2
 	url = https://github.com/rsasaki0109/lidarslam_ros2.git
+[submodule "ros/realsense-ros"]
+	path = ros/realsense-ros
+	url = https://github.com/IntelRealSense/realsense-ros.git
+[submodule "ros/ros2-ublox-zedf9p"]
+	path = ros/ros2-ublox-zedf9p
+	url = https://github.com/gokulp01/ros2-ublox-zedf9p.git
