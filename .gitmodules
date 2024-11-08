@@ -7,7 +7,7 @@
 	branch = humble-devel
 [submodule "ros/sllidar_ros2"]
 	path = ros/sllidar_ros2
-	url = https://github.com/Slamtec/sllidar_ros2.git
+	url = https://github.com/nobu323/sllidar_ros2
 [submodule "ros/velodyne"]
 	path = ros/velodyne
 	url = https://github.com/ros-drivers/velodyne.git

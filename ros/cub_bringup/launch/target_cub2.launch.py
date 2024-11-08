@@ -37,6 +37,7 @@ def generate_launch_description():
         launch_arguments={
             'serial_port': "/dev/ttySLC1L",
             'frame_id': "SLC1L",
+            'topic_name': "/SLC1L/scan",
         }.items()
     )
     sllidar_L_launch_delayed = TimerAction(period=1.0, actions=[sllidar_L_launch])
@@ -49,6 +50,7 @@ def generate_launch_description():
         launch_arguments={
             'serial_port': "/dev/ttySLC1R",
             'frame_id': "SLC1R",
+            'topic_name': "/SLC1R/scan",
         }.items()
     )
     sllidar_R_launch_delayed = TimerAction(period=3.0, actions=[sllidar_R_launch])
