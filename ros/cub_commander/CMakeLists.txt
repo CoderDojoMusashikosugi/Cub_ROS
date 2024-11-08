@@ -6,9 +6,11 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 find_package(rclcpp REQUIRED)
+find_package(rclcpp_action REQUIRED)
 find_package(ament_cmake REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(nav2_msgs REQUIRED)
 
 include_directories(
   include
@@ -17,7 +19,10 @@ include_directories(
 add_executable(cub_commander_node src/cub_commander.cpp src/joy_to_dualsense.cpp)
 ament_target_dependencies(cub_commander_node rclcpp sensor_msgs geometry_msgs geometry_msgs)
 
-install(TARGETS cub_commander_node
+add_executable(nav2_action_client src/nav2_action_client.cpp)
+ament_target_dependencies(nav2_action_client rclcpp rclcpp_action sensor_msgs geometry_msgs geometry_msgs nav2_msgs)
+
+install(TARGETS cub_commander_node nav2_action_client
   DESTINATION lib/${PROJECT_NAME})
 
 ament_package()
