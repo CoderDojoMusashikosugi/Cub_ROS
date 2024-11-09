@@ -71,10 +71,10 @@ Receiver Receiv[4]; // 0:rear left, 1:front right, 2:front left, 3:rear right
 // M5Stackのモジュールによって対応するRX,TXのピン番号が違うためM5製品とRS485モジュールに対応させてください
 auto motor_handler = MotorHandler(33, 23); // Cub2 ATOM(33, 23) Cub1 RX,TX ATOM(32, 26) DDSM210 ATOM S3(2,1)
 
-uint16_t front_right_wheel_position = 0;
-uint16_t rear_right_wheel_position = 0;
-uint16_t front_left_wheel_position = 0;
-uint16_t rear_left_wheel_position = 0;
+volatile uint16_t front_right_wheel_position = 0;
+volatile uint16_t rear_right_wheel_position = 0;
+volatile uint16_t front_left_wheel_position = 0;
+volatile uint16_t rear_left_wheel_position = 0;
 
 int last_num_sign[2] = {0,0};
 const int16_t SPEED_MAX = 115;  //DDSM115 115rpm = max11
@@ -210,6 +210,23 @@ void motor_exec(){
       motor_handler.Control_Motor(Speed[i], i+1, Acce, brake, &Receiv[i]);//スピード0：モーター停止
       // debug_message("i = %d send speed %d receiver id %d temp %d err %d", i, Speed[i], Receiv.ID, Receiv.Temp, Receiv.ErrCode);
       vTaskDelay(5 / portTICK_PERIOD_MS);//1回の通信ごとに5msのWaitが必要（RS485の半二重通信の問題と思われる） 
+      switch (i)
+      {
+      case 0:
+        rear_left_wheel_position = Receiv[i].Position;
+        break;
+      case 1:
+        front_right_wheel_position = Receiv[i].Position;
+        break;
+      case 2:
+        front_left_wheel_position = Receiv[i].Position;
+        break;
+      case 3:
+        rear_right_wheel_position = Receiv[i].Position;
+        break;
+      default:
+        break;
+      }
     }
     xSemaphoreGive(mutex);
   }
@@ -379,29 +396,13 @@ void wh_pos_timer_callback() {
   
     // メッセージデータの設定
 #ifdef CUB_TARGET_CUB2
-  for(int i=0;i<4;i++) {
-    switch (i)
-    {
-    case 0:
-      rear_left_wheel_position = Receiv[i].Position;
-      break;
-    case 1:
-      front_right_wheel_position = Receiv[i].Position;
-      break;
-    case 2:
-      front_left_wheel_position = Receiv[i].Position;
-      break;
-    case 3:
-      rear_right_wheel_position = Receiv[i].Position;
-      break;
-    default:
-      break;
-    }
-  }
-  wheel_positions_msg.data.data[0] = static_cast<int32_t>(rear_left_wheel_position);
-  wheel_positions_msg.data.data[1] = static_cast<int32_t>(rear_right_wheel_position);
-  wheel_positions_msg.data.data[2] = static_cast<int32_t>(front_left_wheel_position);
-  wheel_positions_msg.data.data[3] = static_cast<int32_t>(front_right_wheel_position);
+  // if (xSemaphoreTake(mutex, pdMS_TO_TICKS(100))) {
+    wheel_positions_msg.data.data[0] = static_cast<int32_t>(rear_left_wheel_position);
+    wheel_positions_msg.data.data[1] = static_cast<int32_t>(rear_right_wheel_position);
+    wheel_positions_msg.data.data[2] = static_cast<int32_t>(front_left_wheel_position);
+    wheel_positions_msg.data.data[3] = static_cast<int32_t>(front_right_wheel_position);
+  //   xSemaphoreGive(mutex);
+  // }
   
 #elif defined(CUB_TARGET_MCUB)
   int32_t right_wheel_position;

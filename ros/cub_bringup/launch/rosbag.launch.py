@@ -64,6 +64,8 @@ def generate_launch_description():
         "/camera/camera/extrinsics/depth_to_color",
         "/camera/camera/extrinsics/depth_to_depth",
         "/camera/camera/rgbd",
+        "/SLC1L_scan",
+        "/SLC1R_scan",
     ]
 
     return LaunchDescription([
