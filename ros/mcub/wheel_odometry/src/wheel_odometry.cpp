@@ -83,6 +83,7 @@ private:
             left_wheel_position = last_left_wheel_pos_ += delta_left_pos_2;
             if (left_wheel_position < 0) left_wheel_position += POS_MAX;
             RCLCPP_WARN(this->get_logger(), "msg->data[0] is invalid value %d", msg->data[0]);
+            return;
         } else {
             delta_left_pos = -delta_left_pos;
         }
@@ -96,6 +97,7 @@ private:
             right_wheel_position = last_right_wheel_pos_ += delta_right_pos_2;
             if (right_wheel_position < 0) right_wheel_position += POS_MAX;
             RCLCPP_WARN(this->get_logger(), "msg->data[1] is invalid value %d", msg->data[1]);
+            return;
         }
 
 
@@ -162,7 +164,8 @@ private:
         geometry_msgs::msg::Quaternion q = msg->orientation;
         tf2::Quaternion quaternion(q.x,q.y,q.z,q.w);
         tf2::Matrix3x3(quaternion).getRPY(roll,pitch,yaw);
-        yaw_ = yaw;
+        if(initial_yaw_ == -100) initial_yaw_ = yaw;
+        yaw_ = yaw - initial_yaw_;
         // IMUメッセージをログに出力
         // RCLCPP_INFO(this->get_logger(), "Linear Acceleration:\n x: %.2f, y: %.2f, z: %.2f",
         //             msg->linear_acceleration.x, msg->linear_acceleration.y, msg->linear_acceleration.z);
@@ -173,8 +176,8 @@ private:
 
     int32_t calc_delta_pos(int32_t _last_pos, int32_t _cur_pos)
     {
-        const int32_t upper_th = 30000;
-        const int32_t lower_th = 3000;
+        const int32_t upper_th = 29000;
+        const int32_t lower_th = 3500;
         int32_t delta_pos = 0;
         // オーバーフロー処理
         if (_last_pos > upper_th && _cur_pos < lower_th) {
@@ -231,6 +234,7 @@ private:
 
     double x_, y_, theta_; // 現在のオドメトリの位置と角度
     double yaw_;
+    double initial_yaw_ = -100;
 };
 
 int main(int argc, char * argv[])
