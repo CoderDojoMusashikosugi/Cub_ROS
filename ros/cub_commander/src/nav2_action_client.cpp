@@ -7,6 +7,9 @@
 #include <nav2_msgs/action/follow_waypoints.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <rclcpp/time.hpp>
+#include <iostream>
+#include <yaml-cpp/yaml.h>
+#include <ament_index_cpp/get_package_share_directory.hpp>
 
 using namespace std::chrono_literals;
 using std::placeholders::_1;
@@ -49,43 +52,76 @@ void WaypointFollowerClient::execute()
 
 
   auto goal_msg = FollowWaypoints::Goal();
-  goal_msg.poses.resize(4);
 
-  goal_msg.poses[0].header.frame_id = "map";
-  goal_msg.poses[0].header.stamp = this->now();
-  goal_msg.poses[0].pose.position.x = 1.0;
-  goal_msg.poses[0].pose.position.y = 0.0;
-  goal_msg.poses[0].pose.orientation.x = 0.0;
-  goal_msg.poses[0].pose.orientation.y = 0.0;
-  goal_msg.poses[0].pose.orientation.z = 1.0;
-  goal_msg.poses[0].pose.orientation.w = 0.0;
+  std::string filename = "coordinates.yaml";
+  std::string file_path = ament_index_cpp::get_package_share_directory("cub_commander")+"/routes/"+filename;
+  std::cout << "coordinate file path :" + file_path  << std::endl;
+  YAML::Node config = YAML::LoadFile(file_path);
 
-  goal_msg.poses[1].header.frame_id = "map";
-  goal_msg.poses[1].header.stamp = this->now();
-  goal_msg.poses[1].pose.position.x = 1.5;
-  goal_msg.poses[1].pose.position.y = -0.5;
-  goal_msg.poses[1].pose.orientation.x = 0.0;
-  goal_msg.poses[1].pose.orientation.y = 0.0;
-  goal_msg.poses[1].pose.orientation.z = -0.7;
-  goal_msg.poses[1].pose.orientation.w = 0.7;
+    // "coordinates" ノードを取得して各座標を出力
+    if (config["coordinates"]) {
+        for (const auto& coord : config["coordinates"]) {
+            // x, y, yawの各値を取得
+            double x = coord["x"].as<double>();
+            double y = coord["y"].as<double>();
+            double yaw = coord["yaw"].as<double>();
+            
+            // 標準出力に出力
+            std::cout << "x: " << x << ", y: " << y << ", yaw: " << yaw << std::endl;
+            geometry_msgs::msg::pose_stamped goal;
+            goal.header.frame_id = "map";
+            goal.header.stamp = this->now();
+            goal.pose.position.x = x;
+            goal.pose.position.y = y;
+            goal.pose.orientation.x = 0.0;
+            goal.pose.orientation.y = 0.0;
+            goal.pose.orientation.z = 0.0;
+            goal.pose.orientation.w = 1.0;
+            goal_msgs.poses.push_back(goal);
+        }
+    } else {
+        std::cerr << "Error: 'coordinates' not found in the YAML file." << std::endl;
+        return 1;
+    }
 
-  goal_msg.poses[2].header.frame_id = "map";
-  goal_msg.poses[2].header.stamp = this->now();
-  goal_msg.poses[2].pose.position.x = 1.5;
-  goal_msg.poses[2].pose.position.y = 0.0;
-  goal_msg.poses[2].pose.orientation.x = 0.0;
-  goal_msg.poses[2].pose.orientation.y = 0.0;
-  goal_msg.poses[2].pose.orientation.z = 0.0;
-  goal_msg.poses[2].pose.orientation.w = 1.0;
 
-  goal_msg.poses[3].header.frame_id = "map";
-  goal_msg.poses[3].header.stamp = this->now();
-  goal_msg.poses[3].pose.position.x = 0.0;
-  goal_msg.poses[3].pose.position.y = 0.0;
-  goal_msg.poses[3].pose.orientation.x = 0.0;
-  goal_msg.poses[3].pose.orientation.y = 0.0;
-  goal_msg.poses[3].pose.orientation.z = 0.7;
-  goal_msg.poses[3].pose.orientation.w = 0.7;
+  // goal_msg.poses.resize(4);
+
+  // goal_msg.poses[0].header.frame_id = "map";
+  // goal_msg.poses[0].header.stamp = this->now();
+  // goal_msg.poses[0].pose.position.x = 1.0;
+  // goal_msg.poses[0].pose.position.y = 0.0;
+  // goal_msg.poses[0].pose.orientation.x = 0.0;
+  // goal_msg.poses[0].pose.orientation.y = 0.0;
+  // goal_msg.poses[0].pose.orientation.z = 1.0;
+  // goal_msg.poses[0].pose.orientation.w = 0.0;
+
+  // goal_msg.poses[1].header.frame_id = "map";
+  // goal_msg.poses[1].header.stamp = this->now();
+  // goal_msg.poses[1].pose.position.x = 1.5;
+  // goal_msg.poses[1].pose.position.y = -0.5;
+  // goal_msg.poses[1].pose.orientation.x = 0.0;
+  // goal_msg.poses[1].pose.orientation.y = 0.0;
+  // goal_msg.poses[1].pose.orientation.z = -0.7;
+  // goal_msg.poses[1].pose.orientation.w = 0.7;
+
+  // goal_msg.poses[2].header.frame_id = "map";
+  // goal_msg.poses[2].header.stamp = this->now();
+  // goal_msg.poses[2].pose.position.x = 1.5;
+  // goal_msg.poses[2].pose.position.y = 0.0;
+  // goal_msg.poses[2].pose.orientation.x = 0.0;
+  // goal_msg.poses[2].pose.orientation.y = 0.0;
+  // goal_msg.poses[2].pose.orientation.z = 0.0;
+  // goal_msg.poses[2].pose.orientation.w = 1.0;
+
+  // goal_msg.poses[3].header.frame_id = "map";
+  // goal_msg.poses[3].header.stamp = this->now();
+  // goal_msg.poses[3].pose.position.x = 0.0;
+  // goal_msg.poses[3].pose.position.y = 0.0;
+  // goal_msg.poses[3].pose.orientation.x = 0.0;
+  // goal_msg.poses[3].pose.orientation.y = 0.0;
+  // goal_msg.poses[3].pose.orientation.z = 0.7;
+  // goal_msg.poses[3].pose.orientation.w = 0.7;
 
   RCLCPP_INFO(this->get_logger(), "Sending goal");
 
@@ -162,5 +198,8 @@ int main(int argc, char **argv)
   rclcpp::spin(node);
 
   rclcpp::shutdown();
+
+
+
   return 0;
 }
