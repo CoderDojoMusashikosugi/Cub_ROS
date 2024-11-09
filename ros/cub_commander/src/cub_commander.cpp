@@ -57,7 +57,7 @@ class CubCommander : public rclcpp::Node
     UpEdge leftPressed;
     UpEdge rightPressed;
 
-    double linear = 0.4;
+    double linear = 1.2;
     double linear_step = 0.1;
     double angular = radians(60.0);
     double angular_step = radians(20.0);

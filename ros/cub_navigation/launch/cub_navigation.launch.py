@@ -38,7 +38,7 @@ def generate_launch_description():
             'map.yaml'))
 
     # param_file_name = TURTLEBOT3_MODEL + '.yaml'
-    param_file_name = 'mcub_nav2.yaml'
+    param_file_name = 'cub2_nav2.yaml'
     param_dir = LaunchConfiguration(
         'params_file',
         default=os.path.join(

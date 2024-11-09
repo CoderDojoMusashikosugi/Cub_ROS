@@ -24,10 +24,6 @@ def generate_launch_description():
             package='wheel_odometry',
             executable='wheel_odometry_node',
         ),
-        Node(
-            package='cub_bringup',
-            executable='odom_to_tf',
-        ),
 
         Node(
             package='robot_state_publisher',
