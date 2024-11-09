@@ -68,7 +68,7 @@ void WaypointFollowerClient::execute()
             
             // 標準出力に出力
             std::cout << "x: " << x << ", y: " << y << ", yaw: " << yaw << std::endl;
-            geometry_msgs::msg::pose_stamped goal;
+            geometry_msgs::msg::PoseStamped goal;
             goal.header.frame_id = "map";
             goal.header.stamp = this->now();
             goal.pose.position.x = x;
@@ -77,11 +77,11 @@ void WaypointFollowerClient::execute()
             goal.pose.orientation.y = 0.0;
             goal.pose.orientation.z = 0.0;
             goal.pose.orientation.w = 1.0;
-            goal_msgs.poses.push_back(goal);
+            goal_msg.poses.push_back(goal);
         }
     } else {
         std::cerr << "Error: 'coordinates' not found in the YAML file." << std::endl;
-        return 1;
+        return;
     }
 
 
@@ -198,8 +198,6 @@ int main(int argc, char **argv)
   rclcpp::spin(node);
 
   rclcpp::shutdown();
-
-
 
   return 0;
 }
