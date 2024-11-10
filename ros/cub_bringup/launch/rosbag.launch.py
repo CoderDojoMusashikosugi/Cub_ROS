@@ -23,6 +23,7 @@ def generate_launch_description():
         "/bno055/temp",
         "/clicked_point",
         "/cmd_vel",
+        "/cmd_vel_atom",
         "/diagnostics",
         "/fix",
         "/goal_pose",
