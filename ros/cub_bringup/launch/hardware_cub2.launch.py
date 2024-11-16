@@ -103,10 +103,6 @@ def generate_launch_description():
             name='micro_ros_agent',
             arguments=["serial", "--dev", "/dev/ttyATOM", "-b", "115200", "-v6"]
         ),
-        Node(
-            package='joy_linux',
-            executable='joy_linux_node',
-        ),
 
         # bno055ノード
         # serialerror以外は通常通り動きます

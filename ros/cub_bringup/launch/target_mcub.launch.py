@@ -32,16 +32,6 @@ def generate_launch_description():
             output='screen',
             parameters=[{'use_sim_time': use_sim_time, 'robot_description': robot_desc}],
             arguments=[urdf]),
-        
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource([
-                os.path.join(FindPackageShare('sllidar_ros2').find('sllidar_ros2'), 'launch', 'sllidar_c1_launch.py')
-            ]),
-            launch_arguments={
-                'serial_port': "/dev/ttySLC1",
-                'frame_id': "SLC1_link",
-            }.items()
-        ),
 
         Node(
             package='rviz2',

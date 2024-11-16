@@ -30,9 +30,8 @@ def generate_launch_description():
             executable='cub_commander_node',
             output='screen',
         ),
-
         Node(
-            package='cub_bringup',
-            executable='odom_to_tf',
+            package='joy_linux',
+            executable='joy_linux_node',
         ),
     ])

@@ -24,7 +24,7 @@ install(TARGETS odom_to_tf
   DESTINATION lib/${PROJECT_NAME})
 
 install(
-  DIRECTORY launch
+  DIRECTORY launch params
   DESTINATION share/${PROJECT_NAME}
 )
 

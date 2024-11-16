@@ -37,8 +37,14 @@ def generate_launch_description():
             'map',
             'map.yaml'))
 
-    # param_file_name = TURTLEBOT3_MODEL + '.yaml'
-    param_file_name = 'cub2_nav2.yaml'
+    cub_target = os.getenv('CUB_TARGET', 'cub2')
+    if cub_target == 'cub2':
+        param_file_name = 'cub2_nav2.yaml'
+    elif cub_target == 'mcub':
+        param_file_name = 'mcub_nav2.yaml'
+    else:
+        param_file_name = 'cub2_nav2.yaml'
+
     param_dir = LaunchConfiguration(
         'params_file',
         default=os.path.join(
@@ -54,6 +60,10 @@ def generate_launch_description():
         'nav2_default_view.rviz')
 
     return LaunchDescription([
+        Node(
+            package='cub_bringup',
+            executable='odom_to_tf',
+        ),
         DeclareLaunchArgument(
             'map',
             default_value=map_dir,
