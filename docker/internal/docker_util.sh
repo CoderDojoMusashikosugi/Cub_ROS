@@ -11,7 +11,7 @@ else
     export ARCH="wakaran"
 fi
 
-RUNTIME_NVIDIA=`docker info 2>/dev/null | grep nvidia`
+RUNTIME_NVIDIA=`docker info 2>/dev/null | grep nvidia || true`
 if [ -n "$RUNTIME_NVIDIA" ]; then # runtime: nvidia を指定可能な環境の場合
     docker_compose=$docker_compose" -f docker/internal/docker-compose-nvidia.yml" # runtime: nvidiaをつける
 fi
