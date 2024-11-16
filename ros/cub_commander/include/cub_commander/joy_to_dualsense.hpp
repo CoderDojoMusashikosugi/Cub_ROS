@@ -19,11 +19,15 @@ public:
 
   bool create();
   bool option();
+  bool touchpad();
+  bool ps();
 
   bool l1();
   bool r1();
   bool l2();
   bool r2();
+  bool l3();
+  bool r3();
 
   double lx();
   double ly();

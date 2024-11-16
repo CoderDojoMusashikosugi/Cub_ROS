@@ -11,6 +11,7 @@ find_package(ament_cmake REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(nav2_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
 find_package(yaml-cpp REQUIRED)
 find_package(ament_index_cpp REQUIRED)
 
@@ -19,7 +20,7 @@ include_directories(
 )
 
 add_executable(cub_commander_node src/cub_commander.cpp src/joy_to_dualsense.cpp)
-ament_target_dependencies(cub_commander_node rclcpp sensor_msgs geometry_msgs geometry_msgs)
+ament_target_dependencies(cub_commander_node rclcpp sensor_msgs geometry_msgs geometry_msgs std_msgs)
 
 add_executable(nav2_action_client src/nav2_action_client.cpp)
 ament_target_dependencies(nav2_action_client rclcpp rclcpp_action sensor_msgs geometry_msgs geometry_msgs nav2_msgs yaml-cpp ament_index_cpp)

@@ -47,6 +47,14 @@ bool JoyToDualSense::option()
 {
     return joy.buttons[9];
 }
+bool JoyToDualSense::touchpad()
+{
+    return joy.buttons[13];
+}
+bool JoyToDualSense::ps()
+{
+    return joy.buttons[12];
+}
 
 bool JoyToDualSense::l1()
 {
@@ -63,6 +71,14 @@ bool JoyToDualSense::l2()
 bool JoyToDualSense::r2()
 {
     return joy.buttons[7];
+}
+bool JoyToDualSense::l3()
+{
+    return joy.buttons[10];
+}
+bool JoyToDualSense::r3()
+{
+    return joy.buttons[11];
 }
 
 double JoyToDualSense::lx()

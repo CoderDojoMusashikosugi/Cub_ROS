@@ -3,6 +3,7 @@
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joy.hpp"
 #include "geometry_msgs/msg/twist.hpp"
+#include "std_msgs/msg/empty.hpp"
 #include "cub_commander/joy_to_dualsense.hpp"
 #include <math.h>
 #include <algorithm>
@@ -42,11 +43,13 @@ class CubCommander : public rclcpp::Node
       cmd_vel_sub_ = this->create_subscription<geometry_msgs::msg::Twist>(
       "/cmd_vel", 10, std::bind(&CubCommander::cmd_vel_nav_callback, this, _1));
       publisher_ = this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel_atom", 10);
+      start_button_pub_ = this->create_publisher<std_msgs::msg::Empty>("/start_button", 10);
       cmd_vel_timer_ = this->create_wall_timer(
         std::chrono::milliseconds(50),
         std::bind(&CubCommander::publishCmdVel, this)
       );
 
+      joy_stamp_ = this->get_clock()->now();
       cmd_vel_stamp_ = this->get_clock()->now();
     }
 
@@ -56,6 +59,7 @@ class CubCommander : public rclcpp::Node
     UpEdge downPressed;
     UpEdge leftPressed;
     UpEdge rightPressed;
+    UpEdge TouchpadPressed;
 
     double linear = 1.2;
     double linear_step = 0.1;
@@ -63,6 +67,7 @@ class CubCommander : public rclcpp::Node
     double angular_step = radians(20.0);
     
     geometry_msgs::msg::Twist cmd_vel_;
+    rclcpp::Time joy_stamp_;
     rclcpp::Time cmd_vel_stamp_;
 
     bool autonomous = true;
@@ -71,12 +76,19 @@ class CubCommander : public rclcpp::Node
     {
       joy.update(msg);
 
-      cmd_vel_stamp_ = this->get_clock()->now();
+      joy_stamp_ = this->get_clock()->now();
 
+      // 自動と手動の切り替え
       if(joy.l1() || joy.l2()){
         autonomous = false;
       }else{
         autonomous = true;
+      }
+
+      // 横断歩道での再スタートボタンのJoycon代替版
+      if(TouchpadPressed(joy.touchpad())){
+        std_msgs::msg::Empty empty;
+        start_button_pub_->publish(empty);
       }
 
       // 手動操縦関連
@@ -103,9 +115,7 @@ class CubCommander : public rclcpp::Node
     }
 
     void cmd_vel_nav_callback(const geometry_msgs::msg::Twist & msg){
-      if((this->now() - cmd_vel_stamp_).seconds() >= 1.0){
-        autonomous = true;
-      }// 一秒以上コントローラの接続が切れたらマニュアルモードを強制終了する。
+      cmd_vel_stamp_ = this->get_clock()->now();
 
       if(autonomous){
         cmd_vel_.linear.x  = msg.linear.x;
@@ -115,12 +125,22 @@ class CubCommander : public rclcpp::Node
 
     void publishCmdVel()
     {
+      // 一秒以上コントローラの接続が切れたらマニュアルモードを強制終了する。
+      if((this->now() - joy_stamp_).seconds() >= 1.0){
+        autonomous = true;
+      }
+      // autonomousの時、navigationから３秒以上データが来てなければ、暴走防止に停止命令を入れておく。
+      if(autonomous && (this->now() - cmd_vel_stamp_).seconds() >= 3.0){
+        cmd_vel_.linear.x  = 0.0;
+        cmd_vel_.angular.z = 0.0;
+      }
       publisher_->publish(cmd_vel_);
     }
 
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr subscription_;
     rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_sub_;
     rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr publisher_; 
+    rclcpp::Publisher<std_msgs::msg::Empty>::SharedPtr start_button_pub_; 
     rclcpp::TimerBase::SharedPtr cmd_vel_timer_;
 };
 
