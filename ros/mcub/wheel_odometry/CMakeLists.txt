@@ -25,12 +25,13 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 
 add_executable(wheel_odometry_node src/wheel_odometry.cpp)
-ament_target_dependencies(wheel_odometry_node rclcpp std_msgs nav_msgs tf2 tf2_ros)
+ament_target_dependencies(wheel_odometry_node rclcpp std_msgs sensor_msgs nav_msgs tf2 tf2_ros)
 
 install(TARGETS
   wheel_odometry_node

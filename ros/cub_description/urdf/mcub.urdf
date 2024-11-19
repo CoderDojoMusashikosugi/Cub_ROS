@@ -1,0 +1,99 @@
+<?xml version="1.0"?>
+<robot name="cub2_robot" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- <link name="odom"/> -->
+  <!-- <joint name="odom_to_base_link" type="fixed">
+    <parent link="odom"/>
+    <child link="base_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint> -->
+
+  <!-- ベースリンク -->
+  <link name="base_link">
+     <visual>
+      <geometry>
+        <box size="0.15 0.11 0.08"/>
+      </geometry>
+      <origin xyz="-0.045 0.0 0.07" rpy="0.0 0.0 0.0"/>
+      <material name="white">
+        <color rgba="1 1 1 1"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.15 0.11 0.08"/>
+      </geometry>
+      <origin xyz="-0.045 0.0 0.07" rpy="0.0 0.0 0.0"/>
+    </collision>
+  </link>
+
+  <!-- base_footprint -->
+  <joint name="base_to_footprint" type="fixed">
+    <parent link="base_link"/>
+    <child link="base_footprint"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+  <link name="base_footprint">
+    <visual>
+      <geometry>
+        <cylinder radius="0.02" length="0.13"/>
+      </geometry>
+      <origin xyz="0.0 0.0 0.02" rpy="1.57 0.0 0.0"/>
+      <material name="gray">
+        <color rgba="0.5 0.5 0.5 1"/>
+      </material>
+    </visual>
+  </link>
+  <joint name="base_caster" type="fixed">
+    <parent link="base_footprint"/>
+    <child link="tire_caster"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+  <link name="tire_caster">
+    <visual>
+      <geometry>
+        <cylinder radius="0.02" length="0.015"/>
+      </geometry>
+      <origin xyz="-0.1 0.0 0.02" rpy="1.57 0.0 0.0"/>
+      <material name="gray">
+        <color rgba="0.5 0.5 0.5 1"/>
+      </material>
+    </visual>
+  </link>
+
+  <!-- LiDAR -->
+  <joint name="base_to_SLC1" type="fixed">
+    <parent link="base_link"/>
+    <child link="SLC1_link"/>
+    <origin xyz="0 0 0.14" rpy="0 0 3.1415"/>
+  </joint>
+  <link name="SLC1_link">
+    <visual>
+      <geometry>
+        <cylinder radius="0.025" length="0.015"/>
+      </geometry>
+      <material name="black">
+        <color rgba="0.2 0.2 0.2 1"/>
+      </material>
+    </visual>
+  </link>
+  <joint name="SLC1_base_joint" type="fixed">
+    <parent link="SLC1_link"/>
+    <child link="SLC1_base"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+  <link name="SLC1_base">
+    <visual>
+      <geometry>
+        <box size="0.055 0.055 0.025"/>
+      </geometry>
+      <material name="black">
+        <color rgba="0.2 0.2 0.2 1"/>
+      </material>
+      
+      <origin xyz="0.0 0.0 -0.02" rpy="0.0 0.0 0.0"/>
+    </visual>
+  </link>
+
+
+</robot>

@@ -7,18 +7,24 @@
 	branch = humble-devel
 [submodule "ros/sllidar_ros2"]
 	path = ros/sllidar_ros2
-	url = https://github.com/Slamtec/sllidar_ros2.git
+	url = https://github.com/nobu323/sllidar_ros2
 [submodule "ros/velodyne"]
 	path = ros/velodyne
 	url = https://github.com/ros-drivers/velodyne.git
 	branch = humble-devel
 [submodule "ros/nmea_navsat_driver"]
 	path = ros/nmea_navsat_driver
-	url = https://github.com/ros-drivers/nmea_navsat_driver.git
+	url = https://github.com/nobu323/nmea_navsat_driver.git
 	branch = ros2
 [submodule "ros/bno055"]
 	path = ros/bno055
-	url = https://github.com/flynneva/bno055.git
+	url = https://github.com/nobu323/bno055.git
 [submodule "ros/lidarslam_ros2"]
 	path = ros/lidarslam_ros2
 	url = https://github.com/rsasaki0109/lidarslam_ros2.git
+[submodule "ros/realsense-ros"]
+	path = ros/realsense-ros
+	url = https://github.com/nobu323/realsense-ros.git
+[submodule "ros/ros2-ublox-zedf9p"]
+	path = ros/ros2-ublox-zedf9p
+	url = https://github.com/nobu323/ros2-ublox-zedf9p.git

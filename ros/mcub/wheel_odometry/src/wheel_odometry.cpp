@@ -8,6 +8,10 @@
 #include "nav_msgs/msg/odometry.hpp"
 #include "tf2_ros/transform_broadcaster.h"
 #include "geometry_msgs/msg/transform_stamped.hpp"
+#include "sensor_msgs/msg/imu.hpp"
+#include <rclcpp/qos.hpp>
+#include <tf2/LinearMath/Quaternion.h>
+#include <tf2/LinearMath/Matrix3x3.h>
 
 using namespace std::chrono_literals;
 
@@ -21,8 +25,13 @@ public:
         odometry_publisher_ = this->create_publisher<nav_msgs::msg::Odometry>("odom", 10);
 
         // サブスクライバーの初期化
+        rclcpp::QoS best_effort(10);
+        best_effort.best_effort();
         wheel_position_subscription_ = this->create_subscription<std_msgs::msg::Int32MultiArray>(
-            "wheel_positions", 10, std::bind(&WheelOdometryNode::wheelPositionCallback, this, std::placeholders::_1));
+        "wheel_positions", best_effort, std::bind(&WheelOdometryNode::wheelPositionCallback, this, std::placeholders::_1));
+
+        imu_subscription_ = this->create_subscription<sensor_msgs::msg::Imu>(
+            "/bno055/imu", 10, std::bind(&WheelOdometryNode::imu_callback, this, std::placeholders::_1));
 
         // TFブロードキャスターの初期化
         tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
@@ -30,6 +39,7 @@ public:
         // 初期化
         last_left_wheel_pos_ = 0;
         last_right_wheel_pos_ = 0;
+        yaw_ = 0;
 #ifdef CUB_TARGET_CUB2
         last_left_rear_wheel_pos_ = 0;
         last_right_rear_wheel_pos_ = 0;
@@ -73,6 +83,7 @@ private:
             left_wheel_position = last_left_wheel_pos_ += delta_left_pos_2;
             if (left_wheel_position < 0) left_wheel_position += POS_MAX;
             RCLCPP_WARN(this->get_logger(), "msg->data[0] is invalid value %d", msg->data[0]);
+            return;
         } else {
             delta_left_pos = -delta_left_pos;
         }
@@ -86,6 +97,7 @@ private:
             right_wheel_position = last_right_wheel_pos_ += delta_right_pos_2;
             if (right_wheel_position < 0) right_wheel_position += POS_MAX;
             RCLCPP_WARN(this->get_logger(), "msg->data[1] is invalid value %d", msg->data[1]);
+            return;
         }
 
 
@@ -98,8 +110,12 @@ private:
         double delta_center = (delta_left + delta_right) / 2.0; //[m]
 
         // 角度の更新
+#ifdef CUB_TARGET_CUB2
+        theta_ = yaw_;
+#elif defined(CUB_TARGET_MCUB)
         double delta_theta = (delta_right - delta_left) / wheel_distance_;  // [rad]
         theta_ += delta_theta;
+#endif
 
         // 位置の更新
         double delta_x = delta_center * cos(theta_);
@@ -142,10 +158,26 @@ private:
 #endif
     }
     
+    void imu_callback(const sensor_msgs::msg::Imu::SharedPtr msg) 
+    {
+        double roll, pitch, yaw;
+        geometry_msgs::msg::Quaternion q = msg->orientation;
+        tf2::Quaternion quaternion(q.x,q.y,q.z,q.w);
+        tf2::Matrix3x3(quaternion).getRPY(roll,pitch,yaw);
+        if(initial_yaw_ == -100) initial_yaw_ = yaw;
+        yaw_ = yaw - initial_yaw_;
+        // IMUメッセージをログに出力
+        // RCLCPP_INFO(this->get_logger(), "Linear Acceleration:\n x: %.2f, y: %.2f, z: %.2f",
+        //             msg->linear_acceleration.x, msg->linear_acceleration.y, msg->linear_acceleration.z);
+        // RCLCPP_INFO(this->get_logger(), "Angular Velocity:\n x: %.2f, y: %.2f, z: %.2f",
+        //             msg->angular_velocity.x, msg->angular_velocity.y, msg->angular_velocity.z);
+        
+    }
+
     int32_t calc_delta_pos(int32_t _last_pos, int32_t _cur_pos)
     {
-        const int32_t upper_th = 22000;
-        const int32_t lower_th = 10000;
+        const int32_t upper_th = 29000;
+        const int32_t lower_th = 3500;
         int32_t delta_pos = 0;
         // オーバーフロー処理
         if (_last_pos > upper_th && _cur_pos < lower_th) {
@@ -176,6 +208,7 @@ private:
 
     rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odometry_publisher_;
     rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr wheel_position_subscription_;
+    rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_subscription_;
     std::shared_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
 
     int32_t last_left_wheel_pos_;
@@ -184,7 +217,7 @@ private:
     // オドメトリの計算
 #ifdef CUB_TARGET_CUB2
     // CUB_TARGET が cub2 の場合のコード
-    const double wheel_distance_ = 110.0 / 1000.0;   // 車輪間距離 [mm]
+    const double wheel_distance_ = 205.0 / 1000.0;   // 車輪間距離 [mm]
     const double wheel_circumference_ = 150 * M_PI / 1000.0;       // 車輪の円周 [mm]　直径 * pi
     const int16_t POS_MAX = 32767; //車輪のエンコーダーの最大値
     const double ang_res_ = 1.0/(double)POS_MAX;    // [deg/pulse] motor pluse resolution
@@ -200,6 +233,8 @@ private:
 #endif
 
     double x_, y_, theta_; // 現在のオドメトリの位置と角度
+    double yaw_;
+    double initial_yaw_ = -100;
 };
 
 int main(int argc, char * argv[])

@@ -12,14 +12,6 @@ def generate_launch_description():
     print("launch target:", cub_target)
 
     return LaunchDescription([
-        #cub2だと起動しないので、修正して欲しいですー
-        Node(
-            package='micro_ros_agent',
-            executable='micro_ros_agent',
-            name='micro_ros_agent',
-            arguments=["serial", "--dev", "/dev/ttyATOM", "-b", "115200", "-v6"]
-        ),
-
         IncludeLaunchDescription(
             PathJoinSubstitution(
                 [FindPackageShare("cub_bringup"), "launch", "target_cub2.launch.py"]
@@ -33,12 +25,13 @@ def generate_launch_description():
             condition=IfCondition("true" if cub_target == 'mcub' else "false")
         ),
 
-        # Node(
-        #     package='joy_linux',
-        #     executable='joy_linux_node',
-        # ),
-        # Node(
-        #     package='cub_bringup',
-        #     executable='teleop_joy',
-        # ),    
+        Node(
+            package='cub_commander',
+            executable='cub_commander_node',
+            output='screen',
+        ),
+        Node(
+            package='joy_linux',
+            executable='joy_linux_node',
+        ),
     ])

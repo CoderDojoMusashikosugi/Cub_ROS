@@ -12,69 +12,13 @@ import os
 def generate_launch_description():
     # sllidar_ros2パッケージの共有ディレクトリを取得
     state_launch_file_dir = os.path.join(
-        get_package_share_directory('cub2_description'),
+        get_package_share_directory('cub_description'),
         'launch',
         'display.launch.py'
     )
-    sllidar_ros2_share_dir = FindPackageShare('sllidar_ros2').find('sllidar_ros2')
-    
-    velodyne_launch_file_dir = os.path.join(
-        get_package_share_directory('velodyne'),
-        'launch',
-        'velodyne-all-nodes-VLP32C-launch.py'
-    )
-    
-    # sllidarの起動　LとRで分ける
-    sllidar_L_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource([
-            os.path.join(sllidar_ros2_share_dir, 'launch', 'sllidar_c1_launch.py')
-        ]),
-        launch_arguments={
-            'serial_port': "/dev/ttySLC1L",
-            'frame_id': "SLC1L",
-        }.items()
-    )
-    sllidar_L_launch_delayed = TimerAction(period=1.0, actions=[sllidar_L_launch])
-    
-    # R側の設定
-    sllidar_R_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource([
-            os.path.join(sllidar_ros2_share_dir, 'launch', 'sllidar_c1_launch.py')
-        ]),
-        launch_arguments={
-            'serial_port': "/dev/ttySLC1R",
-            'frame_id': "SLC1R",
-        }.items()
-    )
-    sllidar_R_launch_delayed = TimerAction(period=3.0, actions=[sllidar_R_launch])
-    
-    # GPSのlaunchファイル
-    # gps_launch = IncludeLaunchDescription(
-    #     PythonLaunchDescriptionSource(
-    #         os.path.join(
-    #             FindPackageShare('nmea_navsat_driver').find('nmea_navsat_driver'),
-    #             'launch',
-    #             'nmea_serial_driver.launch.py'
-    #         )
-    #     )
-    # )
+
     # state_publisherの起動
     state_publisher_launch = IncludeLaunchDescription(PythonLaunchDescriptionSource(state_launch_file_dir))
-    # velodyneの起動
-    velodyne_launch=IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(velodyne_launch_file_dir)
-        )
-    
-    # LIDARのGroupAction
-    slc_L_group = GroupAction(
-        actions=[PushRosNamespace('sllidar_l'),sllidar_L_launch_delayed],
-        scoped=True
-    )
-
-    slc_R_group = GroupAction(
-        actions=[PushRosNamespace('sllidar_r'),sllidar_R_launch_delayed],
-        scoped=True
-    )
     
     # Launchファイルの返り値
     return LaunchDescription([
@@ -87,7 +31,6 @@ def generate_launch_description():
         ),
 
         # RVizの起動
-        #起動できてません
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 PathJoinSubstitution(
@@ -96,25 +39,5 @@ def generate_launch_description():
             )
         ),
 
-        # bno055ノード
-        # serialerror以外は通常通り動きます
-        Node(
-            package='bno055',
-            executable='bno055',
-            name='bno055',
-            parameters=[{
-                'uart_port': "/dev/ttyBNO055"
-            }],
-            output='screen'
-        ),
-
-        # グループアクション
-        slc_L_group,
-        slc_R_group,
-
-        # GPS launch
-        #gps_launch,
-        # velodyne launch
-        velodyne_launch,
         state_publisher_launch,
     ])

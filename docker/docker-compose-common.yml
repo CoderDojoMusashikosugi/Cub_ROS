@@ -22,6 +22,7 @@ x-template: &cub_ros_common_setting # デフォルト設定。この値は下に
     - docker                   # dockerコマンドをsudoなしでアクセス可能にする(dood)
     - plugdev
     - root                     # 上のmac版
+    - video
   extra_hosts:
     - "docker:127.0.0.1"       # ホスト名とlocalhostを対応付けておく。sudoのエラーを消す用。
   volumes:                                                   # ホストにあるディレクトリをコンテナ内部から読み書き出来るようマウントする
@@ -39,6 +40,9 @@ x-template: &cub_ros_common_setting # デフォルト設定。この値は下に
     - DISPLAY                     # X11用の設定。値の定義はホスト環境のもの、Macだけrun.shにある。
     - CUB_TARGET                  # どの機体向けに実行するかの設置を読み込む。値の定義はtarget.envにある。
     - INPUT_GROUP_ID              # inputグループをdockerコンテナ内に共有する用の設定。値の定義はdocker/internal/docker_util.shにある。
+  device_cgroup_rules:
+    - 'c 81:* rmw'
+    - 'c 189:* rmw'
 
 services:
   cub_ros:
