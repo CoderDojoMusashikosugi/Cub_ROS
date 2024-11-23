@@ -15,7 +15,7 @@ RUN --mount=type=bind,source=ros/,dst=/ros \
     rosdep install -i -y --from-paths /ros
 
 # Install editting tool of Behavior Tree
-RUN cd /prebuilt_ws git clone --recurse-submodules https://github.com/BehaviorTree/Groot.git && \
+RUN cd /prebuilt_ws && git clone --recurse-submodules https://github.com/BehaviorTree/Groot.git && \
     cd Groot && \
     cmake -S . -B build && cmake --build build -j$(($(nproc)-1)) && cmake --install build && rm -r build
 
