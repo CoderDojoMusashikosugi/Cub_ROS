@@ -51,6 +51,8 @@ def generate_launch_description():
             get_package_share_directory('cub_navigation'),
             'param',
             param_file_name))
+    
+    cub_launch_costmap_dir = os.path.join(get_package_share_directory('cub_navigation'), "launch")
 
     nav2_launch_file_dir = os.path.join(get_package_share_directory('nav2_bringup'), 'launch')
 
@@ -86,6 +88,9 @@ def generate_launch_description():
                 'use_sim_time': use_sim_time,
                 'params_file': param_dir}.items(),
         ),
+        
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource([cub_launch_costmap_dir, '/cub_costmapfilter.launch.py']),),
 
         Node(
             package='rviz2',
