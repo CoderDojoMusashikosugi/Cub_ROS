@@ -1,0 +1,34 @@
+map_matcher_node:
+  ros__parameters:
+
+    # pcd path
+    pcd_file_path: /home/cub/colcon_ws/src/cub/ekf_localizer/pcd/map_msakosu.pcd
+
+    # Downsampling Parameter
+    # この値が大きいほど処理する点群が減る（計算が軽くなる）
+    VOXEL_SIZE: 0.05
+
+    # Paththrough Parameter
+    # 処理する点群の範囲 (m)
+    # 値の距離以内の点群を処理する
+    LIMIT_RANGE: 20.0
+
+    # Matching Parameters # 基本ノータッチで大丈夫です
+    TRANS_EPSILON: 0.001
+    STEP_SIZE: 0.1
+    RESOLUTION: 0.1
+    MAX_ITERATION: 10.0 # 最適化計算を最大何回繰り返すか
+
+    # Matching Score
+    # FitnessScore : 点群地図とLiDAR点群とのマッチング具合を数値化したもの。小さいほどマッチングしている
+    # FitnessScoreがMATCHING_SCORE_THを下回っていたら観測更新を行う
+    # MATCHING_SCORE_THを小さくするほど、観測更新を行う条件が厳しくなります
+    MATCHING_SCORE_TH: 0.4
+
+    # Map Offset
+    MAP_OFFSET_X: 0.0
+    MAP_OFFSET_Y: 0.0
+    MAP_OFFSET_Z: 0.0
+    MAP_OFFSET_ROLL: 0.0
+    MAP_OFFSET_PITCH: 0.0
+    MAP_OFFSET_YAW: 0.0
