@@ -27,6 +27,7 @@ ament_target_dependencies(waypoint_navigator
   geometry_msgs
   yaml-cpp
   rclcpp_action
+  std_msgs
 )
 target_link_libraries(waypoint_navigator
   yaml-cpp
