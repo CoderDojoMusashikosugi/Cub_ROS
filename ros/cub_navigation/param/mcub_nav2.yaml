@@ -62,6 +62,7 @@ bt_navigator:
     # They can be set here or via a RewrittenYaml remap from a parent launch file to Nav2.
     # default_bt_xml_filename: "navigate_w_replanning_and_recovery.xml"
     # default_nav_to_pose_bt_xml: /opt/ros/humble/share/nav2_bt_navigator/behavior_trees/follow_point.xml
+    default_nav_to_pose_bt_xml: /home/cub/colcon_ws/src/cub/cub_behavior_tree/follow_point.xml
     plugin_lib_names:
       - nav2_compute_path_to_pose_action_bt_node
       - nav2_compute_path_through_poses_action_bt_node
@@ -153,11 +154,11 @@ controller_server:
       debug_trajectory_details: True
       min_vel_x: 0.0
       min_vel_y: 0.0
-      max_vel_x: 0.22
+      max_vel_x: 0.1
       max_vel_y: 0.0
       max_vel_theta: 1.0
       min_speed_xy: 0.0
-      max_speed_xy: 0.22
+      max_speed_xy: 0.1
       min_speed_theta: 0.0
       # Add high threshold velocity for turtlebot 3 issue.
       # https://github.com/ROBOTIS-GIT/turtlebot3_simulations/issues/75
