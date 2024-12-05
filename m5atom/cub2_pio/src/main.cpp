@@ -16,6 +16,7 @@
 #include <geometry_msgs/msg/twist.h>
 #include <rosidl_runtime_c/message_type_support_struct.h>
 #include <std_msgs/msg/int32_multi_array.h>
+#include <std_msgs/msg/empty.h>
 
 #ifdef CUB_TARGET_CUB2
 #include <DDT_Motor_M15M06.h>
@@ -31,6 +32,7 @@
 #define NUM_LANE_LEDS 24
 
 #define EMERGENCY_MONITOR (GPIO_NUM_19)
+#define DISPLAY_SWITCH (GPIO_NUM_39)
 
 #define DEBUG
 
@@ -38,6 +40,7 @@
 rcl_publisher_t imu_publisher;
 rcl_publisher_t wh_pos_publisher;
 rcl_publisher_t debug_publisher;
+rcl_publisher_t proceed_publisher;
 rcl_subscription_t subscriber;
 std_msgs__msg__String debug_msg;
 sensor_msgs__msg__Imu imu_msg;
@@ -45,6 +48,7 @@ geometry_msgs__msg__Twist send_twist_msg;
 geometry_msgs__msg__Twist remote_twist_msg;
 geometry_msgs__msg__Twist subscribe_twist_msg;
 std_msgs__msg__Int32MultiArray wheel_positions_msg;
+std_msgs__msg__Empty empty_msg;
 unsigned long prev_msg_time = 0;
 
 rclc_executor_t executor;
@@ -159,6 +163,11 @@ void error_loop(rcl_ret_t temp_rc) {
 
 void IRAM_ATTR set_emergency(){
   robo_mode = EMERGENCY;
+}
+
+volatile bool dsp_sw_pushed = false;
+void IRAM_ATTR set_pushed(){
+  dsp_sw_pushed = true;
 }
 
 // デバッグメッセージを出力する関数
@@ -488,6 +497,7 @@ void twist_callback(const void * msgin)
 void motor_control_loop(void *pvParameters = nullptr) 
 {
   attachInterrupt(EMERGENCY_MONITOR, set_emergency, RISING);
+  attachInterrupt(DISPLAY_SWITCH, set_pushed, RISING);
   while(1) {
     switch (robo_mode)
     {
@@ -623,6 +633,13 @@ bool create_entities() {
     ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Int32MultiArray),
     "wheel_positions"));
 
+  // create proceed_publisher
+  RCCHECK(rclc_publisher_init_default(
+    &proceed_publisher,
+    &node,
+    ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, Empty),
+    "/proceed_to_next_group"
+  ));
 
   // create subscliber
   rmw_qos_profile_t minimum_qos = {
@@ -674,6 +691,7 @@ void destroy_entities() {
   RCCHECK(rcl_publisher_fini(&imu_publisher, &node));
 #endif
   RCCHECK(rcl_publisher_fini(&wh_pos_publisher, &node));
+  RCCHECK(rcl_publisher_fini(&proceed_publisher, &node));
   RCCHECK(rcl_subscription_fini(&subscriber, &node));
 #ifdef CUB_TARGET_MCUB
   RCCHECK(rcl_timer_fini(&imu_timer));
@@ -687,7 +705,9 @@ void destroy_entities() {
 void setup() {
   robo_mode = IDLE;
   pinMode(EMERGENCY_MONITOR, INPUT); 
+  pinMode(DISPLAY_SWITCH, INPUT); 
   gpio_pulldown_dis(EMERGENCY_MONITOR);
+  gpio_pulldown_dis(DISPLAY_SWITCH);
   
 #ifdef CUB_TARGET_MCUB
   auto cfg = M5.config();
@@ -811,5 +831,10 @@ void loop() {
     }
     FastLED.show();
   }
+  if (dsp_sw_pushed) {
+    RCSOFTCHECK(rcl_publish(&proceed_publisher, &empty_msg, NULL))
+    dsp_sw_pushed = false;
+  }
+
   delay(50);
 }
