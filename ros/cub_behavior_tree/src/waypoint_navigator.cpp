@@ -1,6 +1,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
 #include <nav2_msgs/action/navigate_to_pose.hpp>
+#include <nav2_msgs/action/navigate_through_poses.hpp>  // 追加
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <yaml-cpp/yaml.h>
 #include <std_msgs/msg/empty.hpp>
@@ -12,6 +13,7 @@
 #include <condition_variable>
 
 using NavigateToPose = nav2_msgs::action::NavigateToPose;
+using NavigateThroughPoses = nav2_msgs::action::NavigateThroughPoses;
 using namespace std::chrono_literals;
 
 // ウェイポイントの構造体
@@ -40,6 +42,7 @@ public:
   {
     // アクションクライアントの初期化
     navigate_to_pose_client_ = rclcpp_action::create_client<NavigateToPose>(this, "navigate_to_pose");
+    navigate_through_poses_client_ = rclcpp_action::create_client<NavigateThroughPoses>(this, "navigate_through_poses");
 
     // サブスクリプションの設定
     proceed_subscription_ = this->create_subscription<std_msgs::msg::Empty>(
@@ -67,6 +70,7 @@ private:
   bool is_waiting_for_input_;
 
   rclcpp_action::Client<NavigateToPose>::SharedPtr navigate_to_pose_client_;
+  rclcpp_action::Client<NavigateThroughPoses>::SharedPtr navigate_through_poses_client_;
   rclcpp::Subscription<std_msgs::msg::Empty>::SharedPtr proceed_subscription_;
 
   std::mutex mutex_;
@@ -136,10 +140,20 @@ private:
       return;
     }
 
-    // 現在のウェイポイントを取得
-    const Waypoint & wp = current_group.waypoints[current_waypoint_index_];
-    RCLCPP_INFO(this->get_logger(), "Navigating to waypoint %zu in group '%s': x=%.2f, y=%.2f, yaw=%.2f", 
-                current_waypoint_index_ + 1, current_group.group_name.c_str(), wp.x, wp.y, wp.yaw);
+    // グループ内のウェイポイント数に応じてアクションを選択
+    if (current_group.waypoints.size() - current_waypoint_index_ > 1) {
+      // 複数のウェイポイントがある場合は NavigateThroughPoses を使用
+      send_navigate_through_poses(current_group);
+    } else {
+      // 単一のウェイポイントの場合は NavigateToPose を使用
+      send_navigate_to_pose(current_group.waypoints[current_waypoint_index_]);
+    }
+  }
+
+  void send_navigate_to_pose(const Waypoint & wp)
+  {
+    RCLCPP_INFO(this->get_logger(), "Navigating to single waypoint in group '%s': x=%.2f, y=%.2f, yaw=%.2f", 
+                waypoint_groups_[current_group_index_].group_name.c_str(), wp.x, wp.y, wp.yaw);
 
     // PoseStampedメッセージの作成
     auto pose = create_pose_stamped(wp);
@@ -157,11 +171,49 @@ private:
 
     // SendGoalOptions を設定
     rclcpp_action::Client<NavigateToPose>::SendGoalOptions options;
-    options.goal_response_callback = std::bind(&WaypointNavigator::goal_response_callback, this, std::placeholders::_1);
-    options.result_callback = std::bind(&WaypointNavigator::result_callback, this, std::placeholders::_1);
+    options.goal_response_callback = 
+      std::bind(&WaypointNavigator::navigate_to_pose_goal_response_callback, this, std::placeholders::_1);
+    options.result_callback = 
+      std::bind(&WaypointNavigator::navigate_to_pose_result_callback, this, std::placeholders::_1);
 
     // アクションの送信
     navigate_to_pose_client_->async_send_goal(goal_msg, options);
+  }
+
+  void send_navigate_through_poses(WaypointGroup & group)
+  {
+    size_t remaining_waypoints = group.waypoints.size() - current_waypoint_index_;
+    RCLCPP_INFO(this->get_logger(), "Navigating through %zu waypoints in group '%s'.", 
+                remaining_waypoints, group.group_name.c_str());
+
+    // グループ内のすべてのウェイポイントを取得
+    std::vector<geometry_msgs::msg::PoseStamped> poses;
+    for (size_t i = current_waypoint_index_; i < group.waypoints.size(); ++i) {
+      const Waypoint & wp = group.waypoints[i];
+      geometry_msgs::msg::PoseStamped pose = create_pose_stamped(wp);
+      poses.push_back(pose);
+    }
+
+    // アクションサーバーが利用可能か確認
+    if (!navigate_through_poses_client_->wait_for_action_server(10s)) {
+      RCLCPP_ERROR(this->get_logger(), "NavigateThroughPoses action server not available.");
+      rclcpp::shutdown();
+      return;
+    }
+
+    // ゴールメッセージの設定
+    auto goal_msg = NavigateThroughPoses::Goal();
+    goal_msg.poses = poses;
+
+    // SendGoalOptions を設定
+    rclcpp_action::Client<NavigateThroughPoses>::SendGoalOptions options;
+    options.goal_response_callback = 
+      std::bind(&WaypointNavigator::navigate_through_poses_goal_response_callback, this, std::placeholders::_1);
+    options.result_callback = 
+      std::bind(&WaypointNavigator::navigate_through_poses_result_callback, this, std::placeholders::_1);
+
+    // アクションの送信
+    navigate_through_poses_client_->async_send_goal(goal_msg, options);
   }
 
   geometry_msgs::msg::PoseStamped create_pose_stamped(const Waypoint & wp)
@@ -182,21 +234,23 @@ private:
     return pose;
   }
 
-  void goal_response_callback(rclcpp_action::ClientGoalHandle<NavigateToPose>::SharedPtr goal_handle)
+  // NavigateToPose のゴール応答コールバック
+  void navigate_to_pose_goal_response_callback(rclcpp_action::ClientGoalHandle<NavigateToPose>::SharedPtr goal_handle)
   {
     if (!goal_handle) {
-      RCLCPP_ERROR(this->get_logger(), "Goal was rejected by the server.");
+      RCLCPP_ERROR(this->get_logger(), "NavigateToPose goal was rejected by the server.");
       // 次のウェイポイントへ進む
       current_waypoint_index_++;
       send_next_goal();
       return;
     }
 
-    RCLCPP_INFO(this->get_logger(), "Goal accepted by the server, waiting for result...");
+    RCLCPP_INFO(this->get_logger(), "NavigateToPose goal accepted by the server, waiting for result...");
     // 結果の処理は result_callback に委譲
   }
 
-  void result_callback(const rclcpp_action::ClientGoalHandle<NavigateToPose>::WrappedResult & result)
+  // NavigateToPose の結果コールバック
+  void navigate_to_pose_result_callback(const rclcpp_action::ClientGoalHandle<NavigateToPose>::WrappedResult & result)
   {
     if (result.code == rclcpp_action::ResultCode::SUCCEEDED) {
       RCLCPP_INFO(this->get_logger(), "Navigation to waypoint %zu succeeded.", current_waypoint_index_ + 1);
@@ -213,15 +267,64 @@ private:
     send_next_goal();
   }
 
+  // NavigateThroughPoses のゴール応答コールバック
+  void navigate_through_poses_goal_response_callback(rclcpp_action::ClientGoalHandle<NavigateThroughPoses>::SharedPtr goal_handle)
+  {
+    if (!goal_handle) {
+      RCLCPP_ERROR(this->get_logger(), "NavigateThroughPoses goal was rejected by the server.");
+      // 次のグループへ進む
+      current_group_index_++;
+      current_waypoint_index_ = 0;
+      send_next_goal();
+      return;
+    }
+
+    RCLCPP_INFO(this->get_logger(), "NavigateThroughPoses goal accepted by the server, waiting for result...");
+    // 結果の処理は result_callback に委譲
+  }
+
+  // NavigateThroughPoses の結果コールバック
+  void navigate_through_poses_result_callback(const rclcpp_action::ClientGoalHandle<NavigateThroughPoses>::WrappedResult & result)
+  {
+    if (result.code == rclcpp_action::ResultCode::SUCCEEDED) {
+      RCLCPP_INFO(this->get_logger(), "Navigation through group '%s' succeeded.", 
+                  waypoint_groups_[current_group_index_].group_name.c_str());
+    } else if (result.code == rclcpp_action::ResultCode::ABORTED) {
+      RCLCPP_ERROR(this->get_logger(), "Navigation through group '%s' aborted.", 
+                   waypoint_groups_[current_group_index_].group_name.c_str());
+    } else if (result.code == rclcpp_action::ResultCode::CANCELED) {
+      RCLCPP_WARN(this->get_logger(), "Navigation through group '%s' canceled.", 
+                  waypoint_groups_[current_group_index_].group_name.c_str());
+    } else {
+      RCLCPP_ERROR(this->get_logger(), "Unknown result code for navigation through group '%s'.", 
+                   waypoint_groups_[current_group_index_].group_name.c_str());
+    }
+
+    // グループ全体でユーザ入力が要求されている場合
+    WaypointGroup & current_group = waypoint_groups_[current_group_index_];
+    if (current_group.require_input) {
+      RCLCPP_INFO(this->get_logger(), "Group '%s' requires input. Waiting for 'proceed_to_next_group' message.", 
+                  current_group.group_name.c_str());
+      is_waiting_for_input_ = true;
+    } else {
+      RCLCPP_INFO(this->get_logger(), "Group '%s' does not require input. Proceeding to the next group.", 
+                  current_group.group_name.c_str());
+      current_group_index_++;
+      current_waypoint_index_ = 0;
+      send_next_goal();
+    }
+  }
+
   void proceed_callback(const std_msgs::msg::Empty::SharedPtr msg)
   {
+    std::lock_guard<std::mutex> lock(mutex_);
     if (!is_waiting_for_input_) {
       RCLCPP_WARN(this->get_logger(), "Received 'proceed_to_next_group' message but not waiting for input.");
       return;
     }
 
     RCLCPP_INFO(this->get_logger(), "Received 'proceed_to_next_group' message. Proceeding to the next group.");
-
+    
     // 入力待機フラグをリセット
     is_waiting_for_input_ = false;
 
@@ -232,6 +335,7 @@ private:
   }
 };
 
+// メイン関数
 int main(int argc, char ** argv)
 {
   rclcpp::init(argc, argv);
