@@ -15,6 +15,7 @@
   <depend>geometry_msgs</depend>
   <depend>yaml-cpp</depend>
   <depend>rclcpp_action</depend>
+  <depend>std_msgs</depend>
 
 
   <export>
