@@ -74,7 +74,6 @@ const int16_t POS_MAX = 32767; //車輪のエンコーダーの最大値
 Receiver Receiv[4]; // 0:rear left, 1:front right, 2:front left, 3:rear right
 // M5Stackのモジュールによって対応するRX,TXのピン番号が違うためM5製品とRS485モジュールに対応させてください
 auto motor_handler = MotorHandler(33, 23); // Cub2 ATOM(33, 23) Cub1 RX,TX ATOM(32, 26) DDSM210 ATOM S3(2,1)
-unsigned long lastCallTime = 0; // 前回の呼び出し時刻を保存する変数
 
 volatile uint16_t front_right_wheel_position = 0;
 volatile uint16_t rear_right_wheel_position = 0;
@@ -106,6 +105,8 @@ const uint8_t DXL2_ID = 2;
 volatile SemaphoreHandle_t mutex;
 // タイマーのハンドル
 TimerHandle_t motorControlTimer;
+
+unsigned long lastCallTime = 0; // 前回の呼び出し時刻を保存する変数
 
 enum uros_states {
   WAITING_AGENT,
@@ -171,10 +172,10 @@ void IRAM_ATTR set_pushed(){
     // 現在時刻を取得
   unsigned long currentTime = millis();
   unsigned long elapsedTime = currentTime - lastCallTime;
-  if (elapsedTime > 2000) {
+  if (elapsedTime > 50) {
     dsp_sw_pushed = true;
+    lastCallTime = currentTime;
   }
-  lastCallTime = currentTime;
 }
 
 // デバッグメッセージを出力する関数
@@ -504,7 +505,7 @@ void twist_callback(const void * msgin)
 void motor_control_loop(void *pvParameters = nullptr) 
 {
   attachInterrupt(EMERGENCY_MONITOR, set_emergency, RISING);
-  attachInterrupt(DISPLAY_SWITCH, set_pushed, RISING);
+  // attachInterrupt(DISPLAY_SWITCH, set_pushed, FALLING);
   while(1) {
     switch (robo_mode)
     {
@@ -711,10 +712,10 @@ void destroy_entities() {
 
 void setup() {
   robo_mode = IDLE;
-  pinMode(EMERGENCY_MONITOR, INPUT); 
-  pinMode(DISPLAY_SWITCH, INPUT); 
+  pinMode(EMERGENCY_MONITOR, INPUT);
+  // pinMode(DISPLAY_SWITCH, INPUT_PULLUP);
   gpio_pulldown_dis(EMERGENCY_MONITOR);
-  gpio_pulldown_dis(DISPLAY_SWITCH);
+  // gpio_pulldown_dis(DISPLAY_SWITCH);
   
 #ifdef CUB_TARGET_MCUB
   auto cfg = M5.config();
@@ -838,10 +839,10 @@ void loop() {
     }
     FastLED.show();
   }
-  if (dsp_sw_pushed) {
-    RCSOFTCHECK(rcl_publish(&proceed_publisher, &empty_msg, NULL))
-    dsp_sw_pushed = false;
-  }
+  // if (dsp_sw_pushed && digitalRead(DISPLAY_SWITCH == LOW)) {
+  //   RCSOFTCHECK(rcl_publish(&proceed_publisher, &empty_msg, NULL))
+  //   dsp_sw_pushed = false;
+  // }
 
   delay(50);
 }
