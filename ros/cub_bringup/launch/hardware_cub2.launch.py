@@ -60,7 +60,7 @@ def generate_launch_description():
     #         )
     #     )
     # )
-
+    
     ublox_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(
@@ -71,6 +71,7 @@ def generate_launch_description():
 
         )
     )
+    ublox_launch_delayed = TimerAction(period=3.0, actions=[ublox_launch])
 
     # velodyneの起動
     velodyne_launch=IncludeLaunchDescription(
@@ -117,12 +118,13 @@ def generate_launch_description():
         ),
 
         # グループアクション
-        slc_L_group,
-        slc_R_group,
+        # slc_L_group,
+        # slc_R_group,
 
         # GPS launch
         #gps_launch,
+        ublox_launch_delayed,
         # velodyne launch
         velodyne_launch,
-        realsense_launch,
+        # realsense_launch,
     ])
