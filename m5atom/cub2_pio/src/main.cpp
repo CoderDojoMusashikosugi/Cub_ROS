@@ -74,6 +74,7 @@ const int16_t POS_MAX = 32767; //車輪のエンコーダーの最大値
 Receiver Receiv[4]; // 0:rear left, 1:front right, 2:front left, 3:rear right
 // M5Stackのモジュールによって対応するRX,TXのピン番号が違うためM5製品とRS485モジュールに対応させてください
 auto motor_handler = MotorHandler(33, 23); // Cub2 ATOM(33, 23) Cub1 RX,TX ATOM(32, 26) DDSM210 ATOM S3(2,1)
+unsigned long lastCallTime = 0; // 前回の呼び出し時刻を保存する変数
 
 volatile uint16_t front_right_wheel_position = 0;
 volatile uint16_t rear_right_wheel_position = 0;
@@ -167,7 +168,13 @@ void IRAM_ATTR set_emergency(){
 
 volatile bool dsp_sw_pushed = false;
 void IRAM_ATTR set_pushed(){
-  dsp_sw_pushed = true;
+    // 現在時刻を取得
+  unsigned long currentTime = millis();
+  unsigned long elapsedTime = currentTime - lastCallTime;
+  if (elapsedTime > 2000) {
+    dsp_sw_pushed = true;
+  }
+  lastCallTime = currentTime;
 }
 
 // デバッグメッセージを出力する関数
