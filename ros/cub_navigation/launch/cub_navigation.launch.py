@@ -32,11 +32,7 @@ def generate_launch_description():
     use_sim_time = LaunchConfiguration('use_sim_time', default='false')
     map_dir = LaunchConfiguration(
         'map',
-        default=os.path.join(
-            get_package_share_directory('cub_navigation'),
-            'map',
-            'map.yaml'))
-
+        default="/home/cub/maps/map_manual_modify_from_saishin/map_from3d_manual_clean.yaml")
     cub_target = os.getenv('CUB_TARGET', 'cub2')
     if cub_target == 'cub2':
         param_file_name = 'cub2_nav2.yaml'

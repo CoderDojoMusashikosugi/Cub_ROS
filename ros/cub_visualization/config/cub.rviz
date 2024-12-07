@@ -6,6 +6,7 @@ Panels:
       Expanded:
         - /Global Options1
         - /Status1
+        - /PointCloud21
       Splitter Ratio: 0.5
     Tree Height: 555
   - Class: rviz_common/Selection
@@ -25,7 +26,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: ""
+    SyncSource: PointCloud2
 Visualization Manager:
   Class: ""
   Displays:
@@ -60,21 +61,13 @@ Visualization Manager:
           Value: true
         base_link:
           Value: true
-        camera_color_frame:
-          Value: true
-        camera_color_optical_frame:
-          Value: true
-        camera_depth_frame:
-          Value: true
-        camera_depth_optical_frame:
-          Value: true
         camera_link:
           Value: true
         gps_link:
           Value: true
         imu_link:
           Value: true
-        odom:
+        map:
           Value: true
         velodyne:
           Value: true
@@ -84,7 +77,22 @@ Visualization Manager:
       Show Axes: true
       Show Names: false
       Tree:
-        {}
+        map:
+          base_link:
+            SLCL_link:
+              {}
+            SLCR_link:
+              {}
+            base_footprint:
+              {}
+            camera_link:
+              {}
+            gps_link:
+              {}
+            imu_link:
+              {}
+            velodyne:
+              {}
       Update Interval: 0
       Value: true
     - Alpha: 1
@@ -216,6 +224,40 @@ Visualization Manager:
         Value: /global_costmap/costmap_updates
       Use Timestamp: false
       Value: true
+    - Alpha: 1
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 10
+        Min Value: -10
+        Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz_default_plugins/PointCloud2
+      Color: 255; 255; 255
+      Color Transformer: Intensity
+      Decay Time: 0
+      Enabled: true
+      Invert Rainbow: false
+      Max Color: 255; 255; 255
+      Max Intensity: 255
+      Min Color: 0; 0; 0
+      Min Intensity: 0
+      Name: PointCloud2
+      Position Transformer: XYZ
+      Selectable: true
+      Size (Pixels): 2
+      Size (m): 0.009999999776482582
+      Style: Points
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /map_out
+      Use Fixed Frame: true
+      Use rainbow: true
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -262,7 +304,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 14.974298477172852
+      Distance: 11.004913330078125
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -277,10 +319,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.8103981614112854
+      Pitch: 1.1103976964950562
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 5.147251129150391
+      Yaw: 5.652244567871094
     Saved: ~
 Window Geometry:
   Displays:
@@ -298,5 +340,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1200
-  X: 207
-  Y: 128
+  X: 468
+  Y: 81
