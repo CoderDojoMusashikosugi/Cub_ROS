@@ -32,7 +32,7 @@ def generate_launch_description():
     use_sim_time = LaunchConfiguration('use_sim_time', default='false')
     map_dir = LaunchConfiguration(
         'map',
-        default=os.path.join('/home/cub/maps/kakuninsoukoumade/mapkakunin.yaml'))
+        default="/home/cub/maps/oudanhodoumade/mapoudanhodoumade_manual_crean.yaml")
 
     cub_target = os.getenv('CUB_TARGET', 'cub2')
     if cub_target == 'cub2':
@@ -93,6 +93,13 @@ def generate_launch_description():
         package='tf2_ros',
         executable='static_transform_publisher',
         arguments=['0','0','0','0','0','0','1','map','odom']
+        ),
+
+        Node(
+            package='cub_behavior_tree',
+            executable='waypoint_navigator',
+            arguments=["/home/cub/colcon_ws/src/cub/cub_behavior_tree/routes/3d_waypoints.yaml"]
+            # arguments=["/home/cub/colcon_ws/src/cub/cub_behavior_tree/routes/2d_waypoints.yaml"]
         ),
 
 
