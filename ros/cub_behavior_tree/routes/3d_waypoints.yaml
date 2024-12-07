@@ -1,5 +1,5 @@
 waypoint_groups:
-  - group_name: "Entrance Path"
+  - group_name: "Start Path"
     require_input: false
     waypoints:
       - x: 51.508056640625
@@ -11,6 +11,9 @@ waypoint_groups:
       - x: 92.443588256835938
         y: -26.662149429321289
         yaw: -0.35766353358967734
+  - group_name: "left top Path"
+    require_input: false
+    waypoints:
       - x: 114.94454193115234
         y: -29.474771499633789
         yaw: 0.6273030199975036
@@ -20,6 +23,9 @@ waypoint_groups:
       - x: 118.74794006347656
         y: -101.25303649902344
         yaw: 3.0599566687912683
+  - group_name: "right top Path"
+    require_input: false
+    waypoints:
       - x: 90.013038635253906
         y: -97.314468383789062
         yaw: 3.0548559086507057
@@ -32,6 +38,9 @@ waypoint_groups:
       - x: 15.700102806091309
         y: -88.387832641601562
         yaw: 1.5072464812806445
+  - group_name: "near entrance Path"
+    require_input: false
+    waypoints:
       - x: 21.502471923828125
         y: -32.985519409179688
         yaw: 1.9776131404550212
