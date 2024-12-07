@@ -34,7 +34,7 @@ public:
             "/bno055/imu", 10, std::bind(&WheelOdometryNode::imu_callback, this, std::placeholders::_1));
 
         // TFブロードキャスターの初期化
-        tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
+        // tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
 
         // 初期化
         last_left_wheel_pos_ = 0;
@@ -138,16 +138,16 @@ private:
         odometry_publisher_->publish(odometry_msg);
 
         // TF変換のブロードキャスト
-        geometry_msgs::msg::TransformStamped transform_stamped;
-        transform_stamped.header.stamp = odometry_msg.header.stamp;
-        transform_stamped.header.frame_id = "odom";
-        transform_stamped.child_frame_id = "base_link";
-        transform_stamped.transform.translation.x = x_;
-        transform_stamped.transform.translation.y = y_;
-        transform_stamped.transform.translation.z = 0.0;
-        transform_stamped.transform.rotation = odometry_msg.pose.pose.orientation;
+//geometry_msgs::msg::TransformStamped transform_stamped;
+//        transform_stamped.header.stamp = odometry_msg.header.stamp;
+//        transform_stamped.header.frame_id = "odom";
+//        transform_stamped.child_frame_id = "base_link";
+//        transform_stamped.transform.translation.x = x_;
+//        transform_stamped.transform.translation.y = y_;
+//        transform_stamped.transform.translation.z = 0.0;
+//       transform_stamped.transform.rotation = odometry_msg.pose.pose.orientation;
 
-        tf_broadcaster_->sendTransform(transform_stamped);
+ //       tf_broadcaster_->sendTransform(transform_stamped);
 
         // 現在の車輪位置を保存
         last_left_wheel_pos_ = left_wheel_position;
@@ -209,7 +209,7 @@ private:
     rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odometry_publisher_;
     rclcpp::Subscription<std_msgs::msg::Int32MultiArray>::SharedPtr wheel_position_subscription_;
     rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_subscription_;
-    std::shared_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
+    // std::shared_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
 
     int32_t last_left_wheel_pos_;
     int32_t last_right_wheel_pos_;
