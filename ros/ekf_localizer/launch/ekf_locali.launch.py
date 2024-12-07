@@ -18,7 +18,7 @@ def generate_launch_description():
         'map_matcher.yaml'  # ファイル名
     )
     pcd_params = {
-        "file_name": "/home/cub/colcon_ws/src/cub/ekf_localizer/pcd/map_msakosu.pcd",
+        "file_name": "/home/cub/maps/kakuninsoukoumade/mapkakunin.pcd",
         "frame_id": "map",
         "publish_rate": 0.5
     }

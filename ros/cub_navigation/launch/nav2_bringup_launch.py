@@ -174,7 +174,17 @@ def generate_launch_description():
             arguments=['--ros-args', '--log-level', log_level],
             condition=IfCondition(PythonExpression(['not ', use_localization])),
             remappings=remappings),
-
+        Node(
+            package='nav2_lifecycle_manager',
+            executable='lifecycle_manager',
+            name='lifecycle_manager',
+            output='screen',
+            emulate_tty=True,
+            parameters=[{'use_sim_time': False},
+                        {'autostart': True},
+                        {'node_names': ['map_server']}]
+        ),
+        
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(os.path.join(launch_dir, 'navigation_launch.py')),
             launch_arguments={'namespace': namespace,
