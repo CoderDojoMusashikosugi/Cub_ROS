@@ -32,10 +32,7 @@ def generate_launch_description():
     use_sim_time = LaunchConfiguration('use_sim_time', default='false')
     map_dir = LaunchConfiguration(
         'map',
-        default=os.path.join(
-            get_package_share_directory('cub_navigation'),
-            'map',
-            'map.yaml'))
+        default=os.path.join('/home/cub/maps/kakuninsoukoumade/mapkakunin.yaml'))
 
     cub_target = os.getenv('CUB_TARGET', 'cub2')
     if cub_target == 'cub2':
@@ -60,6 +57,10 @@ def generate_launch_description():
         'nav2_default_view.rviz')
 
     return LaunchDescription([
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource([os.path.join(get_package_share_directory('ekf_localizer'), 'launch'), '/ekf_locali.launch.py']),
+        ),
+
         # Node(
         #     package='cub_bringup',
         #     executable='odom_to_tf',
