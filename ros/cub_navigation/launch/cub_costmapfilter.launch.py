@@ -65,7 +65,7 @@ def generate_launch_description():
 
     declare_mask_yaml_file_cmd = DeclareLaunchArgument(
         'mask',
-        default_value = "/home/cub/maps/map_manual_modify_from_saishin/mapmap_from3d_keepout.yaml",
+        default_value = "/home/cub/maps/oudanhodoumade/mapoudanhodoumade_keepOut.yaml",
         description='Full path to filter mask yaml file to load')
 
     declare_use_composition_cmd = DeclareLaunchArgument(
