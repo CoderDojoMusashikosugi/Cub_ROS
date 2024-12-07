@@ -58,7 +58,8 @@ def generate_launch_description():
 
     return LaunchDescription([
         IncludeLaunchDescription(
-            PythonLaunchDescriptionSource([os.path.join(get_package_share_directory('ekf_localizer'), 'launch'), '/ekf_locali.launch.py']),
+            PythonLaunchDescriptionSource([os.path.join(get_package_share_directory('ekf_localizer'), 'launch'), '/ekf_locali_city_hall.launch.py']),
+            # PythonLaunchDescriptionSource([os.path.join(get_package_share_directory('ekf_localizer'), 'launch'), '/ekf_locali_road_side.launch.py']),
         ),
 
         # Node(
