@@ -97,6 +97,7 @@ private:
 	bool is_pcl_offset_;
 
 	double VOXEL_SIZE_;
+	double VOXEL_SIZE_MAP_;
 	double LIMIT_RANGE_;
 	double TRANS_EPSILON_;
 	double STEP_SIZE_;

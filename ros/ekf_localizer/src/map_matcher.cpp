@@ -25,6 +25,7 @@ MapMatcher::MapMatcher() : Node("MapMatcher")
 	this->get_parameter("is_pcl_offset", is_pcl_offset_);
 
 	this->declare_parameter<double>("VOXEL_SIZE", {0.2});
+	this->declare_parameter<double>("VOXEL_SIZE_MAP", {0.2});
 	this->declare_parameter<double>("LIMIT_RANGE", {20.0});
 	this->declare_parameter<double>("TRANS_EPSILON", {0.001});
 	this->declare_parameter<double>("STEP_SIZE", {0.1});
@@ -39,6 +40,7 @@ MapMatcher::MapMatcher() : Node("MapMatcher")
 	this->declare_parameter<double>("MAP_OFFSET_YAW", {0.0});
 
 	this->get_parameter("VOXEL_SIZE", VOXEL_SIZE_);
+	this->get_parameter("VOXEL_SIZE_MAP", VOXEL_SIZE_MAP_);
 	this->get_parameter("LIMIT_RANGE", LIMIT_RANGE_);
 	this->get_parameter("TRANS_EPSILON", TRANS_EPSILON_);
 	this->get_parameter("STEP_SIZE", STEP_SIZE_);
@@ -189,9 +191,10 @@ void MapMatcher::read_map()
 
 	std::cout  << "raw map_points: " << raw_cloud->points.size() << std::endl;
 	// downsampling
-	// if(VOXEL_SIZE_ > 0) downsample_pcl(raw_cloud,map_pcl_,VOXEL_SIZE_);
-	// else map_pcl_ = raw_cloud;
-	map_pcl_ = raw_cloud;
+	if(VOXEL_SIZE_MAP_ > 0) downsample_pcl(raw_cloud, map_pcl_, VOXEL_SIZE_MAP_);
+	else map_pcl_ = raw_cloud;
+	// map_pcl_ = raw_cloud;
+
 	std::cout  << "down map_points: " << map_pcl_->points.size() << std::endl;
 
 	// offset
@@ -265,12 +268,13 @@ void MapMatcher::matching(pcl::PointCloud<pcl::PointXYZI>::Ptr map_pcl,pcl::Poin
 		std::cout << "local clouds > map clouds" << std::endl;
 		return;
 	}
-	ndt.align(*ndt_pcl,init_guess);
+	ndt.align(*ndt_pcl, init_guess);
 	//ndt.align(*ndt_pcl,Eigen::Matrix4f::Identity());
 	if(!ndt.hasConverged()){
 		std::cout << "Has converged" << std::endl;
 		return;
 	}
+
 
 	std::cout << "FitnessScore: " << ndt.getFitnessScore() << std::endl;
 	std::cout << std::endl;
@@ -304,10 +308,10 @@ void MapMatcher::matching(pcl::PointCloud<pcl::PointXYZI>::Ptr map_pcl,pcl::Poin
 		tf2::fromMsg(ndt_pose.pose.orientation,q);
 		tf2::Matrix3x3 r(q);
 		r.getRPY(roll,pitch,yaw);
-		std::cout << "NDT POSE: " << std::endl;
-		std::cout << " X : " << ndt_pose.pose.position.x << std::endl;
-		std::cout << " Y : " << ndt_pose.pose.position.y << std::endl;
-		std::cout << "YAW: " << yaw << std::endl;
+		// std::cout << "NDT POSE: " << std::endl;
+		// std::cout << " X : " << ndt_pose.pose.position.x << std::endl;
+		// std::cout << " Y : " << ndt_pose.pose.position.y << std::endl;
+		// std::cout << "YAW: " << yaw << std::endl;
 		std::cout << std::endl;
 	}
 	else{
@@ -363,9 +367,9 @@ Eigen::Quaternionf MapMatcher::msg_to_quat_eigen(geometry_msgs::msg::Quaternion 
 void MapMatcher::process()
 {
 	if(has_read_map_ && has_received_ekf_pose_ && has_received_pc_){
-		std::cout << "is_read_map: " << has_read_map_ << std::endl;
-		std::cout << "is_ekf_pose: " << has_received_ekf_pose_ << std::endl;
-		std::cout << "is_rec_pc: " << has_received_pc_ << std::endl;
+		// std::cout << "is_read_map: " << has_read_map_ << std::endl;
+		// std::cout << "is_ekf_pose: " << has_received_ekf_pose_ << std::endl;
+		// std::cout << "is_rec_pc: " << has_received_pc_ << std::endl;
 		matching(map_pcl_,current_pcl_);
 		has_received_pc_ = false;
 		has_received_ekf_pose_ = false;

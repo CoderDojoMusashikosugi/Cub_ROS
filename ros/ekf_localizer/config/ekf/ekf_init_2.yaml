@@ -1,0 +1,22 @@
+ekf_localizer_node:
+  ros__parameters:
+
+    # 初期位置設定
+    INIT_X: 0.0
+    INIT_Y: 7.8
+    INIT_Z: 0.0 
+    # 初期姿勢設定（今回はroll, pitchはいらない？）
+    INIT_ROLL: 0.0
+    INIT_PITCH: 0.0
+    INIT_YAW: 0.0
+
+    # Parameters
+    INIT_SIGMA: 0.00001
+    SIGMA_IMU: 0.0001
+    SIGMA_ODOM: 0.0001
+    SIGMA_NDT: 0.0001
+
+    #MOTION_NOISE_NN: 0.01
+    #MOTION_NOISE_NO: 0.001
+    #MOTION_NOISE_ON: 0.0001
+    #MOTION_NOISE_OO: 0.0001

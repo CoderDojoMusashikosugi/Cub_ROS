@@ -65,6 +65,8 @@ EKF::EKF() : Node("EKF")
 
     ekf_pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>(
         "/ekf_pose", rclcpp::QoS(1).reliable());
+	path_pub_ = this->create_publisher<nav_msgs::msg::Path>(
+		"/ekf_pose/trajectory", rclcpp::QoS(1).reliable());
 
 
 	auto clock = this->get_clock();
@@ -72,6 +74,7 @@ EKF::EKF() : Node("EKF")
 	initialize(INIT_X_, INIT_Y_, INIT_Z_, INIT_ROLL_, INIT_PITCH_, INIT_YAW_);
 	is_measurement_.data = false;
 	last_time_ = this->get_clock()->now();
+	ekf_pose_trajectry.header.frame_id = "map"; 
 }
 
 EKF::~EKF() {}
@@ -344,8 +347,15 @@ void EKF::publish_ekf_pose()
 		std::cout << std::endl;
 	}
 
-	// ekf_pose_pub_.publish(ekf_pose_);
+	// 配列に追加
+	// poses_.push_back(ekf_pose_);
+
+	// Pathメッセージを更新
+	// ekf_pose_trajectry.header.stamp = this->get_clock()->now();
+	// ekf_pose_trajectry.poses = poses_;
+
 	ekf_pose_pub_->publish(ekf_pose_);
+	// path_pub_->publish(ekf_pose_trajectry);
 }
 
 // void EKF::publish_tf()

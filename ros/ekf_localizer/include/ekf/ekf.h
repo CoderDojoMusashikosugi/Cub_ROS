@@ -8,6 +8,7 @@
 #include <tf2_ros/transform_broadcaster.h>
 #include <tf2_ros/transform_listener.h>
 #include <std_msgs/msg/bool.hpp>
+#include "nav_msgs/msg/path.hpp"
 
 #include <Eigen/Dense>
 
@@ -54,6 +55,7 @@ private:
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
 
     rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr ekf_pose_pub_;
+	rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub_;
 
 
 	std::shared_ptr<tf2_ros::TransformBroadcaster> broadcaster_;
@@ -72,6 +74,8 @@ private:
 
 	std_msgs::msg::Bool is_measurement_;
 	geometry_msgs::msg::PoseStamped respawn_pose_;
+	nav_msgs::msg::Path ekf_pose_trajectry;
+	std::vector<geometry_msgs::msg::PoseStamped> poses_;
 
 	std::string ndt_pose_topic_name_;
 	std::string imu_topic_name_;

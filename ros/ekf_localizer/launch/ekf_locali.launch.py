@@ -39,7 +39,7 @@ def generate_launch_description():
             executable='map_matcher_node',
             name='map_matcher_node',
             parameters=[params_map_matcher],
-            # output='screen',  # 標準出力を表示
+            output='screen',  # 標準出力を表示
         ),
 
         # ノード3: TF Cub
