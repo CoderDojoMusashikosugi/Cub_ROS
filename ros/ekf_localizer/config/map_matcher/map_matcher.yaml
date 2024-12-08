@@ -28,7 +28,7 @@ map_matcher_node:
     # FitnessScore : 点群地図とLiDAR点群とのマッチング具合を数値化したもの。小さいほどマッチングしている
     # FitnessScoreがMATCHING_SCORE_THを下回っていたら観測更新を行う
     # MATCHING_SCORE_THを小さくするほど、観測更新を行う条件が厳しくなります
-    MATCHING_SCORE_TH: 2.5
+    MATCHING_SCORE_TH: 0.6
 
     # Map Offset
     MAP_OFFSET_X: 0.0

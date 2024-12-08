@@ -30,14 +30,14 @@ def generate_launch_description():
             output='screen'
         ),
 
-        # RVizの起動
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                PathJoinSubstitution(
-                    [FindPackageShare("cub_visualization"), "launch", "rviz.launch.py"]
-                )
-            )
-        ),
+        # # RVizの起動
+        # IncludeLaunchDescription(
+        #     PythonLaunchDescriptionSource(
+        #         PathJoinSubstitution(
+        #             [FindPackageShare("cub_visualization"), "launch", "rviz.launch.py"]
+        #         )
+        #     )
+        # ),
 
         state_publisher_launch,
     ])

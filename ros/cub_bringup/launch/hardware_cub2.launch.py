@@ -167,5 +167,5 @@ def generate_launch_description():
         ublox_launch_delayed,
         velodyne_driver_node,
         velodyne_transform_node,
-        # realsense_launch,
+        realsense_launch,
     ])
