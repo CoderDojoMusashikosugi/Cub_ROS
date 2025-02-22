@@ -19,7 +19,7 @@ include_directories(
   include
 )
 
-add_executable(cub_commander_node src/cub_commander.cpp src/joy_to_dualsense.cpp)
+add_executable(cub_commander_node src/cub_commander.cpp src/joypad.cpp src/joy_to_dualsense.cpp src/joy_to_xbox1914.cpp)
 ament_target_dependencies(cub_commander_node rclcpp sensor_msgs geometry_msgs geometry_msgs std_msgs)
 
 add_executable(nav2_action_client src/nav2_action_client.cpp)
