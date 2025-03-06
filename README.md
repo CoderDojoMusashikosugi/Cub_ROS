@@ -105,4 +105,4 @@
   - Dockerイメージがストレージを圧迫している場合は、`./docker/remove.sh`で最新の以外を削除できる。
 
 ## Dockerの技術情報
-[dockerディレクトリ内のREADME.md](./docker/README.dm)を参照
+[dockerディレクトリ内のREADME.md](./docker/README.md)を参照
