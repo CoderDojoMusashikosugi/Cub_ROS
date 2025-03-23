@@ -68,7 +68,7 @@
     - container_install_docker.sh: DockerイメージにDockerをインストールするためのスクリプト。今は意味がないがかつてDooDに使っていた。
     - container_install_prebuilt.sh: 主にaptで入らないROSパッケージのビルドをDocker Build中に実施するもの。変更を加える必要なければここに置くと便利。ARM向けのバイナリ無いシミュレータ等はここに置くと便利。
     - container_install_ros.sh: コンテナイメージにROSをインストールするスクリプト。
-    - docker_exec.sh: コンテナに入る。./run.shがコンテナ起動後にこれを呼び出す形で使われる。
+    - docker_exec.sh: コンテナでコマンドを実行する。例えば'docker/docker_exec.sh /bin/bash'でシェルが立ち上がる。./run.shはコンテナ起動後にこれを呼び出す。
     - docker_install_raspi.sh: ./docker/install.shで、環境がRasPiだと判定されたらこれが呼び出される。
     - docker_install_ubuntu.sh: ./docker/install.shで、環境がUbuntuだと判定されたらこれが呼び出される。
     - docker_util.sh: docker-composeのための設定を読み込む。特に.env系のファイルなど。
