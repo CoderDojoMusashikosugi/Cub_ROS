@@ -25,6 +25,12 @@ def generate_launch_description():
             executable='wheel_odometry_node',
         ),
 
+        # 2Dのマッピングやナビゲーションを実行する際はこれを有効化、3Dでは無効化
+        Node(
+            package='cub_bringup',
+            executable='odom_to_tf',
+        ),
+
         Node(
             package='robot_state_publisher',
             executable='robot_state_publisher',

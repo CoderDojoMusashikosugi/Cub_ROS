@@ -10,7 +10,6 @@ import os
 def generate_launch_description():
     cub_target = os.getenv('CUB_TARGET', 'cub2')
     print("launch target:", cub_target)
-    joy_dev = "/dev/input/js0"
 
     return LaunchDescription([
         IncludeLaunchDescription(
@@ -24,17 +23,5 @@ def generate_launch_description():
                 [FindPackageShare("cub_bringup"), "launch", "target_mcub.launch.py"]
             ),
             condition=IfCondition("true" if cub_target == 'mcub' else "false")
-        ),
-
-        Node(
-            package='cub_commander',
-            executable='cub_commander_node',
-            output='screen',
-            parameters=[{'dev': joy_dev}],
-        ),
-        Node(
-            package='joy_linux',
-            executable='joy_linux_node',
-            parameters=[{'dev': joy_dev}],
         ),
     ])

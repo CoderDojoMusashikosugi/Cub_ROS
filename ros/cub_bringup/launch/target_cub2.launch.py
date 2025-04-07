@@ -30,6 +30,12 @@ def generate_launch_description():
             output='screen'
         ),
 
+        # 2Dのマッピングやナビゲーションを実行する際はこれを有効化、3Dでは無効化
+        # Node(
+        #     package='cub_bringup',
+        #     executable='odom_to_tf',
+        # ),
+
         # RVizの起動
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
