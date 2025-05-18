@@ -34,4 +34,6 @@ if [ -z "$container_list" ]; then # コンテナ起動してなければ起動
     sleep 1 # 低性能環境で、プロンプトが I have no name!@docker:/home/cub$ になっちゃう現象対策。それでも起きたら一旦exitしてから再度./run.shすると治る。
 fi
 
-./docker/internal/docker_exec.sh
+if [[ -z "$INVOCATION_ID" ]]; then
+    ./docker/internal/docker_exec.sh /bin/bash # systemdからの起動でなければ、オマケとしてexecまで実行する。
+fi

@@ -24,14 +24,4 @@ def generate_launch_description():
             ),
             condition=IfCondition("true" if cub_target == 'mcub' else "false")
         ),
-
-        Node(
-            package='cub_commander',
-            executable='cub_commander_node',
-            output='screen',
-        ),
-        Node(
-            package='joy_linux',
-            executable='joy_linux_node',
-        ),
     ])

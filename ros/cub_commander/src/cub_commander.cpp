@@ -4,7 +4,7 @@
 #include "sensor_msgs/msg/joy.hpp"
 #include "geometry_msgs/msg/twist.hpp"
 #include "std_msgs/msg/empty.hpp"
-#include "cub_commander/joy_to_dualsense.hpp"
+#include "cub_commander/joypad.hpp"
 #include <math.h>
 #include <algorithm>
 using std::placeholders::_1;
@@ -54,7 +54,7 @@ class CubCommander : public rclcpp::Node
     }
 
   private:
-    JoyToDualSense joy;
+    Joypad joy;
     UpEdge upPressed;
     UpEdge downPressed;
     UpEdge leftPressed;
@@ -75,6 +75,7 @@ class CubCommander : public rclcpp::Node
     void topic_callback(const sensor_msgs::msg::Joy & msg)
     {
       joy.update(msg);
+      // joy.print();
 
       joy_stamp_ = this->get_clock()->now();
 
@@ -125,8 +126,8 @@ class CubCommander : public rclcpp::Node
 
     void publishCmdVel()
     {
-      // 一秒以上コントローラの接続が切れたらマニュアルモードを強制終了する。
-      if((this->now() - joy_stamp_).seconds() >= 1.0){
+      // コントローラの接続が切れたらマニュアルモードを強制終了する。
+      if(!joy.connected()){
         autonomous = true;
       }
       // autonomousの時、navigationから３秒以上データが来てなければ、暴走防止に停止命令を入れておく。

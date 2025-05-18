@@ -24,6 +24,9 @@ if [ -f /System/Library/CoreServices/SystemVersion.plist ]; then # macOSの場�
 else # macOS以外の場合
     export USE_VNC_ENV=0
     export INPUT_GROUP_ID=`getent group input | cut -d: -f3` # ホストのinputのgroup idを取得する。コンテナ内外でinputに割り当てられたidが違う場合があるので、idで指定したい。
+    if [ -z "$DISPLAY" ]; then
+        export DISPLAY=:0 # DISPLAY環境変数が無い場合は:0で決め打ちしてしまう。もっと良い方法あったら取り替えたい。
+    fi
 fi
 
 # export USE_VNC_ENV=1 # これを有効化すると、VNC環境を強制オン

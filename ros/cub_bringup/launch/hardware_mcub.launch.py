@@ -9,7 +9,23 @@ from launch.substitutions import LaunchConfiguration
 import os
 
 def generate_launch_description():
+    joy_dev = "/dev/input/js0"
+
     return LaunchDescription([
+        Node(
+            package='cub_commander',
+            executable='cub_commander_node',
+            output='screen',
+            parameters=[{'dev': joy_dev}],
+            # remappings=[('/cmd_vel_atom', '/cmd_vel'),
+            #             ('/cmd_vel', '/cmd_vel_input')],
+        ),
+        Node(
+            package='joy_linux',
+            executable='joy_linux_node',
+            parameters=[{'dev': joy_dev}],
+        ),
+
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource([
                 os.path.join(FindPackageShare('sllidar_ros2').find('sllidar_ros2'), 'launch', 'sllidar_c1_launch.py')
@@ -25,4 +41,8 @@ def generate_launch_description():
             name='micro_ros_agent',
             arguments=["serial", "--dev", "/dev/ttyATOM", "-b", "115200", "-v6"]
         ),
+        # Node(
+        #     package='control_mcub',
+        #     executable='control_mcub_moter_node',
+        # ),
     ])
