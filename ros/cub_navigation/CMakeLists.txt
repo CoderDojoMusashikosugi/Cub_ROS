@@ -7,6 +7,10 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(visualization_msgs REQUIRED)
+find_package(yaml-cpp REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
@@ -17,7 +21,18 @@ install(
   DESTINATION share/${PROJECT_NAME}
 )
 
-
+add_executable(waypoint_manager src/waypoint_editor.cpp)
+ament_target_dependencies(waypoint_manager rclcpp geometry_msgs visualization_msgs yaml-cpp)
+install(TARGETS waypoint_manager DESTINATION lib/${PROJECT_NAME})
+target_link_libraries(waypoint_manager
+  yaml-cpp
+)
+add_executable(waypoint_visualizer src/waypoint_visualizer.cpp)
+ament_target_dependencies(waypoint_visualizer rclcpp geometry_msgs visualization_msgs yaml-cpp)
+install(TARGETS waypoint_visualizer DESTINATION lib/${PROJECT_NAME})
+target_link_libraries(waypoint_visualizer
+  yaml-cpp
+)
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   # the following line skips the linter which checks for copyrights

@@ -12,15 +12,31 @@ find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(pcl_conversions)
+find_package(pcl_ros)
+find_package(Eigen3 REQUIRED)
+find_package(PCL REQUIRED COMPONENTS common io)
 
 include_directories(
   include
+  ${PCL_INCLUDE_DIRS}
+  ${EIGEN3_INCLUDE_DIRS}
 )
 
 add_executable(odom_to_tf src/odom_to_tf.cpp)
 ament_target_dependencies(odom_to_tf rclcpp nav_msgs geometry_msgs tf2 tf2_ros)
+add_executable(odom_as_localization src/odom_as_localization.cpp)
+ament_target_dependencies(odom_as_localization rclcpp nav_msgs geometry_msgs tf2 tf2_ros)
 
-install(TARGETS odom_to_tf
+add_executable(tilt_correction_node src/tilt_correction_node.cpp)
+ament_target_dependencies(tilt_correction_node rclcpp sensor_msgs message_filters pcl_conversions pcl_ros Eigen3)
+
+install(TARGETS odom_to_tf odom_as_localization
+  DESTINATION lib/${PROJECT_NAME})
+
+install(TARGETS
+  tilt_correction_node
   DESTINATION lib/${PROJECT_NAME})
 
 install(

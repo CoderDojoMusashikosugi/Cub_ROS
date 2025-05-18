@@ -7,17 +7,32 @@ from launch_ros.substitutions import FindPackageShare
 from ament_index_python.packages import get_package_share_directory
 from launch.actions import TimerAction
 from launch_ros.actions import PushRosNamespace
+import ament_index_python.packages
+import launch_ros.actions
+import yaml
 import os
 
 def generate_launch_description():
     # sllidar_ros2パッケージの共有ディレクトリを取得
     sllidar_ros2_share_dir = FindPackageShare('sllidar_ros2').find('sllidar_ros2')
     
-    velodyne_launch_file_dir = os.path.join(
-        get_package_share_directory('velodyne'),
-        'launch',
-        'velodyne-all-nodes-VLP32C-launch.py'
-    )
+    # velodyneの起動
+    velodyne_driver_share_dir = ament_index_python.packages.get_package_share_directory('velodyne_driver')
+    _velodyne_driver_params_file = os.path.join(velodyne_driver_share_dir, 'config', 'VLP32C-velodyne_driver_node-params.yaml')
+    velodyne_driver_node = launch_ros.actions.Node(package='velodyne_driver',
+                                                   executable='velodyne_driver_node',
+                                                   output='both',
+                                                   parameters=[_velodyne_driver_params_file])
+    velodyne_convert_share_dir = ament_index_python.packages.get_package_share_directory('velodyne_pointcloud')
+    velodyne_convert_params_file = os.path.join(velodyne_convert_share_dir, 'config', 'VLP32C-velodyne_transform_node-params.yaml')
+    with open(velodyne_convert_params_file, 'r') as f:
+        velodyne_convert_params = yaml.safe_load(f)['velodyne_transform_node']['ros__parameters']
+    velodyne_convert_params['calibration'] = os.path.join(velodyne_convert_share_dir, 'params', 'VeloView-VLP-32C.yaml')
+    velodyne_transform_node = launch_ros.actions.Node(package='velodyne_pointcloud',
+                                                      executable='velodyne_transform_node',
+                                                      output='both',
+                                                      parameters=[velodyne_convert_params])
+
 
     realsense_launch_file_dir = os.path.join(
         get_package_share_directory("realsense2_camera"),
@@ -60,7 +75,7 @@ def generate_launch_description():
     #         )
     #     )
     # )
-
+    
     ublox_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(
@@ -71,12 +86,8 @@ def generate_launch_description():
 
         )
     )
+    ublox_launch_delayed = TimerAction(period=3.0, actions=[ublox_launch])
 
-    # velodyneの起動
-    velodyne_launch=IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(velodyne_launch_file_dir)
-        )
-    
     realsense_launch=IncludeLaunchDescription(
         PythonLaunchDescriptionSource(os.path.join(realsense_launch_file_dir, "rs_launch.py")),
         launch_arguments={
@@ -115,14 +126,46 @@ def generate_launch_description():
             }],
             output='screen'
         ),
+        # correction point cloud tilt
+        Node(
+            package='cub_bringup',
+            executable='tilt_correction_node',
+            name='tilt_correction_node',
+            parameters=[{
+                'tilt_angle_degrees': 2.07
+            }],
+        ),
+
+        # pointcloud to laser scan
+        Node(
+            package='pointcloud_to_laserscan', executable='pointcloud_to_laserscan_node',
+            remappings=[('cloud_in', '/velodyne_points_corrected'),
+                        ('scan', '/scan')],
+            parameters=[{
+                'target_frame': '',
+                'transform_tolerance': 0.01,
+                'min_height': -0.35,
+                'max_height': 1.5,
+                'angle_min': -3.14,  # -M_PI
+                'angle_max': 3.14,  # M_PI
+                'angle_increment': 0.0087,  # M_PI/360.0
+                'scan_time': 0.3333,
+                'range_min': 0.1,
+                'range_max': 100.0,
+                'use_inf': True,
+                'inf_epsilon': 1.0
+            }],
+            name='pointcloud_to_laserscan'
+        ),
 
         # グループアクション
-        slc_L_group,
-        slc_R_group,
+        # slc_L_group,
+        # slc_R_group,
 
         # GPS launch
         #gps_launch,
-        # velodyne launch
-        velodyne_launch,
+        ublox_launch_delayed,
+        velodyne_driver_node,
+        velodyne_transform_node,
         realsense_launch,
     ])

@@ -9,7 +9,7 @@ def generate_launch_description():
         get_package_share_directory('ekf_localizer'),  # パッケージ名
         'config',  # ディレクトリ名
         'ekf',  # サブディレクトリ
-        'ekf.yaml'  # ファイル名
+        'ekf_init_2.yaml'  # ファイル名
     )
     params_map_matcher = os.path.join(
         get_package_share_directory('ekf_localizer'),  # パッケージ名

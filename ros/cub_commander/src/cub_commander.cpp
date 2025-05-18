@@ -43,7 +43,7 @@ class CubCommander : public rclcpp::Node
       cmd_vel_sub_ = this->create_subscription<geometry_msgs::msg::Twist>(
       "/cmd_vel", 10, std::bind(&CubCommander::cmd_vel_nav_callback, this, _1));
       publisher_ = this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel_atom", 10);
-      start_button_pub_ = this->create_publisher<std_msgs::msg::Empty>("/start_button", 10);
+      start_button_pub_ = this->create_publisher<std_msgs::msg::Empty>("/proceed_to_next_group", 10);
       cmd_vel_timer_ = this->create_wall_timer(
         std::chrono::milliseconds(50),
         std::bind(&CubCommander::publishCmdVel, this)

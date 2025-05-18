@@ -1,0 +1,24 @@
+waypoint_groups:
+  - group_name: "Entrance Path"
+    require_input: true
+    waypoints:
+      - x: 1.0391708612442017
+        y: 0.7717792987823486
+        yaw: 0.0
+  - group_name: "Main Corridor"
+    require_input: true
+    waypoints:
+      - x: 1.0025804042816162
+        y: 2.60064959526062
+        yaw: 0
+
+  - group_name: "Return Path"
+    require_input: false
+    waypoints:
+      - x: 3.1833574771881104
+        y: 3.2590346336364746
+        yaw: 0.0
+      - x: -0.07318040728569031
+        y: 0.0182888675481081
+        yaw: 0.0
+    
