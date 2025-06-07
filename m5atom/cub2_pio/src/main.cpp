@@ -767,7 +767,11 @@ void setup() {
 }
 
 void loop() {
-  if (digitalRead(EMERGENCY_MONITOR) == HIGH) {
+  // if (digitalRead(EMERGENCY_MONITOR) == HIGH) {
+  if (false) {  // for temporary disable emergency stop
+    debug_message("Emergency stop triggered");
+    robo_mode = EMERGENCY;
+    leds[4] = CRGB::Red;
 #ifdef CUB_TARGET_CUB2
     emergency_stop();
     fill_solid(lane_led, NUM_LANE_LEDS, CRGB::Red);
