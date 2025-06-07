@@ -122,7 +122,8 @@ def generate_launch_description():
             executable='bno055',
             name='bno055',
             parameters=[{
-                'uart_port': "/dev/ttyBNO055"
+                'uart_port': "/dev/ttyBNO055",
+                'data_query_frequency': 100
             }],
             output='screen'
         ),
@@ -164,7 +165,7 @@ def generate_launch_description():
 
         # GPS launch
         #gps_launch,
-        ublox_launch_delayed,
+        # ublox_launch_delayed,
         velodyne_driver_node,
         velodyne_transform_node,
         realsense_launch,
