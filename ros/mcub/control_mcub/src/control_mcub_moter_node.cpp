@@ -105,18 +105,36 @@ ReadWriteNode::ReadWriteNode()
 
   const auto QOS_RKL10V =
     rclcpp::QoS(rclcpp::KeepLast(qos_depth)).reliable().durability_volatile();
+  
+  odometry_publisher_ = this->create_publisher<nav_msgs::msg::Odometry>("odom", 10);
 
   set_twist_subscriber_ =
     this->create_subscription<Twist>(
-    "cmd_vel",
+    "cmd_vel_atom",
     QOS_RKL10V,
     [this](const Twist::SharedPtr msg) -> void
     {
-      // caluclate velocity for each dinamixel from twist value
+      this->twist_request = *msg;
+      // timer_callback();
+    }
+    );
+
+  timer_ = this->create_wall_timer(
+    std::chrono::milliseconds(dt_millis),
+    std::bind(&ReadWriteNode::timer_callback, this)
+  );
+}
+
+ReadWriteNode::~ReadWriteNode()
+{
+}
+
+void ReadWriteNode::timer_callback(){
+        // caluclate velocity for each dinamixel from twist value
       float cub_d = 62.5;  // [mm] distance between center and wheel
       float motor_vel_unit = 0.229;  //[rpm]
-      double r_vel_m = msg->linear.x + cub_d * msg->angular.z / 1000.0; // [m/s]
-      double l_vel_m = msg->linear.x - cub_d * msg->angular.z / 1000.0; // [m/s]
+      double r_vel_m = this->twist_request.linear.x + cub_d * this->twist_request.angular.z / 1000.0; // [m/s]
+      double l_vel_m = this->twist_request.linear.x - cub_d * this->twist_request.angular.z / 1000.0; // [m/s]
       
       float diameter = 40; // [mm] diameter of wheel
       double r_vel_r = r_vel_m / (diameter / 1000.0 / 2.0); // [rad/s]
@@ -131,7 +149,7 @@ ReadWriteNode::ReadWriteNode()
                                       "r_vel_m = %lf l_vel_m = %lf\n"
                                       "r_vel_r = %lf l_vel_r = %lf\n"
                                       "r_goal_vel = %d l_goal_vel = %d",
-                                      msg->linear.x, msg->angular.z,
+                                      this->twist_request.linear.x, this->twist_request.angular.z,
                                       r_vel_m, l_vel_m, r_vel_r, l_vel_r,
                                       r_goal_vel, l_goal_vel);
 
@@ -173,64 +191,67 @@ ReadWriteNode::ReadWriteNode()
 
 
       // Position Value of X series is 4 byte data. For AX & MX(1.0) use 2 byte data(int16_t) for the Position Value.
-      int32_t velocity = 0;
+      int32_t position1 = 0;
 
       // Read Present Velocity (length : 4 bytes) and Convert uint32 -> int32
       // When reading 2 byte data from AX / MX(1.0), use read2ByteTxRx() instead.
       dxl_comm_result = packetHandler->read4ByteTxRx(
-        portHandler, DXL1_ID, ADDR_PRESENT_VELOCITY, (uint32_t *)&velocity, &dxl_error);
+        portHandler, DXL1_ID, ADDR_PRESENT_POSITION, (uint32_t *)&position1, &dxl_error);
       if (dxl_comm_result == COMM_SUCCESS) {
-        RCLCPP_INFO(this->get_logger(), "getVelocity : [ID:%d] -> [VELOCITY:%d]", DXL1_ID, velocity);
+        RCLCPP_INFO(this->get_logger(), "getposition : [ID:%d] -> [position:%d]", DXL1_ID, position1);
       } else {
-        RCLCPP_INFO(this->get_logger(), "Failed to get velocity! Result: %d", dxl_comm_result);
+        RCLCPP_INFO(this->get_logger(), "Failed to get position! Result: %d", dxl_comm_result);
       }
 
-
       // Position Value of X series is 4 byte data. For AX & MX(1.0) use 2 byte data(int16_t) for the Position Value.
-      int32_t position = 0;
+      int32_t position2 = 0;
 
       // Read Present position (length : 4 bytes) and Convert uint32 -> int32
       // When reading 2 byte data from AX / MX(1.0), use read2ByteTxRx() instead.
       dxl_comm_result = packetHandler->read4ByteTxRx(
-        portHandler, DXL1_ID, ADDR_PRESENT_POSITION, (uint32_t *)&position, &dxl_error);
+        portHandler, DXL2_ID, ADDR_PRESENT_POSITION, (uint32_t *)&position2, &dxl_error);
       if (dxl_comm_result == COMM_SUCCESS) {
-        RCLCPP_INFO(this->get_logger(), "getposition : [ID:%d] -> [position:%d]", DXL1_ID, position);
+        RCLCPP_INFO(this->get_logger(), "getposition : [ID:%d] -> [position:%d]", DXL2_ID, position2);
       } else {
         RCLCPP_INFO(this->get_logger(), "Failed to get position! Result: %d", dxl_comm_result);
       }
-    }
-    );
-  
-  auto get_present_position =
-    [this](
-    const std::shared_ptr<GetPosition::Request> request,
-    std::shared_ptr<GetPosition::Response> response) -> void
-    {
-      // Read Present Position (length : 4 bytes) and Convert uint32 -> int32
-      // When reading 2 byte data from AX / MX(1.0), use read2ByteTxRx() instead.
-      dxl_comm_result = packetHandler->read4ByteTxRx(
-        portHandler,
-        (uint8_t) request->id,
-        ADDR_PRESENT_POSITION,
-        reinterpret_cast<uint32_t *>(&present_position),
-        &dxl_error
-      );
 
-      RCLCPP_INFO(
-        this->get_logger(),
-        "Get [ID: %d] [Present Position: %d]",
-        request->id,
-        present_position
-      );
 
-      response->position = present_position;
-    };
+      if(abs(position1-last_position1) >= 2048 && abs(position1-last_position1) >= 2048){
+        last_position1 = position1;
+        last_position2 = position2;
+        RCLCPP_INFO(this->get_logger(), "reset last_position %d,%d", last_position1,last_position2);
+      }else{
+        int32_t diff1 = position1-last_position1;
+        int32_t diff2 = position2-last_position2;
+        last_position1 = position1;
+        last_position2 = position2;
+        RCLCPP_INFO(this->get_logger(), "position diff %d,%d", diff1,diff2);
 
-  get_position_server_ = create_service<GetPosition>("get_position", get_present_position);
-}
+        static int rotation = 4096;
+        static double circle = diameter / 1000.0 * M_PI;
 
-ReadWriteNode::~ReadWriteNode()
-{
+        double diff1_meter = double(diff1)/rotation*circle;
+        double diff2_meter = double(diff2)/rotation*circle;
+
+        double diff_linear = (diff1_meter+diff2_meter)/2.0;
+        double diff_angular = (diff1_meter-diff2_meter)/(cub_d/1000.0)/2.0;
+
+        // odom.pose.pose.position.z += diff_angular;
+        theta_ += diff_angular;
+        double diff_x = cos(theta_)*diff_linear;
+        double diff_y = sin(theta_)*diff_linear;
+
+        odom.header.stamp = this->get_clock()->now();
+        odom.header.frame_id = "odom";
+        odom.child_frame_id = "base_link";
+        odom.pose.pose.position.x += diff_x;
+        odom.pose.pose.position.y += diff_y;
+        odom.pose.pose.orientation.z = sin(theta_ / 2.0);
+        odom.pose.pose.orientation.w = cos(theta_ / 2.0);
+      }
+      odometry_publisher_->publish(odom);
+
 }
 
 /******************************************************************************/

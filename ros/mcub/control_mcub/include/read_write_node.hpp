@@ -23,23 +23,33 @@
 #include "rcutils/cmdline_parser.h"
 #include "dynamixel_sdk/dynamixel_sdk.h"
 #include "geometry_msgs/msg/twist.hpp"
-#include "dynamixel_sdk_custom_interfaces/srv/get_position.hpp"
+#include "nav_msgs/msg/odometry.hpp"
 
 
 class ReadWriteNode : public rclcpp::Node
 {
 public:
   using Twist = geometry_msgs::msg::Twist;
-  using GetPosition = dynamixel_sdk_custom_interfaces::srv::GetPosition;
+  using Odometry = nav_msgs::msg::Odometry;
 
   ReadWriteNode();
   virtual ~ReadWriteNode();
 
+  void timer_callback();
+
+
 private:
   rclcpp::Subscription<Twist>::SharedPtr set_twist_subscriber_;
-  rclcpp::Service<GetPosition>::SharedPtr get_position_server_;
+  rclcpp::Publisher<Odometry>::SharedPtr odometry_publisher_;
 
-  int present_position;
+  rclcpp::TimerBase::SharedPtr timer_;
+  Twist twist_request;
+  Odometry odom;
+  int32_t last_position1;
+  int32_t last_position2;
+  double theta_=0.0;
+
+  int dt_millis = 50;
 };
 
 #endif  // READ_WRITE_NODE_HPP_
