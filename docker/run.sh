@@ -27,17 +27,21 @@ if [ -n "$container_list" ]; then # コンテナ起動していた場合、そ�
 
     if [ $IDEAL_CUB_TARGET != $RUNNING_CUB_TARGET ]; then
         # CUB_TARGETがコンテナ内外で同じ設定でなければ落とす
-        echo "CUB_TARGET updated. recreating container..."
-        ./stop.sh
-        container_list=""
-        :
+        # echo "CUB_TARGET updated. recreating container..."
+        # ./stop.sh
+        # container_list=""
+        # というのは止めて警告に留める
+        echo "現在起動中のコンテナは、設定されたCUB_TARGETに対応したものではありません。"
+        echo "一旦exitし、ホスト環境で./stop.shを実行してから再度./run.shを試してください。"
     elif [ -n "$RUNNING_IMAGE_NAME" ] && [ $RUNNING_IMAGE_NAME != $IDEAL_IMAGE_NAME ]; then
         # 実行中のイメージ名が設定のイメージ名と合ってなければ落とす。
         # イメージ名取得出来ない場合は一旦無視する。cub_ros以外、すなわちvncコンテナを起動してる場合を想定。
-        echo "image tag updated. recreating container..."
-        ./stop.sh
-        container_list=""
-        :
+        # echo "image tag updated. recreating container..."
+        # ./stop.sh
+        # container_list=""
+        # というのは止めて警告に留める
+        echo "現在起動中のコンテナは、設定されたバージョンのものではありません。"
+        echo "一旦exitし、ホスト環境で./stop.shを実行してから再度./run.shを試してください。"
     fi
 fi
 
