@@ -6,10 +6,14 @@ from launch.substitutions import PathJoinSubstitution
 from launch_ros.substitutions import FindPackageShare
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
+from launch.conditions import IfCondition
+from launch.substitutions import LaunchConfiguration, EnvironmentVariable
 import os
 
 def generate_launch_description():
     joy_dev = "/dev/input/js0"
+    cub_target = os.getenv('CUB_TARGET', 'mcub')
+    print("launch target:", cub_target)
 
     return LaunchDescription([
         Node(
@@ -17,8 +21,6 @@ def generate_launch_description():
             executable='cub_commander_node',
             output='screen',
             parameters=[{'dev': joy_dev}],
-            # remappings=[('/cmd_vel_atom', '/cmd_vel'),
-            #             ('/cmd_vel', '/cmd_vel_input')],
         ),
         Node(
             package='joy_linux',
@@ -39,10 +41,12 @@ def generate_launch_description():
             package='micro_ros_agent',
             executable='micro_ros_agent',
             name='micro_ros_agent',
-            arguments=["serial", "--dev", "/dev/ttyATOM", "-b", "115200", "-v6"]
+            arguments=["serial", "--dev", "/dev/ttyATOM", "-b", "115200", "-v6"],
+            condition=IfCondition("true" if cub_target == 'mcub' else "false")
         ),
-        # Node(
-        #     package='control_mcub',
-        #     executable='control_mcub_moter_node',
-        # ),
+        Node(
+            package='control_mcub',
+            executable='control_mcub_moter_node',
+            condition=IfCondition("true" if cub_target == 'mcub_direct' else "false")
+        ),
     ])
