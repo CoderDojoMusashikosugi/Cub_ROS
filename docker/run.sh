@@ -7,11 +7,39 @@ if [ ! -e docker/home/.user_config.bash ]; then
     cp docker/.default_do_not_edit/user_config.bash docker/home/.user_config.bash
 fi
 
+docker/internal/set_target_env.sh
 source docker/internal/docker_util.sh
 
 export HOST_UID=`id -u`
 export HOST_GID=`id -g`
 container_list=`$docker_compose ps -q`
+
+if [ -n "$container_list" ]; then # コンテナ起動していた場合、それが今の設定と合ってなかったら落とす。
+    # CUB_TARGETがコンテナ内外で同じ設定でなければ落とす用の情報収集
+    RUNNING_CUB_TARGET=`./docker/internal/docker_exec.sh env | grep CUB_TARGET`
+    IDEAL_CUB_TARGET=`source ./target.env && echo $CUB_TARGET`
+    IDEAL_CUB_TARGET="CUB_TARGET=$IDEAL_CUB_TARGET"
+
+    # 実行中のイメージ名が設定のイメージ名と合ってなければ落とす用の情報収集
+    RUNNING_IMAGE_NAME=`docker inspect --format='{{.Config.Image}}' cub_ros` || true
+    IDEAL_VER=`source ./docker/ver.env && echo $VER`
+    IDEAL_IMAGE_NAME=ghcr.io/coderdojomusashikosugi/cub_ros:${IDEAL_VER}_${ARCH}
+
+    if [ $IDEAL_CUB_TARGET != $RUNNING_CUB_TARGET ]; then
+        # CUB_TARGETがコンテナ内外で同じ設定でなければ落とす
+        echo "CUB_TARGET updated. recreating container..."
+        ./stop.sh
+        container_list=""
+        :
+    elif [ -n "$RUNNING_IMAGE_NAME" ] && [ $RUNNING_IMAGE_NAME != $IDEAL_IMAGE_NAME ]; then
+        # 実行中のイメージ名が設定のイメージ名と合ってなければ落とす。
+        # イメージ名取得出来ない場合は一旦無視する。cub_ros以外、すなわちvncコンテナを起動してる場合を想定。
+        echo "image tag updated. recreating container..."
+        ./stop.sh
+        container_list=""
+        :
+    fi
+fi
 
 if [ -z "$container_list" ]; then # コンテナ起動してなければ起動
     git submodule update --init --recursive # dockerイメージをbuildする際には手元のROS pkgが依存するapt pkgを調べるので、その前に全部揃えておく。
