@@ -12,6 +12,7 @@ find_package(dynamixel_sdk REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(dynamixel_sdk_custom_interfaces REQUIRED)
 find_package(nav_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
 
 include_directories(include)
 ################################################################################
@@ -23,6 +24,7 @@ ament_target_dependencies(control_mcub_moter_node
   dynamixel_sdk_custom_interfaces
   geometry_msgs
   nav_msgs
+  std_msgs
   rclcpp
 )
 add_executable(mcub_teleop_key src/mcub_teleop_key.cpp)

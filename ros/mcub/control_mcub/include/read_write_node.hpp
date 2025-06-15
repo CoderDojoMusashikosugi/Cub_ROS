@@ -24,6 +24,7 @@
 #include "dynamixel_sdk/dynamixel_sdk.h"
 #include "geometry_msgs/msg/twist.hpp"
 #include "nav_msgs/msg/odometry.hpp"
+#include "std_msgs/msg/empty.hpp"
 
 
 class ReadWriteNode : public rclcpp::Node
@@ -31,6 +32,7 @@ class ReadWriteNode : public rclcpp::Node
 public:
   using Twist = geometry_msgs::msg::Twist;
   using Odometry = nav_msgs::msg::Odometry;
+  using Empty = std_msgs::msg::Empty;
 
   ReadWriteNode();
   virtual ~ReadWriteNode();
@@ -40,7 +42,9 @@ public:
 
 private:
   rclcpp::Subscription<Twist>::SharedPtr set_twist_subscriber_;
+  rclcpp::Subscription<Empty>::SharedPtr clear_odom_subscriber_;
   rclcpp::Publisher<Odometry>::SharedPtr odometry_publisher_;
+
 
   rclcpp::TimerBase::SharedPtr timer_;
   Twist twist_request;

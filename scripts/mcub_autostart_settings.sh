@@ -3,7 +3,7 @@
 echo "This script setups host autostart settings."
 if [ $(whoami) != "root" ]; then
     echo "[error] run as sudo"
-    echo "for example: sudo ./mcub_host_settings.sh"
+    echo "for example: sudo ./mcub_autostart_settings.sh"
     exit
 fi
 
@@ -19,7 +19,7 @@ User=$USER_NAME
 Type=simple
 WorkingDirectory=$CUB_ROS_WS
 ExecStartPre=$CUB_ROS_WS/run.sh
-ExecStart=$CUB_ROS_WS/docker/internal/docker_exec.sh /bin/bash -c 'source /home/cub/colcon_ws/install/setup.bash && source ~/.user_config.bash && ros2 launch cub_bringup hardware_mcub.launch.py'
+ExecStart=$CUB_ROS_WS/docker/internal/docker_exec.sh /bin/bash -c 'source /home/cub/colcon_ws/install/setup.bash && source ~/.user_config.bash && ros2 launch cub_bringup launch_at_boot.launch.py'
 
 [Install]
 WantedBy=graphical.target" > /etc/systemd/system/cub_ros.service

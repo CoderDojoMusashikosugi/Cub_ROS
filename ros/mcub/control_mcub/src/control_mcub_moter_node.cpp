@@ -115,9 +115,18 @@ ReadWriteNode::ReadWriteNode()
     [this](const Twist::SharedPtr msg) -> void
     {
       this->twist_request = *msg;
-      // timer_callback();
     }
-    );
+  );
+
+  clear_odom_subscriber_ =
+    this->create_subscription<Empty>(
+    "clear_odom",
+    QOS_RKL10V,
+    [this]([[maybe_unused]] const Empty::SharedPtr msg) -> void
+    {
+      this->odom = nav_msgs::msg::Odometry();
+    }
+  );
 
   timer_ = this->create_wall_timer(
     std::chrono::milliseconds(dt_millis),

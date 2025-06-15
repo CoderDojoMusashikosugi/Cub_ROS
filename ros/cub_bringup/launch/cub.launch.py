@@ -12,6 +12,12 @@ def generate_launch_description():
     print("launch target:", cub_target)
 
     return LaunchDescription([
+        Node(# オドメトリをクリアしておく
+            package='cub_bringup',
+            executable='clear_odom',
+            name='clear_odom',
+            output='screen'
+        ),
         IncludeLaunchDescription(
             PathJoinSubstitution(
                 [FindPackageShare("cub_bringup"), "launch", "target_cub2.launch.py"]
@@ -22,6 +28,6 @@ def generate_launch_description():
             PathJoinSubstitution(
                 [FindPackageShare("cub_bringup"), "launch", "target_mcub.launch.py"]
             ),
-            condition=IfCondition("true" if cub_target == 'mcub' else "false")
+            condition=IfCondition("true" if (cub_target == 'mcub' or cub_target == 'mcub_direct') else "false")
         ),
     ])
