@@ -40,7 +40,7 @@ public:
         last_left_wheel_pos_ = 0;
         last_right_wheel_pos_ = 0;
         yaw_ = 0;
-#ifdef CUB_TARGET_CUB2
+#ifdef CUB_TARGET_CUB3
         last_left_rear_wheel_pos_ = 0;
         last_right_rear_wheel_pos_ = 0;
 #endif
@@ -59,7 +59,7 @@ private:
             last_left_wheel_pos_ = left_wheel_position;
             last_right_wheel_pos_ = right_wheel_position;
         }
-#ifdef CUB_TARGET_CUB2
+#ifdef CUB_TARGET_CUB3
         // メッセージから車輪の位置を取得
         int32_t left_wheel_position_2 = msg->data[2];   // 不正値読み出し時のバックアップ
         int32_t right_wheel_position_2 = msg->data[3];  // 不正値読み出し時のバックアップ
@@ -110,7 +110,7 @@ private:
         double delta_center = (delta_left + delta_right) / 2.0; //[m]
 
         // 角度の更新
-#ifdef CUB_TARGET_CUB2
+#ifdef CUB_TARGET_CUB3
         theta_ = yaw_;
 #elif defined(CUB_TARGET_MCUB)
         double delta_theta = (delta_right - delta_left) / wheel_distance_;  // [rad]
@@ -152,7 +152,7 @@ private:
         // 現在の車輪位置を保存
         last_left_wheel_pos_ = left_wheel_position;
         last_right_wheel_pos_ = right_wheel_position;
-#ifdef CUB_TARGET_CUB2
+#ifdef CUB_TARGET_CUB3
         last_left_rear_wheel_pos_ = left_wheel_position_2;
         last_right_rear_wheel_pos_ = right_wheel_position_2;
 #endif
@@ -215,8 +215,8 @@ private:
     int32_t last_right_wheel_pos_;
 
     // オドメトリの計算
-#ifdef CUB_TARGET_CUB2
-    // CUB_TARGET が cub2 の場合のコード
+#ifdef CUB_TARGET_CUB3
+    // CUB_TARGET が cub3 の場合のコード
     const double wheel_distance_ = 205.0 / 1000.0;   // 車輪間距離 [mm]
     const double wheel_circumference_ = 150 * M_PI / 1000.0;       // 車輪の円周 [mm]　直径 * pi
     const int16_t POS_MAX = 32767; //車輪のエンコーダーの最大値

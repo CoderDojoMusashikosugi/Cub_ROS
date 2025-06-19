@@ -27,7 +27,7 @@ sudo apt install python3-venv
 ![pio_menu](doc/002-pio_menu.png)
 
 5. mCubの場合[mcub_pio/platfomio.ini](mcub_pio/platformio.ini)を選択する  
-Cub2の場合[cub2_pio/platformio.ini](cub2_pio/platformio.ini)を選択する  
+Cub3の場合[cub3_pio/platformio.ini](cub3_pio/platformio.ini)を選択する  
 初回は必要なライブラリインストールが走るため、数分時間がかかります。
 
 6. 画面下部にあるプラグマーク Auto ボタンをクリックし、M5STackのポートを選択する。

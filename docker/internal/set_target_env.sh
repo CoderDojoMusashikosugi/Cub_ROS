@@ -29,7 +29,7 @@ if [ -f $BASE_DIR/target.env ]; then
 else
   echo "# このレポジトリのソースコードをどのロボット向けにビルド・実行する予定かを設定するファイル。
 # dockerを起動するとこれが読み込まれて環境変数に設定される。あとはビルドや実行の際にいい感じに使う。
-# cub2/mcub/mcub_directなどから選ぶ。一覧には./docker/environment内の○○.confというファイル名を確認。
+# cub3/mcub/mcub_directなどから選ぶ。一覧には./docker/environment内の○○.confというファイル名を確認。
 # このファイルは.gitignoreに設定してあるので、コミットされない。
 
 CUB_TARGET=DEFAULT

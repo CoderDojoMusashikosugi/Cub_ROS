@@ -18,7 +18,7 @@
 #include <std_msgs/msg/int32_multi_array.h>
 #include <std_msgs/msg/empty.h>
 
-#ifdef CUB_TARGET_CUB2
+#ifdef CUB_TARGET_CUB3
 #include <DDT_Motor_M15M06.h>
 #elif defined(CUB_TARGET_MCUB)
 #include <Dynamixel2Arduino.h>
@@ -58,7 +58,7 @@ rcl_node_t node;
 rcl_timer_t imu_timer;
 rcl_init_options_t init_options; // Humble
 
-#ifdef CUB_TARGET_CUB2
+#ifdef CUB_TARGET_CUB3
 size_t domain_id = 0;
 
 
@@ -73,7 +73,7 @@ uint8_t brake = Brake_Disable;
 const int16_t POS_MAX = 32767; //車輪のエンコーダーの最大値
 Receiver Receiv[4]; // 0:rear left, 1:front right, 2:front left, 3:rear right
 // M5Stackのモジュールによって対応するRX,TXのピン番号が違うためM5製品とRS485モジュールに対応させてください
-auto motor_handler = MotorHandler(33, 23); // Cub2 ATOM(33, 23) Cub1 RX,TX ATOM(32, 26) DDSM210 ATOM S3(2,1)
+auto motor_handler = MotorHandler(33, 23); // Cub3 ATOM(33, 23) Cub1 RX,TX ATOM(32, 26) DDSM210 ATOM S3(2,1)
 
 volatile uint16_t front_right_wheel_position = 0;
 volatile uint16_t rear_right_wheel_position = 0;
@@ -220,7 +220,7 @@ void imu_timer_callback(rcl_timer_t * imu_timer, int64_t last_call_time) {
   }
 }
 
-#ifdef CUB_TARGET_CUB2
+#ifdef CUB_TARGET_CUB3
 void motor_exec(){
   if (xSemaphoreTake(mutex, pdMS_TO_TICKS(100))) {
     for(int i=0;i<4;i++){
@@ -383,7 +383,7 @@ void initialize_dynamixel() {
 #endif
 
 // caluclate velocity for each dinamixel from twist value
-#ifdef CUB_TARGET_CUB2
+#ifdef CUB_TARGET_CUB3
 const float cub_d = 110;  // [mm] distance between center and wheel
 float motor_vel_unit = 1;  //[rpm]
 const float diameter = 150; // [mm] diameter of wheel
@@ -412,7 +412,7 @@ geometry_msgs__msg__Twist vehicle_stop_msg() {
 void wh_pos_timer_callback() {
   
     // メッセージデータの設定
-#ifdef CUB_TARGET_CUB2
+#ifdef CUB_TARGET_CUB3
   // if (xSemaphoreTake(mutex, pdMS_TO_TICKS(100))) {
     wheel_positions_msg.data.data[0] = static_cast<int32_t>(rear_left_wheel_position);
     wheel_positions_msg.data.data[1] = static_cast<int32_t>(rear_right_wheel_position);
@@ -449,7 +449,7 @@ void control_motor(const geometry_msgs__msg__Twist* arg_twist) {
   double l_vel_m = arg_twist->linear.x - cub_d * arg_twist->angular.z / 1000.0; // [m/s]
   double r_vel_r = r_vel_m / (diameter / 1000.0 / 2.0); // [rad/s]
   double l_vel_r = l_vel_m / (diameter / 1000.0 / 2.0); // [rad/s]
-  #ifdef CUB_TARGET_CUB2
+  #ifdef CUB_TARGET_CUB3
   int r_goal_vel = (int)(r_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit); // right goal velocity[rpm] # TODO: check whether need to add dvidid by motor_velocity_unit
   int l_goal_vel = (int)(l_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit); // left goal velocity[rpm]
 
@@ -510,7 +510,7 @@ void motor_control_loop(void *pvParameters = nullptr)
     switch (robo_mode)
     {
     case IDLE:
-  #ifdef CUB_TARGET_CUB2
+  #ifdef CUB_TARGET_CUB3
       motor_stop();
   #endif
       send_twist_msg = vehicle_stop_msg();
@@ -521,7 +521,7 @@ void motor_control_loop(void *pvParameters = nullptr)
     case AUTONOMOUS:
       if (millis() - prev_msg_time > 3000) {
         robo_mode = IDLE;
-  #ifdef CUB_TARGET_CUB2
+  #ifdef CUB_TARGET_CUB3
         motor_stop();
   #endif
         subscribe_twist_msg = vehicle_stop_msg();
@@ -529,7 +529,7 @@ void motor_control_loop(void *pvParameters = nullptr)
         send_twist_msg = subscribe_twist_msg;
       break;
     case EMERGENCY:
-  #ifdef CUB_TARGET_CUB2
+  #ifdef CUB_TARGET_CUB3
       emergency_stop();
   #endif
       remote_twist_msg = vehicle_stop_msg();
@@ -537,7 +537,7 @@ void motor_control_loop(void *pvParameters = nullptr)
       send_twist_msg = vehicle_stop_msg();
       break;
     default:
-  #ifdef CUB_TARGET_CUB2
+  #ifdef CUB_TARGET_CUB3
       motor_stop();
   #endif
       send_twist_msg = vehicle_stop_msg();
@@ -559,7 +559,7 @@ void remote_control_loop(void *pvParameters){
       delay(100);
       continue;
     }
-  #ifdef CUB_TARGET_CUB2
+  #ifdef CUB_TARGET_CUB3
     float default_linear = 1.2;
   #elif defined(CUB_TARGET_MCUB)
     float default_linear = 0.3;
@@ -731,7 +731,7 @@ void setup() {
 
   // initialize LED
   FastLED.addLeds<WS2812, LED_DATA_PIN, GRB>(leds, NUM_LEDS);
-#ifdef CUB_TARGET_CUB2
+#ifdef CUB_TARGET_CUB3
   FastLED.addLeds<NEOPIXEL, LANE_LED_DATA_PIN>(lane_led, NUM_LANE_LEDS);
   FastLED.setBrightness(200);
   fill_solid(lane_led, NUM_LANE_LEDS, CRGB( 255, 255, 255));
@@ -742,7 +742,7 @@ void setup() {
   FastLED.show();
   delay(10);
 
-#ifdef CUB_TARGET_CUB2
+#ifdef CUB_TARGET_CUB3
   for(int i=1;i<=4;i++){
     motor_handler.Control_Motor(0, i, Acce, Brake_P, &Receiv[i]); //4つのモーター
   }
@@ -752,7 +752,7 @@ void setup() {
 
   // メッセージの初期化
   std_msgs__msg__Int32MultiArray__init(&wheel_positions_msg);
-#ifdef CUB_TARGET_CUB2
+#ifdef CUB_TARGET_CUB3
   wheel_positions_msg.data.capacity = 4;
   wheel_positions_msg.data.size = 4;
   wheel_positions_msg.data.data = (int32_t*) malloc(4 * sizeof(int32_t));
@@ -772,7 +772,7 @@ void loop() {
     debug_message("Emergency stop triggered");
     robo_mode = EMERGENCY;
     leds[4] = CRGB::Red;
-#ifdef CUB_TARGET_CUB2
+#ifdef CUB_TARGET_CUB3
     emergency_stop();
     fill_solid(lane_led, NUM_LANE_LEDS, CRGB::Red);
 #endif
@@ -790,17 +790,17 @@ void loop() {
 
   if (robo_mode == REMOTE_CTRL) {
     leds[4] = CRGB::Yellow;
-#ifdef CUB_TARGET_CUB2
+#ifdef CUB_TARGET_CUB3
     fill_solid(lane_led, NUM_LANE_LEDS, CRGB::Yellow);
 #endif
   } else if (robo_mode == AUTONOMOUS) {
     leds[4] = CRGB::Green;
-#ifdef CUB_TARGET_CUB2
+#ifdef CUB_TARGET_CUB3
     fill_solid(lane_led, NUM_LANE_LEDS, CRGB::Green);
 #endif
   } else if (robo_mode == IDLE) {
     leds[4] = CRGB::Blue;
-#ifdef CUB_TARGET_CUB2
+#ifdef CUB_TARGET_CUB3
     fill_solid(lane_led, NUM_LANE_LEDS, CRGB::Blue);
 #endif
   }

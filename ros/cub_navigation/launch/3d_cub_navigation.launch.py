@@ -34,13 +34,13 @@ def generate_launch_description():
         'map',
         default="/home/cub/maps/oudanhodoumade/mapoudanhodoumade_white.yaml")
 
-    cub_target = os.getenv('CUB_TARGET', 'cub2')
-    if cub_target == 'cub2':
-        param_file_name = 'cub2_nav2_3d.yaml'
+    cub_target = os.getenv('CUB_TARGET', 'cub3')
+    if cub_target == 'cub3':
+        param_file_name = 'cub3_nav2_3d.yaml'
     elif cub_target == 'mcub':
         param_file_name = 'mcub_nav2.yaml'
     else:
-        param_file_name = 'cub2_nav2_3d.yaml'
+        param_file_name = 'cub3_nav2_3d.yaml'
 
     param_dir = LaunchConfiguration(
         'params_file',

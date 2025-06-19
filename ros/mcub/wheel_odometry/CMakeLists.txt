@@ -9,15 +9,15 @@ endif()
 if(DEFINED ENV{CUB_TARGET})
     message(STATUS "CUB_TARGET is set to $ENV{CUB_TARGET}")
 
-    if($ENV{CUB_TARGET} STREQUAL "cub2")
-        add_definitions(-DCUB_TARGET_CUB2)
+    if($ENV{CUB_TARGET} STREQUAL "cub3")
+        add_definitions(-DCUB_TARGET_CUB3)
     elseif($ENV{CUB_TARGET} STREQUAL "mcub")
         add_definitions(-DCUB_TARGET_MCUB)
     elseif($ENV{CUB_TARGET} STREQUAL "mcub_direct")
         add_definitions(-DCUB_TARGET_MCUB)
     else()
         message(WARNING "CUB_TARGET is set to an unknown value: $ENV{CUB_TARGET}")
-        add_definitions(-DCUB_TARGET_CUB2) #何も設定されてなければCub2にしておく
+        add_definitions(-DCUB_TARGET_CUB3) #何も設定されてなければCub3にしておく
     endif()
 else()
     message(FATAL_ERROR "CUB_TARGET environment variable is not set")

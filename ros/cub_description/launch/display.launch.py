@@ -16,7 +16,7 @@ def generate_launch_description():
                 PathJoinSubstitution([
                     FindPackageShare('cub_description'),
                     'urdf',
-                    'cub2.urdf'
+                    'cub3.urdf'
                 ])
             ])}]
         ),

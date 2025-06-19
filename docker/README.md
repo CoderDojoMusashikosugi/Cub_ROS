@@ -81,7 +81,7 @@
 - m5atom: Docker的には関係ない。M5 Atom向けのスクリプト置き場。
 - support_tools: Docker的には関係ない。今のところDynamixel関係のファイルが置かれている。
 - scripts: Docker的には関係ないスクリプト置き場。ホスト環境のセットアップ用スクリプトなど。
-  - install_host_settings.sh: Cub2用
+  - install_host_settings.sh: Cub3用
   - mcub_host_settings.sh: mCub用
   - libuvc_installation.sh: ?
 

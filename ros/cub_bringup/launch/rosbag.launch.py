@@ -10,7 +10,7 @@ from launch.actions import TimerAction
 import os
 
 def generate_launch_description():
-    cub_target = os.getenv('CUB_TARGET', 'cub2')
+    cub_target = os.getenv('CUB_TARGET', 'cub3')
     print("launch target:", cub_target)
 
     home_directory="/home/cub/"

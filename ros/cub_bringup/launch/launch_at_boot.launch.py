@@ -8,15 +8,15 @@ from launch.substitutions import LaunchConfiguration, EnvironmentVariable
 import os
 
 def generate_launch_description():
-    cub_target = os.getenv('CUB_TARGET', 'cub2')
+    cub_target = os.getenv('CUB_TARGET', 'cub3')
     print("launch target:", cub_target)
 
     return LaunchDescription([
         IncludeLaunchDescription(
             PathJoinSubstitution(
-                [FindPackageShare("cub_bringup"), "launch", "hardware_cub2.launch.py"]
+                [FindPackageShare("cub_bringup"), "launch", "hardware_cub3.launch.py"]
             ),
-            condition=IfCondition("true" if cub_target == 'cub2' else "false")
+            condition=IfCondition("true" if cub_target == 'cub3' else "false")
         ),
         IncludeLaunchDescription(
             PathJoinSubstitution(
