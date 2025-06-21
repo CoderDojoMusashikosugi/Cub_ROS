@@ -50,6 +50,9 @@ qtcreator-*
 # Catkin custom files
 CATKIN_IGNORE
 
+# Colcon custom files
+COLCON_IGNORE
+
 .DS_store
 
 # docker env custom files
