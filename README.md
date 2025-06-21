@@ -1,11 +1,11 @@
 # Cub_ROS
 
 ## はじめに
-このレポジトリでは、つくばチャレンジのCoderDojo武蔵小杉チームが開発するCub2とmCub向けのソフトウェアを管理している。
+このレポジトリでは、つくばチャレンジのCoderDojo武蔵小杉チームが開発するCub3とmCub向けのソフトウェアを管理している。
 
 ## 使い方
 ### 開発環境の用意
-- Cub2またはmCubを用意
+- Cub3またはmCubを用意
   - UbuntuやWSLgやmacOS等、[ここのサポート環境](./docker/README.md)の項目にあるパソコンでも利用可能
 - このレポジトリをClone
   - `cd ~` (gitレポジトリをホームディレクトリ直下へ配置することを前提に解説するが、他のディレクトリでも問題ない)
@@ -17,12 +17,12 @@
     - `./docker/install.sh`
     - 環境によってはインストール出来ない。その場合は自力で。
     - 再起動の指示が出たら、再起動して`cd ~/Cub_ROS`に自力で帰り、次の手順を続ける。この項目の最後の再起動でまとめてやっても大丈夫。
-  - **Cub2の場合** Cub2向けデバイス設定をインストール
+  - **Cub3の場合** Cub3向けデバイス設定をインストール
     - `./scripts/install_host_settings.sh`
   - **mCubの場合** mCub向けデバイス設定をインストール
     - `./scripts/mcub_host_settings.sh`
 - 設定
-  - **Cub2の場合** target.envを`CUB_TARGET=cub2`にする (デフォルトでそうなっているので基本的には対応不要)
+  - **Cub3の場合** target.envを`CUB_TARGET=cub3`にする (デフォルトでそうなっているので基本的には対応不要)
   - **mCubの場合** target.envを`CUB_TARGET=mCub`にする。**ここ変更しないとmCubで立ち上がらないので注意**。
 - 再起動する
   - 再起動後`cd ~/Cub_ROS`に返ってくるのをお忘れなく。
@@ -31,7 +31,7 @@
 - [m5atom/README.md](m5atom/README.md)の内容の通りにM5 Atomにプログラムを書き込む。
 
 ### 開発・実行環境に入る
-- Cub2やmCubをGUI操作可能な画面を用意し、そこでターミナルを立ち上げて`./run.sh`を実行
+- Cub3やmCubをGUI操作可能な画面を用意し、そこでターミナルを立ち上げて`./run.sh`を実行
   - 言い換えれば、コンピュータ起動後最初の./run.shはssh経由でやらないほうが良い。やるとGUIにRViz等が出なくなってしまう。もしsshから初回起動してしまった場合は、一旦`exit`して`./stop.sh`の後再度`./run.sh`すべし。
     - こうなるのは、dockerコンテナを立ち上げた際の画面にGUIを出す設定となっているため。一度stopすると良いというのは、dockerコンテナを立ち下げる操作であるため。
     - MacはVNC環境側に画面を出すため、どこで起動しても大丈夫。
@@ -39,7 +39,7 @@
 - 完了したらDocker環境に入れる。
   - もしこのシェルを`exit`しても、コンテナ自体は立ち上がり続けている。再度`./run.sh`すれば再度入れる。
 - 他のターミナルを開いて同様に./run.shすればもっとシェルを増やせる。
-  - GUIのアプリをssh経由で立ち上げようとも、画面はCub2/mCub側に出る。
+  - GUIのアプリをssh経由で立ち上げようとも、画面はCub3/mCub側に出る。
 - 以降はこの./run.shまで実行されていることを前提に解説する。
 - RViz2(`rviz2`で起動する)等のGUIは基本的にはデスクトップ上に出るが、macでだけ出せないので代わりにwebブラウザから http://localhost:6080 にアクセスした先に出す。詳しくは[Tiryoh/docker-ros-desktop-vnc](https://github.com/Tiryoh/docker-ros-desktop-vnc)を参照。
 
@@ -61,13 +61,13 @@
   - これはcolcon buildごとに実行する必要は必ずしも無くて、パッケージ追加時やパッケージへのファイル追加時に実行すると吉。
 
 ### ロボットを起動する
-- **Cub2の場合** センサやアクチュエータを`ros2 launch cub_bringup hardware_cub2.launch.py`で立ち上げる
+- **Cub3の場合** センサやアクチュエータを`ros2 launch cub_bringup hardware_cub3.launch.py`で立ち上げる
   - これは通信系のプロセスを一度落とすと再度立ち上がらなくなるバグへの対応。一度起動したら、ロボットの電源を落とすまでずっと立ち上げておくことを推奨する。
 - **mCubの場合** センサやアクチュエータを`ros2 launch cub_bringup hardware_mcub.launch.py`で立ち上げる
   - これは通信系のプロセスを一度落とすと再度立ち上がらなくなるバグへの対応。一度起動したら、ロボットの電源を落とすまでずっと立ち上げておくことを推奨する。
-- Cub2/mCub向けのROS2ノードを実行する
+- Cub3/mCub向けのROS2ノードを実行する
   - `ros2 launch cub_bringup cub.launch.py`
-  - ここでCub2/mCubの選択が不要なのは、内部でtarget.envの値を見て仕分けているから(hardware_〇〇.launch.pyはまだこの仕組みを入れておらず・・・)
+  - ここでCub3/mCubの選択が不要なのは、内部でtarget.envの値を見て仕分けているから(hardware_〇〇.launch.pyはまだこの仕組みを入れておらず・・・)
 - ここまで実行すれば、DualSenseで操作が可能になっている
   - L2(今はL1も同様の機能)を押しながら左スティック前後左右で、前後移動と左右回転ができる。
   - DualSenseの矢印ボタン上下で0.1m/sずつ最高速度の変更ができる。デフォルトでは1.2m/s。
