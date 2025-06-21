@@ -16,17 +16,18 @@
   - NVIDIAのGPUを搭載した環境では、NVIDIA Container Toolkitが有効であればCUDAが使える
 
 ### Dockerイメージの構造
-- ベースのイメージはnvidia/cuda
-- **Baseイメージ**(cub_ros_base)は、↑これにROS等必須のパッケージを追加して作成される
-- **(通常の)コンテナイメージ**(cub_ros)は、↑これに`ros`以下のパッケージが要求するaptパッケージや`docker/additional_pkgs.bash`でインストールするパッケージを追加したもの。通常はこれが起動される。
-  - ベースイメージが存在するのは、無いとadditional_pkgsを編集する度にROSまるごとインストールからやり直されて非常に時間がかかり面倒であったため。
-- **VNCイメージ**(cub_ros_vnc)は、↑これに[Tiryoh/docker-ros-desktop-vnc](https://github.com/Tiryoh/docker-ros-desktop-vnc)の機能を追加したもの。macOS環境ではこれが起動される。
-  - この構造がゆえ、additinal_pkgsを編集する度にVNCのインストールからやり直されて非常に時間がかかり面倒。mac以外の環境で動作確認してから作成するのがおすすめ。
-
-- Dockerイメージのタグは、「バージョン名_アーキテクチャ名」で付けられる。
-  - バージョン名は、その日の日時を秒まで入れたもの。数人程度なら同時に開発してても、さすがに秒までは被らないかなと思って・・・
+- ベースのイメージは設定ファイルで指定（nvidia/cudaまたはros:humble等）
+- **Baseイメージ**(例: cub3_ros_base, mcub_ros_base)は、↑これに必要に応じてROSや基本パッケージを追加して作成される
+- **(通常の)コンテナイメージ**(例: cub3_ros, mcub_ros)は、↑これに設定ファイルで指定された追加パッケージを追加したもの。通常はこれが起動される。
+  - ベースイメージが存在するのは、設定を編集する度にROSまるごとインストールからやり直されて非常に時間がかかり面倒であったため。
+- **VNCイメージ**(例: cub3_ros_vnc, mcub_ros_vnc)は、↑これに[Tiryoh/docker-ros-desktop-vnc](https://github.com/Tiryoh/docker-ros-desktop-vnc)の機能を追加したもの。macOS環境ではこれが起動される。
+  - VNCイメージのバージョンは通常イメージと同じものを使用する。
+- Dockerイメージのタグは、設定ファイル内の「IMAGE_VERSION_アーキテクチャ名」で付けられる。
+  - IMAGE_VERSIONは、./docker/build.shでビルド成功時にその日の日時を秒まで入れたものに自動更新される。
+  - BASE_IMAGE_VERSIONは、./docker/internal/base_build.shでベースイメージビルド成功時にのみ更新される。
   - アーキテクチャ名はarm64またはx86_64が入る。
-  - このタグ付けに特に深い意味は無いし、アーキテクチャごとにタグ分けなくて良い仕組みの活用や、日時基準の甘いID設定の撤廃等は時間があればやっても良さそう。
+  - VNCイメージは通常イメージと同じIMAGE_VERSIONを使用する。
+  - ./docker/build.shは既存のBASE_IMAGE_VERSIONを使用し、更新はしない。
 
 ### ファイル構造と簡単な説明
 - run.sh: 一度叩くだけで色々実行してDockerコンテナ内のbashを起動するスクリプト。
@@ -52,19 +53,18 @@
   - additional_pkgs.bash: dockerイメージにインストールしたいパッケージを書くなどに使う。build.shでイメージ生成時に実行される。
   - docker-compose.yml & docker-compose-common.yml: デバイスとの接続設定などに使う。commonに通常とVNCのコンテナの共通部分を書いて、差分をdocker-compose.ymlに書く。
   - .env: Docker向けの設定を記載する。今のところユーザー名しか書いてない。
-  - ver_base.env & ver_vnc.env & ver.env: 起動するDockerイメージのバージョンを保存する。
-  - Dockerfile & Dockerfile_vnc & Dockerfile.base: コンテナごとのDockerfile。追加したいものがあれば主にadditional_pkgs.bashに書けば良いため、あまり触る機会は無い。
+  - environment/: ロボット設定ごとの設定ファイル（*.conf）を配置。ベースイメージ、追加パッケージ、イメージ名、バージョン情報などを管理。
+  - Dockerfile & Dockerfile_vnc & Dockerfile.base: コンテナごとのDockerfile。追加したいものがあれば主に設定ファイルのADDITIONAL_PKGSに書けば良いため、あまり触る機会は無い。
   - install.sh: ホスト環境にDockerをインストールするスクリプト。無理そうなら諦めたり解説へのリンクを教えてくれたりする。
-  - build.sh: 現在の設定に従って新たなベースイメージを生成するスクリプト。additional_pkgs.bashを書き換えた場合などは、これを実行すると適用される。
+  - build.sh: 現在の設定に従って新たなメインイメージを生成するスクリプト。設定ファイルを変更した場合などは、これを実行すると適用される。ベースイメージのバージョンは更新しない。
   - login.sh: ghcr.ioにログインする。ログイン情報はホスト環境の~/.netrcに置かれたgithubのトークンを利用する。ここに正しい権限をつけたトークンを置く必要があるのには注意。
   - push.sh: dockerコンテナをghcr.ioにpushする。
-  - remove.sh: cub_ros_base/cub_ros/cub_ros_vncそれぞれで、最新以外のイメージを全部削除する。容量削減に効果的。最新というのはdocker imagesで上の方に来るものを差しているだけで、今実際レポジトリが指定するバージョンであるかを見てないのには注意。
+  - remove.sh: 設定に対応するイメージで、最新以外のイメージを全部削除する。容量削減に効果的。最新というのはdocker imagesで上の方に来るものを差しているだけで、今実際レポジトリが指定するバージョンであるかを見てないのには注意。
   - run.sh: ./run.shの実体。解説はその項目を参照。
   - stop.sh: ./stop.shの実体。解説はその項目を参照。
   - README.md: これ。
   - internal: Docker関係のスクリプトを置いているディレクトリ。この中のスクリプトを直接叩く機会はあまり無いと思う。稀に直接叩くものには★をつけた。
-    - ★base_build.sh: 現在の設定に従って新たなベースイメージを生成するスクリプト。これを使う機会は極めて少ないので、間違えて実行しないようにinternalに置いた。
-      - ./docker/build.shでは通常イメージしかビルドせず、ベースイメージはそのまま。ベースイメージから生成し直したい場合はこれを実行後に./docker/build.sh。
+    - ★base_build.sh: 現在の設定に従って新たなベースイメージを生成し、BASE_IMAGE_VERSIONを更新するスクリプト。
     - container_install_docker.sh: DockerイメージにDockerをインストールするためのスクリプト。今は意味がないがかつてDooDに使っていた。
     - container_install_prebuilt.sh: 主にaptで入らないROSパッケージのビルドをDocker Build中に実施するもの。変更を加える必要なければここに置くと便利。ARM向けのバイナリ無いシミュレータ等はここに置くと便利。
     - container_install_ros.sh: コンテナイメージにROSをインストールするスクリプト。
@@ -94,23 +94,44 @@
 
 ## 使い方
 ### Dockerコンテナに新しいaptパッケージを追加したい(ROSとは関係なく)
-1. docker/additional_pkgs.bash にインストールする命令を追加する。
+1. docker/environment/${CUB_TARGET}.conf のADDITIONAL_PKGSにインストールするパッケージを追加する。
 2. `./docker/build.sh`でコンテナを更新する
-3. これを共有するなら、docker/ver.envをgit commit & pushして、さらにdockerイメージも./docker/login.sh & ./docker/push.shでプッシュする。
+3. これを共有するなら、設定ファイルをgit commit & pushして、さらにdockerイメージも./docker/login.sh & ./docker/push.shでプッシュする。
    - ./docker/login.shについてはファイル構造の項目を参照
 
 ### DockerコンテナにROSノードで使用する新しいライブラリを追加したい
-実はadditinal_pkgs.bashを使わずとも実行可能、というかそれがおすすめ
+実は設定ファイルに追記せずとも実行可能、というかそれがおすすめ
 
 1. ROSパッケージのpackage.xmlに、使いたいライブラリを`<depend>`タグ等で指定する
 2. `./docker/build.sh`でコンテナを更新すると、内部でrosdepがパッケージが必要とするライブラリを探してインストールしてくれる
 3. あとはaptパッケージの項目と同じ
 
-インストールするパッケージのリストをadditional_pkgs.bashにだけ書くと、どのパッケージがどのライブラリを追加したがってるのか分からなくなる。こうしておくと対応付けが楽になる。
+インストールするパッケージのリストをADDITIONAL_PKGSにだけ書くと、どのパッケージがどのライブラリを追加したがってるのか分からなくなる。こうしておくと対応付けが楽になる。
 
 ### Dockerコンテナに予めビルド済みのパッケージを追加したい
 micro_rosの追加の際に必要になった機能
 
 1. docker/internal/container_install_prebuilt.sh にインストールする司令を追加する
 2. あとはaptパッケージの項目と同じ
+
+### ロボット設定を新しく追加したい
+1. docker/environment/に新しい設定ファイル（例: new_robot.conf）を作成する
+2. 設定ファイルに以下を記述：
+   ```
+   ros_package_exclusive=(
+   "必要なパッケージ名"
+   )
+   
+   ros_package_disable=(
+   "不要なパッケージ名"
+   )
+   
+   BASE_IMAGE=使用するベースイメージ
+   ADDITIONAL_PKGS="追加パッケージ"
+   IMAGE_NAME=イメージ名
+   IMAGE_VERSION=初期バージョン
+   BASE_IMAGE_VERSION=初期ベースバージョン
+   ```
+3. target.envでCUB_TARGET=new_robotに設定
+4. ./docker/build.shでイメージをビルド
 

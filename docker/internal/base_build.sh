@@ -7,16 +7,24 @@ set -e
 ./stop.sh
 
 source docker/internal/docker_util.sh
+docker/internal/colcon_ignore.sh
 
+UPDATE_VERSION=false
 if [ ${1:-update} != "stay" ]; then
-    export VER_BASE=`date "+%Y%m%d_%H%M%S"`
-    echo The tag name will be ${VER_BASE}.
+    export CONFIG_BASE_IMAGE_VERSION=`date "+%Y%m%d_%H%M%S"`
+    echo The tag name will be ${CONFIG_BASE_IMAGE_VERSION}.
+    UPDATE_VERSION=true
 fi
 
 $docker_compose build cub_ros_base
 
-if [ ${1:-update} != "stay" ]; then
-    echo VER_BASE=$VER_BASE > docker/ver_base.env
-    cat docker/ver_base.env
-    echo The tag name is ${VER_BASE}.
+# Update version only after successful build
+if [ "$UPDATE_VERSION" = true ]; then
+    # Source config_utils.sh to get access to update functions
+    source docker/internal/config_utils.sh
+    
+    # Update BASE_IMAGE_VERSION for all configs that share the same IMAGE_NAME and BASE_IMAGE
+    update_shared_base_versions "$CUB_TARGET" "$CONFIG_BASE_IMAGE_VERSION"
+    
+    echo "Base build successful! Updated BASE_IMAGE_VERSION to ${CONFIG_BASE_IMAGE_VERSION} for all configs sharing the same image configuration"
 fi

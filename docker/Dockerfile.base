@@ -1,4 +1,5 @@
-FROM nvidia/cuda:12.2.2-cudnn8-devel-ubuntu22.04
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
 
 LABEL org.opencontainers.image.source=https://github.com/CoderDojoMusashikosugi/Cub_ROS
 
@@ -6,13 +7,17 @@ COPY docker/internal/container_install_ros.sh /install_ros.sh
 COPY docker/internal/container_install_prebuilt.sh /install_prebuilt.sh
 COPY docker/internal/container_install_docker.sh /install_docker.sh
 
-RUN sed -i.bak -e "s/http:\/\/ports\.ubuntu\.com/http:\/\/jp\.ports\.ubuntu\.com/g" /etc/apt/sources.list && \
-    sed -i.bak -e "s/http:\/\/archive\.ubuntu\.com/http:\/\/jp\.archive\.ubuntu\.com/g" /etc/apt/sources.list && \
+# Install additional packages based on the base image
+ARG NEEDS_ROS_INSTALL=true
+RUN sed -i.bak -e "s/http:\/\/ports\.ubuntu\.com/http:\/\/jp\.ports\.ubuntu\.com/g" /etc/apt/sources.list 2>/dev/null || true && \
+    sed -i.bak -e "s/http:\/\/archive\.ubuntu\.com/http:\/\/jp\.archive\.ubuntu\.com/g" /etc/apt/sources.list 2>/dev/null || true && \
     apt update && \
-    apt -y install sudo vim x11-apps net-tools iputils-ping terminator screen neovim tmux && \
-    /install_ros.sh && \
-    rosdep init && \
-    rosdep update --rosdistro=humble && \
+    apt -y install sudo vim x11-apps net-tools iputils-ping terminator screen neovim tmux emacs && \
+    /install_ros.sh "$NEEDS_ROS_INSTALL" && \
+    if [ "$NEEDS_ROS_INSTALL" = "true" ]; then \
+        rosdep init && \
+        rosdep update --rosdistro=humble; \
+    fi && \
     /install_prebuilt.sh && \
     /install_docker.sh && \
     rm -rf /var/lib/apt/lists/

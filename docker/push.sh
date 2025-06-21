@@ -5,6 +5,10 @@
 set -e
 
 source docker/internal/docker_util.sh
+
+echo "Pushing images for target: $CUB_TARGET"
+echo "Image name: $CONFIG_IMAGE_NAME"
+
 $docker_compose push cub_ros_base
 $docker_compose push cub_ros
 

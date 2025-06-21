@@ -7,12 +7,9 @@ set -e
 
 source docker/internal/docker_util.sh
 
-if [ ${1:-update} != "stay" ]; then
-    export VER_VNC=`date "+%Y%m%d_%H%M%S"`
-fi
+echo "Building VNC image for target: $CUB_TARGET"
+echo "VNC image will use same version as main image: $CONFIG_IMAGE_VERSION"
 
 $docker_compose build cub_ros_vnc
 
-if [ ${1:-update} != "stay" ]; then
-    echo VER_VNC=$VER_VNC > docker/ver_vnc.env
-fi
+echo "VNC build successful! VNC image version matches main image: ${CONFIG_IMAGE_VERSION}"

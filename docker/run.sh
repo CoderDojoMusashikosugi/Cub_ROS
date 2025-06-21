@@ -21,9 +21,14 @@ if [ -n "$container_list" ]; then # コンテナ起動していた場合、そ�
     IDEAL_CUB_TARGET="CUB_TARGET=$IDEAL_CUB_TARGET"
 
     # 実行中のイメージ名が設定のイメージ名と合ってなければ落とす用の情報収集
-    RUNNING_IMAGE_NAME=`docker inspect --format='{{.Config.Image}}' cub_ros` || true
-    IDEAL_VER=`source ./docker/ver.env && echo $VER`
-    IDEAL_IMAGE_NAME=ghcr.io/coderdojomusashikosugi/cub_ros:${IDEAL_VER}_${ARCH}
+    # VNC環境かどうかに応じて適切なコンテナ名を使用
+    if [ $USE_VNC_ENV -eq 0 ]; then
+        RUNNING_IMAGE_NAME=`docker inspect --format='{{.Config.Image}}' cub_ros 2>/dev/null` || true
+        IDEAL_IMAGE_NAME=ghcr.io/coderdojomusashikosugi/${CONFIG_IMAGE_NAME}:${CONFIG_IMAGE_VERSION}_${ARCH}
+    else
+        RUNNING_IMAGE_NAME=`docker inspect --format='{{.Config.Image}}' cub_ros_vnc 2>/dev/null` || true
+        IDEAL_IMAGE_NAME=ghcr.io/coderdojomusashikosugi/${CONFIG_IMAGE_NAME}_vnc:${CONFIG_IMAGE_VERSION}_${ARCH}
+    fi
 
     if [ $IDEAL_CUB_TARGET != $RUNNING_CUB_TARGET ]; then
         # CUB_TARGETがコンテナ内外で同じ設定でなければ落とす

@@ -6,9 +6,10 @@ x-template: &cub_ros_common_setting # デフォルト設定。この値は下に
     network: host
     dockerfile: docker/Dockerfile
     args:
-      - BASE_IMAGE_NAME=ghcr.io/coderdojomusashikosugi/cub_ros_base:${VER_BASE:-latest}_${ARCH:-default}
-  image: ghcr.io/coderdojomusashikosugi/cub_ros:${VER:-latest}_${ARCH:-default} # dockerにイメージ名:タグ名を付ける
-  container_name: cub_ros      # コンテナ名を付ける
+      - BASE_IMAGE_NAME=ghcr.io/coderdojomusashikosugi/${CONFIG_IMAGE_NAME:-cub_ros}_base:${CONFIG_BASE_IMAGE_VERSION:-latest}_${ARCH:-default}
+      - ADDITIONAL_PKGS=${CONFIG_ADDITIONAL_PKGS:-}
+  image: ghcr.io/coderdojomusashikosugi/${CONFIG_IMAGE_NAME:-cub_ros}:${CONFIG_IMAGE_VERSION:-latest}_${ARCH:-default} # dockerにイメージ名:タグ名を付ける
+  container_name: ${CONFIG_IMAGE_NAME:-cub_ros}      # コンテナ名を付ける
   hostname: docker             # ホスト名を付ける。内部のシェルを起動した際のプロンプトに影響する。
   stdin_open: true             # docker compose upでコンテナ立ち上げっぱなしにする用
   tty: true                    # docker compose upでコンテナ立ち上げっぱなしにする用
@@ -56,5 +57,8 @@ services:
       context: ..
       dockerfile: docker/Dockerfile.base
       network: host
+      args:
+        - BASE_IMAGE=${CONFIG_BASE_IMAGE:-nvidia/cuda:12.2.2-cudnn8-devel-ubuntu22.04}
+        - NEEDS_ROS_INSTALL=${CONFIG_NEEDS_ROS_INSTALL:-true}
     network_mode: "none"
-    image: ghcr.io/coderdojomusashikosugi/cub_ros_base:${VER_BASE:-latest}_${ARCH:-default} # dockerにイメージ名:タグ名を付ける
+    image: ghcr.io/coderdojomusashikosugi/${CONFIG_IMAGE_NAME:-cub_ros}_base:${CONFIG_BASE_IMAGE_VERSION:-latest}_${ARCH:-default} # dockerにイメージ名:タグ名を付ける

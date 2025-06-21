@@ -1,5 +1,22 @@
 
-docker_compose="docker compose -f docker/docker-compose-common.yml -f docker/docker-compose.yml --env-file docker/.env --env-file docker/ver.env --env-file docker/ver_base.env --env-file docker/ver_vnc.env --env-file target.env"
+#!/bin/bash
+
+# Load configuration utilities
+source docker/internal/config_utils.sh
+
+# Load target environment and configuration
+if [ -f "target.env" ]; then
+    source target.env
+    if ! load_config "$CUB_TARGET"; then
+        echo "Failed to load configuration for target: $CUB_TARGET"
+        exit 1
+    fi
+else
+    echo "target.env not found"
+    exit 1
+fi
+
+docker_compose="docker compose -f docker/docker-compose-common.yml -f docker/docker-compose.yml --env-file docker/.env --env-file target.env"
 
 # アーキテクチャを確認
 UNAME_M=`uname -m`

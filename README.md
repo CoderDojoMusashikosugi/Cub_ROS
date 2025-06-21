@@ -23,7 +23,8 @@
     - `./scripts/mcub_host_settings.sh`
 - 設定
   - **Cub3の場合** target.envを`CUB_TARGET=cub3`にする (デフォルトでそうなっているので基本的には対応不要)
-  - **mCubの場合** target.envを`CUB_TARGET=mCub`にする。**ここ変更しないとmCubで立ち上がらないので注意**。
+  - **mCubの場合** target.envを`CUB_TARGET=mcub`にする。**ここ変更しないとmCubで立ち上がらないので注意**。
+  - 各ロボットの設定は`./docker/environment/`内の設定ファイルで管理される。
 - 再起動する
   - 再起動後`cd ~/Cub_ROS`に返ってくるのをお忘れなく。
 
@@ -61,13 +62,11 @@
   - これはcolcon buildごとに実行する必要は必ずしも無くて、パッケージ追加時やパッケージへのファイル追加時に実行すると吉。
 
 ### ロボットを起動する
-- **Cub3の場合** センサやアクチュエータを`ros2 launch cub_bringup hardware_cub3.launch.py`で立ち上げる
-  - これは通信系のプロセスを一度落とすと再度立ち上がらなくなるバグへの対応。一度起動したら、ロボットの電源を落とすまでずっと立ち上げておくことを推奨する。
-- **mCubの場合** センサやアクチュエータを`ros2 launch cub_bringup hardware_mcub.launch.py`で立ち上げる
-  - これは通信系のプロセスを一度落とすと再度立ち上がらなくなるバグへの対応。一度起動したら、ロボットの電源を落とすまでずっと立ち上げておくことを推奨する。
+- センサやアクチュエータを`ros2 launch cub_bringup launch_at_boot.launch.py`で立ち上げる
+  - これはロボットの起動と共に自動で起動させるはずのもの。起動自体の設定をしていない場合はこの通りに手動で実行する。
+  - ロボット自体の電源を落とすまで開きっぱなしがおすすめ。
 - Cub3/mCub向けのROS2ノードを実行する
   - `ros2 launch cub_bringup cub.launch.py`
-  - ここでCub3/mCubの選択が不要なのは、内部でtarget.envの値を見て仕分けているから(hardware_〇〇.launch.pyはまだこの仕組みを入れておらず・・・)
 - ここまで実行すれば、DualSenseで操作が可能になっている
   - L2(今はL1も同様の機能)を押しながら左スティック前後左右で、前後移動と左右回転ができる。
   - DualSenseの矢印ボタン上下で0.1m/sずつ最高速度の変更ができる。デフォルトでは1.2m/s。

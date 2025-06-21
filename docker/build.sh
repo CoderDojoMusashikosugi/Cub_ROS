@@ -1,32 +1,56 @@
 #!/bin/bash
-# additional_pkgs.bash への変更をdockerイメージに反映するために実行するスクリプト
+# configuration-based docker image builder
 
 set -e
 
 ./stop.sh
 
 source docker/internal/docker_util.sh
+docker/internal/colcon_ignore.sh
 
+UPDATE_VERSION=false
 if [ ${1:-update} != "stay" ]; then
-    export VER=`date "+%Y%m%d_%H%M%S"`
-    export VER_VNC=`date "+%Y%m%d_%H%M%S"`
+    # Generate version based on current timestamp for main image only
+    export CONFIG_IMAGE_VERSION=`date "+%Y%m%d_%H%M%S"`
+    # Use existing base image version from config file
+    # CONFIG_BASE_IMAGE_VERSION is already loaded from config_utils.sh
+    UPDATE_VERSION=true
 fi
 
 git submodule update --init --recursive # 使うパッケージを全部取得しておく。rosdepでソースパッケージを見るので。
 
-$docker_compose up cub_ros_base --no-start # buildじゃなくてupなのは、一旦pull出来ないか確認するため
+echo "Building images for target: $CUB_TARGET"
+echo "Base image: $CONFIG_BASE_IMAGE"
+echo "Image name: $CONFIG_IMAGE_NAME"
+echo "Additional packages: $CONFIG_ADDITIONAL_PKGS"
+echo "Needs ROS install: $CONFIG_NEEDS_ROS_INSTALL"
+
+echo "Trying to pull base image: ghcr.io/coderdojomusashikosugi/${CONFIG_IMAGE_NAME}_base:${CONFIG_BASE_IMAGE_VERSION}_${ARCH}"
+if ! $docker_compose up cub_ros_base --no-start; then
+    echo "Base image pull failed. Base image will be built automatically when building main image."
+fi
 $docker_compose down cub_ros_base # buildじゃないのでコンテナ出来ちゃうから、終わったら落としておく
 
+echo "Building main image: ${CONFIG_IMAGE_NAME}"
 $docker_compose build cub_ros
-if [ ${1:-update} != "stay" ]; then
-    echo VER=$VER > docker/ver.env
-fi
 
 if [ $USE_VNC_ENV -eq 0 ]; then # 通常のイメージ
     echo "skip building VNC image"
 else # VNC対応イメージ
     $docker_compose build cub_ros_vnc
-    if [ ${1:-update} != "stay" ]; then
-        echo VER_VNC=$VER_VNC > docker/ver_vnc.env
-    fi
+fi
+
+# Update version only after successful build
+if [ "$UPDATE_VERSION" = true ]; then
+    # Source config_utils.sh to get access to update functions
+    source docker/internal/config_utils.sh
+    
+    # Update IMAGE_VERSION for all configs that share the same IMAGE_NAME
+    update_shared_image_versions "$CUB_TARGET" "$CONFIG_IMAGE_VERSION"
+    
+    # Note: Base image version is only updated by base_build.sh
+    # build.sh uses existing base image version and doesn't update it
+    
+    echo "Build successful! Updated IMAGE_VERSION to $CONFIG_IMAGE_VERSION for all configs sharing the same IMAGE_NAME"
+    echo "  BASE_IMAGE_VERSION: $CONFIG_BASE_IMAGE_VERSION (unchanged)"
 fi

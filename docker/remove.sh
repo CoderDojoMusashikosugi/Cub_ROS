@@ -1,31 +1,44 @@
 #!/bin/bash
-# cub_rosと名のつくイメージ&名前のないイメージを全削除する。
+# 設定に基づくイメージ&名前のないイメージを削除する。
 # ただし、念のために手元でビルドした最新版だけは保持する
 
+source docker/internal/docker_util.sh
 
-# 最新のcub_rosイメージを検索
-images=`docker images ghcr.io/coderdojomusashikosugi/cub_ros -q`
-latest_image=`echo $images | awk '{print $1}'`
+echo "Removing old images for: $CONFIG_IMAGE_NAME"
 
-# 最新のcub_rosイメージ以外を削除
-if [ -n "$latest_image" ]; then
-    docker rmi -f `docker images ghcr.io/coderdojomusashikosugi/cub_ros --filter "before=$latest_image" -q`
-fi
+# Function to remove old images for a given image pattern
+remove_old_images() {
+    local image_pattern=$1
+    echo "Processing: $image_pattern"
+    
+    # 最新のイメージを検索
+    images=`docker images $image_pattern -q`
+    latest_image=`echo $images | awk '{print $1}'`
+    
+    # 最新のイメージ以外を削除
+    if [ -n "$latest_image" ]; then
+        old_images=`docker images $image_pattern --filter "before=$latest_image" -q`
+        if [ -n "$old_images" ]; then
+            echo "Removing old images for $image_pattern"
+            docker rmi -f $old_images
+        else
+            echo "No old images found for $image_pattern"
+        fi
+    else
+        echo "No images found for $image_pattern"
+    fi
+}
 
-# 最新のcub_ros_baseイメージを検索
-images=`docker images ghcr.io/coderdojomusashikosugi/cub_ros_base -q`
-latest_image=`echo $images | awk '{print $1}'`
+# Remove old images for current configuration
+remove_old_images "ghcr.io/coderdojomusashikosugi/${CONFIG_IMAGE_NAME}"
+remove_old_images "ghcr.io/coderdojomusashikosugi/${CONFIG_IMAGE_NAME}_base"
+remove_old_images "ghcr.io/coderdojomusashikosugi/${CONFIG_IMAGE_NAME}_vnc"
 
-# 最新のcub_ros_baseイメージ以外を削除
-if [ -n "$latest_image" ]; then
-    docker rmi -f `docker images ghcr.io/coderdojomusashikosugi/cub_ros_base --filter "before=$latest_image" -q`
-fi
-
-# 最新のcub_ros_vncイメージを検索
-images=`docker images ghcr.io/coderdojomusashikosugi/cub_ros_vnc -q`
-latest_image=`echo $images | awk '{print $1}'`
-
-# 最新のcub_ros_vncイメージ以外を削除
-if [ -n "$latest_image" ]; then
-    docker rmi -f `docker images ghcr.io/coderdojomusashikosugi/cub_ros_vnc --filter "before=$latest_image" -q`
+# Remove dangling images
+dangling_images=`docker images -f "dangling=true" -q`
+if [ -n "$dangling_images" ]; then
+    echo "Removing dangling images"
+    docker rmi -f $dangling_images
+else
+    echo "No dangling images found"
 fi

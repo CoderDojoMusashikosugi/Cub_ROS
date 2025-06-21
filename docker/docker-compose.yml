@@ -11,8 +11,8 @@ services:
     build:
       dockerfile: docker/Dockerfile_vnc
       args:
-        - BASE_IMAGE_NAME=ghcr.io/coderdojomusashikosugi/cub_ros:${VER:-latest}_${ARCH:-default}
-    image: ghcr.io/coderdojomusashikosugi/cub_ros_vnc:${VER_VNC:-latest}_${ARCH:-default}
+        - BASE_IMAGE_NAME=ghcr.io/coderdojomusashikosugi/${CONFIG_IMAGE_NAME:-cub_ros}:${CONFIG_IMAGE_VERSION:-latest}_${ARCH:-default}
+    image: ghcr.io/coderdojomusashikosugi/${CONFIG_IMAGE_NAME:-cub_ros}_vnc:${CONFIG_IMAGE_VERSION:-latest}_${ARCH:-default}
     network_mode: bridge           # hostだとnoVNCのサーバーが外からアクセスできないためbridgeに。Velodyneとか追加設定必要そう。
     ports:
       - "6080:80"    # VNC表示ページ用のポート
@@ -20,8 +20,8 @@ services:
     security_opt:
       - seccomp:unconfined # VNC環境用の設定
     shm_size: 512M
-    container_name: cub_ros_vnc        # コンテナ名を付ける
-    hostname: cub_ros_vnc          # ホスト名を付ける。内部のシェルを起動した際のプロンプトに影響する。
+    container_name: ${CONFIG_IMAGE_NAME:-cub_ros}_vnc        # コンテナ名を付ける
+    hostname: ${CONFIG_IMAGE_NAME:-cub_ros}_vnc          # ホスト名を付ける。内部のシェルを起動した際のプロンプトに影響する。
     entrypoint: /entrypoint_vnc.sh # コンテナ起動時に最初に実行されるスクリプトの設定
     environment:                   # コンテナ内で使う環境変数の設定
       - DISPLAY=:1                 # VNC環境向けの設定

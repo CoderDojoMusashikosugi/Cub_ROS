@@ -18,6 +18,13 @@ export CUDA_HOME=/usr/local/cuda
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda/lib64:/usr/local/cuda/extras/CUPTI/lib64
 export PATH=$PATH:$CUDA_HOME/bin
 
+# modify for Cub
+if [ ! -d /usr/local/cuda/lib64 ]; then
+    echo "this is no cuda env"
+	echo "skipping installation"
+    exit
+fi
+
 lsb_release -a
 echo "Kernel version $(uname -r)"
 sudo apt-get update
