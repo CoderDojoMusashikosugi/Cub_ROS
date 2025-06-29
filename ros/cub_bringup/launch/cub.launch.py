@@ -20,13 +20,13 @@ def generate_launch_description():
         ),
         IncludeLaunchDescription(
             PathJoinSubstitution(
-                [FindPackageShare("cub_bringup"), "launch", "target_cub3.launch.py"]
+                [FindPackageShare("cub_bringup"), "launch", "cub3" , "target_cub3.launch.py"]
             ),
             condition=IfCondition("true" if cub_target == 'cub3' else "false")
         ),
         IncludeLaunchDescription(
             PathJoinSubstitution(
-                [FindPackageShare("cub_bringup"), "launch", "target_mcub.launch.py"]
+                [FindPackageShare("cub_bringup"), "launch", "mcub" , "target_mcub.launch.py"]
             ),
             condition=IfCondition("true" if (cub_target == 'mcub' or cub_target == 'mcub_direct') else "false")
         ),
