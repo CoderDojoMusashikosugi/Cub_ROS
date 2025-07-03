@@ -28,22 +28,34 @@ def generate_launch_description():
 
     return LaunchDescription([
         Node(
-            package='nav2_map_server',
-            executable='map_server',
-            name='map_server',
-            output='screen',
-            respawn_delay=2.0,
-            parameters=[{'yaml_filename': map_yaml_file}],
-        ),#ros2 lifecycle set map_server configure && ros2 lifecycle set map_server activate
-        Node(
-            package='nav2_lifecycle_manager',
-            executable='lifecycle_manager',
-            name='lifecycle_manager',
-            output='screen',
-            emulate_tty=True,
-            parameters=[{'use_sim_time': False},
-                        {'autostart': True},
-                        {'node_names': ['map_server']}]
+            package='rviz2',
+            executable='rviz2',
+            name='rviz2',
+            arguments=['-d', rviz_config_dir],
+            output='screen'), #press g key to publish goal pose
+        
+        TimerAction(
+            period=3.0,
+            actions=[
+                Node(
+                    package='nav2_map_server',
+                    executable='map_server',
+                    name='map_server',
+                    output='screen',
+                    respawn_delay=2.0,
+                    parameters=[{'yaml_filename': map_yaml_file}],
+                ),#ros2 lifecycle set map_server configure && ros2 lifecycle set map_server activate
+                Node(
+                    package='nav2_lifecycle_manager',
+                    executable='lifecycle_manager',
+                    name='lifecycle_manager',
+                    output='screen',
+                    emulate_tty=True,
+                    parameters=[{'use_sim_time': False},
+                                {'autostart': True},
+                                {'node_names': ['map_server']}]
+                ),
+                ]
         ),
 
         TimerAction(period=1.0, actions=[Node(
@@ -60,10 +72,4 @@ def generate_launch_description():
             arguments=['0','0','0','0','0','0','1','map','base_link']
         ),
 
-        Node(
-            package='rviz2',
-            executable='rviz2',
-            name='rviz2',
-            arguments=['-d', rviz_config_dir],
-            output='screen'), #press g key to publish goal pose
     ])

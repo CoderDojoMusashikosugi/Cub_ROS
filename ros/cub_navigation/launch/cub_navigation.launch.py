@@ -49,9 +49,11 @@ def generate_launch_description():
             'param',
             param_file_name))
     
-    cub_launch_costmap_dir = os.path.join(get_package_share_directory('cub_navigation'), "launch")
+    cub_navigation_launch_dir = os.path.join(get_package_share_directory('cub_navigation'), "launch")
 
     nav2_launch_file_dir = os.path.join(get_package_share_directory('nav2_bringup'), 'launch')
+
+    collison_monitor_launch_file_dir = os.path.join(get_package_share_directory('nav2_collision_monitor'), 'launch')
 
     rviz_config_dir = os.path.join(
         get_package_share_directory('nav2_bringup'),
@@ -86,14 +88,22 @@ def generate_launch_description():
             description='Use simulation (Gazebo) clock if true'),
 
         IncludeLaunchDescription(
-            PythonLaunchDescriptionSource([nav2_launch_file_dir, '/bringup_launch.py']),
-            launch_arguments={
-                'map': map_dir,
-                'use_sim_time': use_sim_time,
-                'params_file': param_dir}.items(),
+            PythonLaunchDescriptionSource([cub_navigation_launch_dir, '/bringup_launch.py']),
+            launch_arguments=[
+                ('map', map_dir),
+                ('use_sim_time', use_sim_time),
+                ('params_file', param_dir)
+            ],
+        ),
+
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource([collison_monitor_launch_file_dir, '/collision_monitor_node.launch.py']),
+            launch_arguments=[
+                ('use_sim_time', use_sim_time),
+            ],
         ),
 
         
         TimerAction(period=5.0, actions=[IncludeLaunchDescription(
-            PythonLaunchDescriptionSource([cub_launch_costmap_dir, '/cub_costmapfilter.launch.py']),)]),
+            PythonLaunchDescriptionSource([cub_navigation_launch_dir, '/cub_costmapfilter.launch.py']),)]),
     ])
