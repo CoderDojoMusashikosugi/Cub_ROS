@@ -17,7 +17,7 @@ load_config() {
     # Export variables for use in other scripts
     export CONFIG_BASE_IMAGE="$BASE_IMAGE"
     export CONFIG_ADDITIONAL_PKGS="$ADDITIONAL_PKGS"
-    export CONFIG_IMAGE_NAME="$IMAGE_NAME"
+    export CONFIG_IMAGE_TYPE="$IMAGE_TYPE"
     export CONFIG_IMAGE_VERSION="$IMAGE_VERSION"
     export CONFIG_BASE_IMAGE_VERSION="${BASE_IMAGE_VERSION:-$IMAGE_VERSION}"
     
@@ -35,7 +35,7 @@ load_config() {
 get_unified_image_name() {
     local target=$1
     load_config "$target"
-    echo "$CONFIG_IMAGE_NAME"
+    echo "$CONFIG_IMAGE_TYPE"
 }
 
 # Get the base image tag suffix
@@ -61,12 +61,12 @@ targets_share_image() {
     local target2=$2
     
     load_config "$target1"
-    local image1="$CONFIG_IMAGE_NAME"
+    local image1="$CONFIG_IMAGE_TYPE"
     local base1="$CONFIG_BASE_IMAGE"
     local pkgs1="$CONFIG_ADDITIONAL_PKGS"
     
     load_config "$target2"
-    local image2="$CONFIG_IMAGE_NAME"
+    local image2="$CONFIG_IMAGE_TYPE"
     local base2="$CONFIG_BASE_IMAGE"
     local pkgs2="$CONFIG_ADDITIONAL_PKGS"
     
@@ -77,16 +77,16 @@ targets_share_image() {
     fi
 }
 
-# Update IMAGE_VERSION for all config files that share the same IMAGE_NAME
+# Update IMAGE_VERSION for all config files that share the same IMAGE_TYPE
 update_shared_image_versions() {
     local target_config=$1
     local new_version=$2
     
-    # Load the current target's config to get IMAGE_NAME
+    # Load the current target's config to get IMAGE_TYPE
     load_config "$target_config"
-    local target_image_name="$CONFIG_IMAGE_NAME"
+    local target_image_type="$CONFIG_IMAGE_TYPE"
     
-    echo "Updating IMAGE_VERSION to $new_version for all configs with IMAGE_NAME=$target_image_name"
+    echo "Updating IMAGE_VERSION to $new_version for all configs with IMAGE_TYPE=$target_image_type"
     
     # Find all config files in the environment directory
     for config_file in docker/environment/*.conf; do
@@ -94,11 +94,11 @@ update_shared_image_versions() {
             # Extract the config name from the file path
             local config_name=$(basename "$config_file" .conf)
             
-            # Load this config to check its IMAGE_NAME
+            # Load this config to check its IMAGE_TYPE
             load_config "$config_name"
             
-            # If IMAGE_NAME matches, update the IMAGE_VERSION
-            if [ "$CONFIG_IMAGE_NAME" = "$target_image_name" ]; then
+            # If IMAGE_TYPE matches, update the IMAGE_VERSION
+            if [ "$CONFIG_IMAGE_TYPE" = "$target_image_type" ]; then
                 echo "  Updating $config_file"
                 sed -i "s/^IMAGE_VERSION=.*/IMAGE_VERSION=${new_version}/" "$config_file"
             fi
@@ -106,17 +106,17 @@ update_shared_image_versions() {
     done
 }
 
-# Update BASE_IMAGE_VERSION for all config files that share the same IMAGE_NAME and BASE_IMAGE
+# Update BASE_IMAGE_VERSION for all config files that share the same IMAGE_TYPE and BASE_IMAGE
 update_shared_base_versions() {
     local target_config=$1
     local new_version=$2
     
-    # Load the current target's config to get IMAGE_NAME and BASE_IMAGE
+    # Load the current target's config to get IMAGE_TYPE and BASE_IMAGE
     load_config "$target_config"
-    local target_image_name="$CONFIG_IMAGE_NAME"
+    local target_image_type="$CONFIG_IMAGE_TYPE"
     local target_base_image="$CONFIG_BASE_IMAGE"
     
-    echo "Updating BASE_IMAGE_VERSION to $new_version for all configs with IMAGE_NAME=$target_image_name and BASE_IMAGE=$target_base_image"
+    echo "Updating BASE_IMAGE_VERSION to $new_version for all configs with IMAGE_TYPE=$target_image_type and BASE_IMAGE=$target_base_image"
     
     # Find all config files in the environment directory
     for config_file in docker/environment/*.conf; do
@@ -124,11 +124,11 @@ update_shared_base_versions() {
             # Extract the config name from the file path
             local config_name=$(basename "$config_file" .conf)
             
-            # Load this config to check its IMAGE_NAME and BASE_IMAGE
+            # Load this config to check its IMAGE_TYPE and BASE_IMAGE
             load_config "$config_name"
             
-            # If IMAGE_NAME and BASE_IMAGE match, update the BASE_IMAGE_VERSION
-            if [ "$CONFIG_IMAGE_NAME" = "$target_image_name" ] && [ "$CONFIG_BASE_IMAGE" = "$target_base_image" ]; then
+            # If IMAGE_TYPE and BASE_IMAGE match, update the BASE_IMAGE_VERSION
+            if [ "$CONFIG_IMAGE_TYPE" = "$target_image_type" ] && [ "$CONFIG_BASE_IMAGE" = "$target_base_image" ]; then
                 echo "  Updating $config_file"
                 # Check if BASE_IMAGE_VERSION exists in the config file
                 if grep -q "^BASE_IMAGE_VERSION=" "$config_file"; then

@@ -24,10 +24,10 @@ if [ -n "$container_list" ]; then # コンテナ起動していた場合、そ�
     # VNC環境かどうかに応じて適切なコンテナ名を使用
     if [ $USE_VNC_ENV -eq 0 ]; then
         RUNNING_IMAGE_NAME=`docker inspect --format='{{.Config.Image}}' cub_ros 2>/dev/null` || true
-        IDEAL_IMAGE_NAME=ghcr.io/coderdojomusashikosugi/${CONFIG_IMAGE_NAME}:${CONFIG_IMAGE_VERSION}_${ARCH}
+        IDEAL_IMAGE_NAME=ghcr.io/coderdojomusashikosugi/cub_ros:${CONFIG_IMAGE_VERSION}_${CONFIG_IMAGE_TYPE}_${ARCH}
     else
         RUNNING_IMAGE_NAME=`docker inspect --format='{{.Config.Image}}' cub_ros_vnc 2>/dev/null` || true
-        IDEAL_IMAGE_NAME=ghcr.io/coderdojomusashikosugi/${CONFIG_IMAGE_NAME}_vnc:${CONFIG_IMAGE_VERSION}_${ARCH}
+        IDEAL_IMAGE_NAME=ghcr.io/coderdojomusashikosugi/cub_ros_vnc:${CONFIG_IMAGE_VERSION}_${CONFIG_IMAGE_TYPE}_${ARCH}
     fi
 
     if [ $IDEAL_CUB_TARGET != $RUNNING_CUB_TARGET ]; then

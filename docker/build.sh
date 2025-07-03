@@ -21,11 +21,11 @@ git submodule update --init --recursive # 使うパッケージを全部取得�
 
 echo "Building images for target: $CUB_TARGET"
 echo "Base image: $CONFIG_BASE_IMAGE"
-echo "Image name: $CONFIG_IMAGE_NAME"
+echo "Image type: $CONFIG_IMAGE_TYPE"
 echo "Additional packages: $CONFIG_ADDITIONAL_PKGS"
 echo "Needs ROS install: $CONFIG_NEEDS_ROS_INSTALL"
 
-echo "Trying to pull base image: ghcr.io/coderdojomusashikosugi/${CONFIG_IMAGE_NAME}_base:${CONFIG_BASE_IMAGE_VERSION}_${ARCH}"
+echo "Trying to pull base image: ghcr.io/coderdojomusashikosugi/cub_ros_base:${CONFIG_BASE_IMAGE_VERSION}_${CONFIG_IMAGE_TYPE}_${ARCH}"
 if ! $docker_compose up cub_ros_base --no-start; then
     echo "Base image pull failed. Base image will be built automatically when building main image."
 fi

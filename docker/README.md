@@ -128,9 +128,9 @@ micro_rosの追加の際に必要になった機能
    
    BASE_IMAGE=使用するベースイメージ
    ADDITIONAL_PKGS="追加パッケージ"
-   IMAGE_NAME=イメージ名
-   IMAGE_VERSION=初期バージョン
-   BASE_IMAGE_VERSION=初期ベースバージョン
+   IMAGE_TYPE=イメージ種類(mcubとmcub_direct等、設定は違うが使うイメージが一緒の環境向け)
+   IMAGE_VERSION=イメージのバージョン
+   BASE_IMAGE_VERSION=利用するベースイメージのバージョン
    ```
 3. target.envでCUB_TARGET=new_robotに設定
 4. ./docker/build.shでイメージをビルド
