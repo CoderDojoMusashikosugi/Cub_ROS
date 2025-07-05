@@ -116,7 +116,7 @@ if ! shopt -oq posix; then
   fi
 fi
 
-source /opt/ros/humble/setup.bash
+source /opt/ros/jazzy/setup.bash
 source /prebuilt_ws/install/local_setup.bash
 source ~/colcon_ws/install/setup.bash
 source ~/.user_config.bash
@@ -132,3 +132,4 @@ cbs(){
   cd - > /dev/null 2>&1
 }
 source /usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash
+source /opt/ros/jazzy/setup.bash

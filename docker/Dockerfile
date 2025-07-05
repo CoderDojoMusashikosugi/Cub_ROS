@@ -12,7 +12,7 @@ ARG ADDITIONAL_PKGS=""
 RUN --mount=type=bind,source=ros/,dst=/ros \
     apt update && \
     apt -y install $ADDITIONAL_PKGS && \
-    . /opt/ros/humble/setup.sh && \
+    . /opt/ros/jazzy/setup.sh && \
     rosdep install -i -y --from-paths /ros
 
 # Install editting tool of Behavior Tree

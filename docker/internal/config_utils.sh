@@ -100,7 +100,7 @@ update_shared_image_versions() {
             # If IMAGE_TYPE matches, update the IMAGE_VERSION
             if [ "$CONFIG_IMAGE_TYPE" = "$target_image_type" ]; then
                 echo "  Updating $config_file"
-                sed -i "s/^IMAGE_VERSION=.*/IMAGE_VERSION=${new_version}/" "$config_file"
+                sed -i '' "s/^IMAGE_VERSION=.*/IMAGE_VERSION=${new_version}/" "$config_file"
             fi
         fi
     done
@@ -133,7 +133,7 @@ update_shared_base_versions() {
                 # Check if BASE_IMAGE_VERSION exists in the config file
                 if grep -q "^BASE_IMAGE_VERSION=" "$config_file"; then
                     # Update existing BASE_IMAGE_VERSION
-                    sed -i "s/^BASE_IMAGE_VERSION=.*/BASE_IMAGE_VERSION=${new_version}/" "$config_file"
+                    sed -i '' "s/^BASE_IMAGE_VERSION=.*/BASE_IMAGE_VERSION=${new_version}/" "$config_file"
                 else
                     # Add BASE_IMAGE_VERSION if it doesn't exist
                     echo "BASE_IMAGE_VERSION=${new_version}" >> "$config_file"

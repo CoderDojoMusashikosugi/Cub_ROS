@@ -16,7 +16,7 @@ RUN sed -i.bak -e "s/http:\/\/ports\.ubuntu\.com/http:\/\/jp\.ports\.ubuntu\.com
     /install_ros.sh "$NEEDS_ROS_INSTALL" && \
     if [ "$NEEDS_ROS_INSTALL" = "true" ]; then \
         rosdep init && \
-        rosdep update --rosdistro=humble; \
+        rosdep update --rosdistro=jazzy; \
     fi && \
     /install_prebuilt.sh && \
     /install_docker.sh && \

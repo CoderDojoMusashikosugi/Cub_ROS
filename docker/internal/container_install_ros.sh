@@ -16,8 +16,8 @@ if [ "$NEEDS_ROS_INSTALL" = "true" ]; then
     apt update
     apt upgrade
 
-    apt -y install ros-humble-desktop
+    apt -y install ros-jazzy-desktop
 else
     echo "ROS is already installed in base image, skipping apt source setup..."
 fi
-apt -y install ros-humble-foxglove-bridge ros-dev-tools
+apt -y install ros-jazzy-foxglove-bridge ros-dev-tools

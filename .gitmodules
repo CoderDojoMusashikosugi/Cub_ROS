@@ -28,3 +28,10 @@
 [submodule "ros/ros2-ublox-zedf9p"]
 	path = ros/ros2-ublox-zedf9p
 	url = https://github.com/nobu323/ros2-ublox-zedf9p.git
+[submodule "ros/cxd5602pwbimu_ros2_driver"]
+	path = ros/cxd5602pwbimu_ros2_driver
+	url = https://github.com/NITKK-ROS-Team/cxd5602pwbimu_ros2_driver
+[submodule "ros/h6x_serial_interface"]
+	path = ros/h6x_serial_interface
+	url = https://github.com/HarvestX/h6x_serial_interface.git
+	branch = humble
