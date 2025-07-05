@@ -1,4 +1,4 @@
-ARG BASE_IMAGE_NAME
+ARG BASE_IMAGE_NAME=ghcr.io/coderdojomusashikosugi/cub_ros:latest_default_default
 
 FROM ${BASE_IMAGE_NAME}
 
