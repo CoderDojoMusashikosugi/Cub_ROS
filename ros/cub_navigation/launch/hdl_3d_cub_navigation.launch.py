@@ -42,12 +42,10 @@ def generate_launch_description():
     else:
         param_file_name = 'cub3_nav2_3d.yaml'
 
-    param_dir = LaunchConfiguration(
-        'params_file',
-        default=os.path.join(
-            get_package_share_directory('cub_navigation'),
-            'param',
-            param_file_name))
+    cub_nav_params_default_path = os.path.join(
+        get_package_share_directory('cub_navigation'),
+        'param',
+        param_file_name)
 
     nav2_launch_file_dir = os.path.join(get_package_share_directory('cub_navigation'), 'launch')
 
@@ -61,6 +59,7 @@ def generate_launch_description():
             PythonLaunchDescriptionSource([os.path.join(get_package_share_directory('hdl_localization'), 'launch'), '/hdl_localization.launch.py']),
             launch_arguments={
                 'globalmap_pcd': "/home/cub/rosbag/musashikosugi_indoor.pcd",
+                'params_file': os.path.join(get_package_share_directory('hdl_localization'), 'param', 'hdl_localization.yaml')
             }.items()
         ),
 
@@ -75,7 +74,7 @@ def generate_launch_description():
 
         DeclareLaunchArgument(
             'params_file',
-            default_value=param_dir,
+            default_value=cub_nav_params_default_path,
             description='Full path to param file to load'),
 
         DeclareLaunchArgument(
@@ -88,7 +87,7 @@ def generate_launch_description():
             launch_arguments={
                 'map': map_dir,
                 'use_sim_time': use_sim_time,
-                'params_file': param_dir,
+                'params_file': cub_nav_params_default_path,
                 'use_localization': 'False'}.items(),
         ),
 
