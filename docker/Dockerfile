@@ -8,7 +8,7 @@ RUN mkdir /build_temp && cd /build_temp && mv /libuvc_installation.sh ./ && \
     sudo ./libuvc_installation.sh 
 
 # Install additional packages specified in configuration
-ARG ADDITIONAL_PKGS="ros-humble-pointcloud-to-laserscan"
+ARG ADDITIONAL_PKGS=""
 RUN --mount=type=bind,source=ros/,dst=/ros \
     apt update && \
     apt -y install $ADDITIONAL_PKGS && \
