@@ -1,0 +1,9 @@
+image: musakosumap.pgm
+resolution: 0.05
+origin:
+- -42.09773635864258
+- -8.012033462524414
+- 0.0
+negate: 0
+occupied_thresh: 0.65
+free_thresh: 0.25
