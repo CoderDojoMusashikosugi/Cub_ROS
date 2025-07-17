@@ -24,7 +24,6 @@ from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
-from launch.actions import TimerAction
 
 # TURTLEBOT3_MODEL = os.environ['TURTLEBOT3_MODEL']
 
@@ -33,25 +32,22 @@ def generate_launch_description():
     use_sim_time = LaunchConfiguration('use_sim_time', default='false')
     map_dir = LaunchConfiguration(
         'map',
-        default = "/home/cub/maps/oudanhodoumade/mapoudanhodoumade_manual_crean.yaml")
+        default="/home/cub/support_tools/pcd_slicer/map_output/musakosumap.yaml")
+
     cub_target = os.getenv('CUB_TARGET', 'cub3')
     if cub_target == 'cub3':
-        param_file_name = 'cub3_nav2.yaml'
-    elif cub_target == 'mcub' or cub_target == 'mcub_direct':
-        param_file_name = 'mcub_tb3base.yaml'
+        param_file_name = 'cub3_nav2_3d.yaml'
+    elif cub_target == 'mcub':
+        param_file_name = 'mcub_nav2.yaml'
     else:
-        param_file_name = 'cub3_nav2.yaml'
+        param_file_name = 'cub3_nav2_3d.yaml'
 
-    param_dir = LaunchConfiguration(
-        'params_file',
-        default=os.path.join(
-            get_package_share_directory('cub_navigation'),
-            'param',
-            param_file_name))
-    
-    cub_launch_costmap_dir = os.path.join(get_package_share_directory('cub_navigation'), "launch")
+    cub_nav_params_default_path = os.path.join(
+        get_package_share_directory('cub_navigation'),
+        'param',
+        param_file_name)
 
-    nav2_launch_file_dir = os.path.join(get_package_share_directory('nav2_bringup'), 'launch')
+    nav2_launch_file_dir = os.path.join(get_package_share_directory('cub_navigation'), 'launch')
 
     rviz_config_dir = os.path.join(
         get_package_share_directory('nav2_bringup'),
@@ -59,17 +55,18 @@ def generate_launch_description():
         'nav2_default_view.rviz')
 
     return LaunchDescription([
-        Node(
-            package='rviz2',
-            executable='rviz2',
-            name='rviz2',
-            arguments=['-d', rviz_config_dir],
-            parameters=[{'use_sim_time': use_sim_time}],
-            output='screen'),
-        Node(
-            package='cub_bringup',
-            executable='odom_to_tf',
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource([os.path.join(get_package_share_directory('hdl_localization'), 'launch'), '/hdl_localization.launch.py']),
+            launch_arguments={
+                'globalmap_pcd': "/home/cub/rosbag/musashikosugi_indoor.pcd",
+                'params_file': os.path.join(get_package_share_directory('hdl_localization'), 'param', 'hdl_localization.yaml')
+            }.items()
         ),
+
+        # Node(
+        #     package='cub_bringup',
+        #     executable='odom_to_tf',
+        # ),
         DeclareLaunchArgument(
             'map',
             default_value=map_dir,
@@ -77,7 +74,7 @@ def generate_launch_description():
 
         DeclareLaunchArgument(
             'params_file',
-            default_value=param_dir,
+            default_value=cub_nav_params_default_path,
             description='Full path to param file to load'),
 
         DeclareLaunchArgument(
@@ -86,14 +83,37 @@ def generate_launch_description():
             description='Use simulation (Gazebo) clock if true'),
 
         IncludeLaunchDescription(
-            PythonLaunchDescriptionSource([nav2_launch_file_dir, '/bringup_launch.py']),
+            PythonLaunchDescriptionSource([nav2_launch_file_dir, '/nav2_bringup_launch.py']),
             launch_arguments={
                 'map': map_dir,
                 'use_sim_time': use_sim_time,
-                'params_file': param_dir}.items(),
+                'params_file': cub_nav_params_default_path,
+                'use_localization': 'False'}.items(),
         ),
 
-        
-        TimerAction(period=5.0, actions=[IncludeLaunchDescription(
-            PythonLaunchDescriptionSource([cub_launch_costmap_dir, '/cub_costmapfilter.launch.py']),)]),
+        Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        arguments=['0','0','0','0','0','0','1','map','odom']
+        ),
+
+        Node(
+            package='cub_behavior_tree',
+            executable='waypoint_navigator',
+            arguments=["/home/cub/colcon_ws/src/cub/cub_behavior_tree/routes/3d_waypoints.yaml"]
+            # arguments=["/home/cub/colcon_ws/src/cub/cub_behavior_tree/routes/2d_waypoints.yaml"]
+        ),
+        Node(
+            package='cub_navigation',
+            executable='waypoint_visualizer'
+        ),
+
+
+        Node(
+            package='rviz2',
+            executable='rviz2',
+            name='rviz2',
+            arguments=['-d', rviz_config_dir],
+            parameters=[{'use_sim_time': use_sim_time}],
+            output='screen'),
     ])

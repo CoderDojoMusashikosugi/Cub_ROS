@@ -28,3 +28,15 @@
 [submodule "ros/ros2-ublox-zedf9p"]
 	path = ros/ros2-ublox-zedf9p
 	url = https://github.com/nobu323/ros2-ublox-zedf9p.git
+[submodule "ros/hdl_localization"]
+	path = ros/hdl_localization
+	url = https://github.com/juchajam/hdl_localization.git
+[submodule "ros/ndt_omp"]
+	path = ros/ndt_omp
+	url = https://github.com/koide3/ndt_omp
+[submodule "ros/hdl_global_localization"]
+	path = ros/hdl_global_localization
+	url = https://github.com/koide3/hdl_global_localization
+[submodule "ros/fast_gicp"]
+	path = ros/fast_gicp
+	url = https://github.com/SMRT-AIST/fast_gicp
