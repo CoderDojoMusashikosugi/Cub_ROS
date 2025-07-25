@@ -9,7 +9,8 @@ COPY docker/internal/container_install_docker.sh /install_docker.sh
 
 # Install additional packages based on the base image
 ARG NEEDS_ROS_INSTALL=true
-RUN sed -i.bak -e "s/http:\/\/ports\.ubuntu\.com/http:\/\/jp\.ports\.ubuntu\.com/g" /etc/apt/sources.list 2>/dev/null || true && \
+RUN rm /etc/apt/sources.list.d/cuda.list && \
+    sed -i.bak -e "s/http:\/\/ports\.ubuntu\.com/http:\/\/jp\.ports\.ubuntu\.com/g" /etc/apt/sources.list 2>/dev/null || true && \
     sed -i.bak -e "s/http:\/\/archive\.ubuntu\.com/http:\/\/jp\.archive\.ubuntu\.com/g" /etc/apt/sources.list 2>/dev/null || true && \
     sed -i.bak -r 's@http://(jp\.)?archive\.ubuntu\.com/ubuntu/?@https://ftp.udx.icscoe.jp/Linux/ubuntu/@g' /etc/apt/sources.list && \
     apt update && \
