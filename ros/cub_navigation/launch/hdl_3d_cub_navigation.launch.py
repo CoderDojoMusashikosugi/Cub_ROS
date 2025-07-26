@@ -49,12 +49,22 @@ def generate_launch_description():
 
     nav2_launch_file_dir = os.path.join(get_package_share_directory('cub_navigation'), 'launch')
 
+    collison_monitor_launch_file_dir = os.path.join(get_package_share_directory('nav2_collision_monitor'), 'launch')
+
     rviz_config_dir = os.path.join(
         get_package_share_directory('nav2_bringup'),
         'rviz',
         'nav2_default_view.rviz')
 
     return LaunchDescription([
+        Node(
+            package='rviz2',
+            executable='rviz2',
+            name='rviz2',
+            arguments=['-d', rviz_config_dir],
+            parameters=[{'use_sim_time': use_sim_time}],
+            output='screen'),
+
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource([os.path.join(get_package_share_directory('hdl_localization'), 'launch'), '/hdl_localization.launch.py']),
             launch_arguments={
@@ -91,6 +101,13 @@ def generate_launch_description():
                 'use_localization': 'False'}.items(),
         ),
 
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource([collison_monitor_launch_file_dir, '/collision_monitor_node.launch.py']),
+            launch_arguments=[
+                ('use_sim_time', use_sim_time),
+            ],
+        ),
+
         Node(
         package='tf2_ros',
         executable='static_transform_publisher',
@@ -107,13 +124,4 @@ def generate_launch_description():
             package='cub_navigation',
             executable='waypoint_visualizer'
         ),
-
-
-        Node(
-            package='rviz2',
-            executable='rviz2',
-            name='rviz2',
-            arguments=['-d', rviz_config_dir],
-            parameters=[{'use_sim_time': use_sim_time}],
-            output='screen'),
     ])
