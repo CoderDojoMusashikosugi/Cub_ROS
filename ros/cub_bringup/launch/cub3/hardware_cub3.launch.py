@@ -140,8 +140,8 @@ def generate_launch_description():
 
 
         # グループアクション
-        # slc_L_group,
-        # slc_R_group,
+        slc_L_group,
+        slc_R_group,
 
         # GPS launch
         #gps_launch,
