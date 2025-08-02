@@ -64,3 +64,4 @@ COLCON_IGNORE
 !docker/home/colcon_ws/src/cub/.gitkeep
 !docker/home/rosbag/.gitkeep
 target.env
+ros/DynamixelSDK
