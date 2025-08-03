@@ -6,6 +6,7 @@ LABEL org.opencontainers.image.source=https://github.com/CoderDojoMusashikosugi/
 COPY docker/internal/container_install_ros.sh /install_ros.sh
 COPY docker/internal/container_install_prebuilt.sh /install_prebuilt.sh
 COPY docker/internal/container_install_docker.sh /install_docker.sh
+COPY docker/internal/container_install_rtklib.sh /install_rtklib.sh
 
 # Install additional packages based on the base image
 ARG NEEDS_ROS_INSTALL=true
@@ -21,4 +22,5 @@ RUN rm /etc/apt/sources.list.d/cuda.list && \
     fi && \
     /install_prebuilt.sh && \
     /install_docker.sh && \
+    /install_rtklib.sh && \
     rm -rf /var/lib/apt/lists/

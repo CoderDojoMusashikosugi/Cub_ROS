@@ -1,7 +1,7 @@
 from launch import LaunchDescription
 from ament_index_python.packages import get_package_share_directory
 from launch_ros.actions import Node
-from launch.actions import IncludeLaunchDescription
+from launch.actions import IncludeLaunchDescription, ExecuteProcess, TimerAction
 from launch.substitutions import PathJoinSubstitution
 from launch_ros.substitutions import FindPackageShare
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -15,6 +15,11 @@ def generate_launch_description():
     cub_target = os.getenv('CUB_TARGET', 'mcub')
     print("launch target:", cub_target)
 
+    cub_bringup_params_path = os.path.join(
+    get_package_share_directory('cub_bringup'),
+    'params')
+    zed_f9p_params = os.path.join(cub_bringup_params_path, 'zed_f9p.yaml')
+
     return LaunchDescription([
         Node(
             package='cub_commander',
@@ -27,6 +32,22 @@ def generate_launch_description():
             executable='joy_linux_node',
             parameters=[{'dev': joy_dev}],
         ),
+
+        # ExecuteProcess(
+        #     cmd=['str2str', '-in','ntrip://guest:guest@160.16.134.72:80/CQ-F9P','-out','serial://ttyGPS:230400'],
+        #     output='both',
+        # ),
+        # TimerAction( # str2strをublox_gpsより先に起動しておく必要がある。
+        #     period=5.0,
+        #     actions=[
+        #         Node(package='ublox_gps',
+        #             executable='ublox_gps_node',
+        #             output='both',
+        #             parameters=[zed_f9p_params]
+        #         ),
+        #     ]
+        # )
+
 
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource([
