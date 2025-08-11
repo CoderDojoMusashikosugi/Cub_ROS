@@ -40,3 +40,6 @@
 [submodule "ros/fast_gicp"]
 	path = ros/fast_gicp
 	url = https://github.com/SMRT-AIST/fast_gicp
+[submodule "ros/cxd5602pwbimu_localizer_node"]
+	path = ros/cxd5602pwbimu_localizer_node
+	url = https://github.com/nobu323/cxd5602pwbimu_localizer_node.git
