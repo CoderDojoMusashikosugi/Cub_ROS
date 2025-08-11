@@ -40,3 +40,6 @@
 [submodule "ros/cxd5602pwbimu_localizer_node"]
 	path = ros/cxd5602pwbimu_localizer_node
 	url = https://github.com/nobu323/cxd5602pwbimu_localizer_node.git
+[submodule "spresense/cxd5602pwbimu_localizer_arduino"]
+	path = spresense/cxd5602pwbimu_localizer_arduino
+	url = https://github.com/nobu323/cxd5602pwbimu_localizer_arduino.git
