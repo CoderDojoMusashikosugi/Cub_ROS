@@ -33,7 +33,7 @@
 	url = https://github.com/juchajam/hdl_localization.git
 [submodule "ros/ndt_omp"]
 	path = ros/ndt_omp
-	url = https://github.com/koide3/ndt_omp
+	url = https://github.com/nobu323/ndt_omp.git
 [submodule "ros/hdl_global_localization"]
 	path = ros/hdl_global_localization
 	url = https://github.com/koide3/hdl_global_localization
