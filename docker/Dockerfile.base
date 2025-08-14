@@ -12,6 +12,7 @@ ARG NEEDS_ROS_INSTALL=true
 RUN rm /etc/apt/sources.list.d/cuda.list && \
     sed -i.bak -e "s/http:\/\/ports\.ubuntu\.com/http:\/\/jp\.ports\.ubuntu\.com/g" /etc/apt/sources.list 2>/dev/null || true && \
     sed -i.bak -e "s/http:\/\/archive\.ubuntu\.com/http:\/\/jp\.archive\.ubuntu\.com/g" /etc/apt/sources.list 2>/dev/null || true && \
+    sed -i.bak -r 's@http://(jp\.)?archive\.ubuntu\.com/ubuntu/?@https://ftp.udx.icscoe.jp/Linux/ubuntu/@g' /etc/apt/sources.list && \
     apt update && \
     apt -y install sudo vim x11-apps net-tools iputils-ping terminator screen neovim tmux emacs && \
     /install_ros.sh "$NEEDS_ROS_INSTALL" && \
