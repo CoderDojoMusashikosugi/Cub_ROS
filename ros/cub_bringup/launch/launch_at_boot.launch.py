@@ -24,4 +24,10 @@ def generate_launch_description():
             ),
             condition=IfCondition("true" if (cub_target == 'mcub' or cub_target == 'mcub_direct') else "false")
         ),
+        IncludeLaunchDescription(
+            PathJoinSubstitution(
+                [FindPackageShare("cub_bringup"), "launch", "spidar" , "hardware_spidar.launch.py"]
+            ),
+            condition=IfCondition("true" if cub_target == 'spidar' else "false")
+        ),
     ])

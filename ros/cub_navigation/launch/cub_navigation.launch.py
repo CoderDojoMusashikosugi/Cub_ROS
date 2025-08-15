@@ -39,6 +39,8 @@ def generate_launch_description():
         param_file_name = 'cub3_nav2.yaml'
     elif cub_target == 'mcub' or cub_target == 'mcub_direct':
         param_file_name = 'mcub_tb3base.yaml'
+    elif cub_target == 'spidar':
+        param_file_name = 'spidar.yaml'
     else:
         param_file_name = 'cub3_nav2.yaml'
 
