@@ -8,10 +8,6 @@
 [submodule "ros/sllidar_ros2"]
 	path = ros/sllidar_ros2
 	url = https://github.com/nobu323/sllidar_ros2
-[submodule "ros/velodyne"]
-	path = ros/velodyne
-	url = https://github.com/ros-drivers/velodyne.git
-	branch = humble-devel
 [submodule "ros/nmea_navsat_driver"]
 	path = ros/nmea_navsat_driver
 	url = https://github.com/nobu323/nmea_navsat_driver.git
