@@ -5,13 +5,13 @@
   <link name="base_link">
      <visual>
       <geometry>
-        <mesh filename="file://$(find cub_description)/meshes/cub3.dae" scale="1 1 1"/>
+        <mesh filename="package://cub_description/meshes/cub3.dae" scale="1 1 1"/>
       </geometry>
       <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 1.57"/>
     </visual>
     <collision>
       <geometry>
-        <mesh filename="file://$(find cub_description)/meshes/cub3.dae" scale="1 1 1"/>
+        <mesh filename="package://cub_description/meshes/cub3.dae" scale="1 1 1"/>
       </geometry>
       <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
     </collision>
