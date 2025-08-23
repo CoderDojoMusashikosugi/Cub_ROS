@@ -42,7 +42,8 @@ def generate_launch_description():
             name='bno055',
             parameters=[{
                 'uart_port': "/dev/ttyBNO055",
-                'data_query_frequency': 100
+                'data_query_frequency': 100,
+                'frame_id':"imu_link"
             }],
             output='screen'
         ),
