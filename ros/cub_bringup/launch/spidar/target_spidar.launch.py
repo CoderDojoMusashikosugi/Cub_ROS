@@ -10,6 +10,15 @@ from launch_ros.actions import PushRosNamespace
 import os
 
 def generate_launch_description():
+    
+    urdf_file_name = 'spidar.urdf'
+    urdf = os.path.join(
+        get_package_share_directory('cub_description'),
+        'urdf',
+        urdf_file_name)
+    with open(urdf, 'r') as infp:
+        robot_desc = infp.read()
+
     # Launchファイルの返り値
     return LaunchDescription([
         # wheel_odometryノード
@@ -58,11 +67,11 @@ def generate_launch_description():
         ),
 
         # state_publisherの起動
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                PathJoinSubstitution(
-                    [FindPackageShare("cub_description"), "launch", "display.launch.py"]
-                )
-            )
-        ),
+        Node(
+            package='robot_state_publisher',
+            executable='robot_state_publisher',
+            name='robot_state_publisher',
+            output='screen',
+            parameters=[{'robot_description': robot_desc}],
+            arguments=[urdf]),
     ])
