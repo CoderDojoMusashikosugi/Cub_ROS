@@ -115,33 +115,21 @@ def generate_launch_description():
             arguments=["serial", "--dev", "/dev/ttyATOM", "-b", "115200", "-v6"]
         ),
 
-        # bno055ノード
-        # serialerror以外は通常通り動きます
+        # spresense IMUノード
         Node(
-            package='bno055',
-            executable='bno055',
-            name='bno055',
+            package='cxd5602pwbimu_localizer_node',
+            executable='localizer_node',
+            name='imu_localizer_node',
             parameters=[{
-                'uart_port': "/dev/ttyBNO055",
-                'data_query_frequency': 100,
-                'frame_id':"imu_link"
+                'serial_port': "/dev/ttyMULIMU",
+                'baud_rate': 1152000,
             }],
             output='screen'
         ),
-        # correction point cloud tilt
-        # Node(
-        #     package='cub_bringup',
-        #     executable='tilt_correction_node',
-        #     name='tilt_correction_node',
-        #     parameters=[{
-        #         'tilt_angle_degrees': 2.07
-        #     }],
-        # ),
-
 
         # グループアクション
-        # slc_L_group,
-        # slc_R_group,
+        slc_L_group,
+        slc_R_group,
 
         # GPS launch
         #gps_launch,

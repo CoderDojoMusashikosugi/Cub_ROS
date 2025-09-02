@@ -1,4 +1,3 @@
-# slamは切れるがlocalizationを切れない問題を解決するためnav2_bringupから持ってきた
 # Copyright (c) 2018 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -26,14 +25,14 @@ from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
 from launch_ros.actions import PushRosNamespace
 from launch_ros.descriptions import ParameterFile
-from nav2_common.launch import RewrittenYaml, ReplaceString
+from nav2_common.launch import ReplaceString, RewrittenYaml
 
 
 def generate_launch_description():
     # Get the launch directory
     bringup_dir = get_package_share_directory('nav2_bringup')
     launch_dir = os.path.join(bringup_dir, 'launch')
-    cub_navigation_launch_dir = os.path.join(get_package_share_directory('cub_navigation'), 'launch')
+    cub_navigation_launch_dir =  os.path.join(get_package_share_directory('cub_navigation'), 'launch')
 
     # Create the launch configuration variables
     namespace = LaunchConfiguration('namespace')
@@ -46,7 +45,6 @@ def generate_launch_description():
     use_composition = LaunchConfiguration('use_composition')
     use_respawn = LaunchConfiguration('use_respawn')
     log_level = LaunchConfiguration('log_level')
-    use_localization = LaunchConfiguration('use_localization')
 
     # Map fully qualified names to relative ones so the node's namespace can be prepended.
     # In case of the transforms (tf), currently, there doesn't seem to be a better alternative
@@ -145,7 +143,7 @@ def generate_launch_description():
 
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(os.path.join(launch_dir, 'slam_launch.py')),
-            condition=IfCondition(PythonExpression([slam, ' and ', use_localization])),
+            condition=IfCondition(slam),
             launch_arguments={'namespace': namespace,
                               'use_sim_time': use_sim_time,
                               'autostart': autostart,
@@ -155,7 +153,7 @@ def generate_launch_description():
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(os.path.join(launch_dir,
                                                        'localization_launch.py')),
-            condition=IfCondition(PythonExpression(['not ', slam, ' and ', use_localization])),
+            condition=IfCondition(PythonExpression(['not ', slam])),
             launch_arguments={'namespace': namespace,
                               'map': map_yaml_file,
                               'use_sim_time': use_sim_time,
@@ -164,28 +162,7 @@ def generate_launch_description():
                               'use_composition': use_composition,
                               'use_respawn': use_respawn,
                               'container_name': 'nav2_container'}.items()),
-        Node(
-            package='nav2_map_server',
-            executable='map_server',
-            name='map_server',
-            output='screen',
-            respawn=use_respawn,
-            respawn_delay=2.0,
-            parameters=[{'yaml_filename': map_yaml_file}],
-            arguments=['--ros-args', '--log-level', log_level],
-            condition=IfCondition(PythonExpression(['not ', use_localization])),
-            remappings=remappings),
-        Node(
-            package='nav2_lifecycle_manager',
-            executable='lifecycle_manager',
-            name='lifecycle_manager',
-            output='screen',
-            emulate_tty=True,
-            parameters=[{'use_sim_time': False},
-                        {'autostart': True},
-                        {'node_names': ['map_server']}]
-        ),
-        
+
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(os.path.join(cub_navigation_launch_dir, 'navigation_launch.py')),
             launch_arguments={'namespace': namespace,
@@ -195,6 +172,8 @@ def generate_launch_description():
                               'use_composition': use_composition,
                               'use_respawn': use_respawn,
                               'container_name': 'nav2_container'}.items()),
+
+        
     ])
 
     # Create the launch description and populate

@@ -31,7 +31,7 @@ public:
         "wheel_positions", best_effort, std::bind(&WheelOdometryNode::wheelPositionCallback, this, std::placeholders::_1));
 
         imu_subscription_ = this->create_subscription<sensor_msgs::msg::Imu>(
-            "/bno055/imu", 10, std::bind(&WheelOdometryNode::imu_callback, this, std::placeholders::_1));
+            "/imu/data", 10, std::bind(&WheelOdometryNode::imu_callback, this, std::placeholders::_1));
 
         // TFブロードキャスターの初期化
         // tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
