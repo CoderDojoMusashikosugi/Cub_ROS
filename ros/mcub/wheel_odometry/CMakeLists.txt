@@ -15,6 +15,8 @@ if(DEFINED ENV{CUB_TARGET})
         add_definitions(-DCUB_TARGET_MCUB)
     elseif($ENV{CUB_TARGET} STREQUAL "mcub_direct")
         add_definitions(-DCUB_TARGET_MCUB)
+    elseif($ENV{CUB_TARGET} STREQUAL "spidar")
+        add_definitions(-DCUB_TARGET_CUB3)
     else()
         message(WARNING "CUB_TARGET is set to an unknown value: $ENV{CUB_TARGET}")
         add_definitions(-DCUB_TARGET_CUB3) #何も設定されてなければCub3にしておく
