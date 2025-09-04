@@ -114,7 +114,7 @@ micro_rosの追加の際に必要になった機能
 1. docker/internal/container_install_prebuilt.sh にインストールする司令を追加する
 2. あとはaptパッケージの項目と同じ
 
-### ロボット設定を新しく追加したい
+### 新たな種類のロボットを追加したい
 1. docker/environment/に新しい設定ファイル（例: new_robot.conf）を作成する
 2. 設定ファイルに以下を記述：
    ```
@@ -128,10 +128,18 @@ micro_rosの追加の際に必要になった機能
    
    BASE_IMAGE=使用するベースイメージ
    ADDITIONAL_PKGS="追加パッケージ"
-   IMAGE_TYPE=イメージ種類(mcubとmcub_direct等、設定は違うが使うイメージが一緒の環境向け)
+   IMAGE_TYPE=イメージ種類(ここはファイル名と同じである必要あり)
    IMAGE_VERSION=イメージのバージョン
    BASE_IMAGE_VERSION=利用するベースイメージのバージョン
    ```
 3. target.envでCUB_TARGET=new_robotに設定
 4. ./docker/build.shでイメージをビルド
 
+### 新たな種類のロボットを追加したいけど、実際の所は既存とほぼ一緒
+1. docker/environment/に新しい設定ファイル（例: new_robot.conf）を作成する
+2. 設定ファイルに以下を追記
+   ```
+   source docker/environment/cub3.conf
+   ```
+3. target.envでCUB_TARGET=new_robotに設定
+4. 既存のイメージを再利用するためビルドの必要無し
