@@ -1,39 +1,21 @@
 [submodule "support_tools/dynamixel/DynamixelSDK"]
 	path = support_tools/dynamixel/DynamixelSDK
 	url = https://github.com/ROBOTIS-GIT/DynamixelSDK.git
-[submodule "ros/DynamixelSDK"]
-	path = ros/DynamixelSDK
-	url = https://github.com/ROBOTIS-GIT/DynamixelSDK.git
-	branch = humble-devel
 [submodule "ros/sllidar_ros2"]
 	path = ros/sllidar_ros2
 	url = https://github.com/nobu323/sllidar_ros2
-[submodule "ros/nmea_navsat_driver"]
-	path = ros/nmea_navsat_driver
-	url = https://github.com/nobu323/nmea_navsat_driver.git
-	branch = ros2
-[submodule "ros/bno055"]
-	path = ros/bno055
-	url = https://github.com/nobu323/bno055.git
 [submodule "ros/lidarslam_ros2"]
 	path = ros/lidarslam_ros2
 	url = https://github.com/rsasaki0109/lidarslam_ros2.git
 [submodule "ros/realsense-ros"]
 	path = ros/realsense-ros
 	url = https://github.com/nobu323/realsense-ros.git
-[submodule "ros/ros2-ublox-zedf9p"]
-	path = ros/ros2-ublox-zedf9p
-	url = https://github.com/nobu323/ros2-ublox-zedf9p.git
-
 [submodule "ros/ndt_omp"]
 	path = ros/ndt_omp
 	url = https://github.com/nobu323/ndt_omp.git
 [submodule "ros/hdl_global_localization"]
 	path = ros/hdl_global_localization
 	url = https://github.com/koide3/hdl_global_localization
-[submodule "ros/fast_gicp"]
-	path = ros/fast_gicp
-	url = https://github.com/SMRT-AIST/fast_gicp
 [submodule "ros/hdl_localization"]
 	path = ros/hdl_localization
 	url = https://github.com/nobu323/hdl_localization.git
