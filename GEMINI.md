@@ -6,12 +6,35 @@ ROS2 Humbleを利用した自律移動ロボットCubの制御ソフトウェア
 センサ情報をDockerコンテナ上のROS2ノードで処理し制御コマンドを生成、シリアル通信経由でM5 Atomに渡して車体を制御する。
 
 ## 主要なコマンド
-- Dockerコンテナを起動しコンテナに入る
-    - `./docker/run.sh`
 - ROS2のビルド(コンテナ内で実行)
     - `cb`
 - ROS2で単体のパッケージをビルド(コンテナ内で実行)
     - `cbs <package name>`
+
+## コンテナ内でのコマンド実行
+コンテナ内でのコマンド実行は、ホストから `docker/run_in_container.sh` スクリプトを利用して行います。  
+`ros2`コマンドは、この機能を利用してコンテナ中で実行する必要があります。  
+このスクリプトは、コンテナが停止している場合に自動で起動し、指定されたコマンドを実行します。`.bashrc`で定義されたエイリアス (`cb`, `cbs`など) も利用可能です。  
+
+コンテナ内のホームディレクトリ`/home/cub/`は、ホストの`./docker/home/`にボリュームマウントされています。  
+コンテナ内の`/home/cub/colcon_ws/src/cub/`は、ホストの`./ros/`にボリュームマウントされています。
+
+### 使い方
+```bash
+./docker/run_in_container.sh <コンテナ内で実行したいコマンド>
+```
+
+### 例
+```bash
+# パッケージを全てビルドする
+./docker/run_in_container.sh cb
+
+# パッケージを一つビルドする(この場合はcub_bringupを選択)
+./docker/run_in_container.sh cbs cub_bringup
+
+# コンテナ内のファイルをリストする
+./docker/run_in_container.sh ls -l
+```
 
 ## 技術スタック
 - 言語: C++, Python
