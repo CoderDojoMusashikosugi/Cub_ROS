@@ -13,7 +13,8 @@ RUN --mount=type=bind,source=ros/,dst=/ros \
     apt update && \
     apt -y install $ADDITIONAL_PKGS && \
     . /opt/ros/humble/setup.sh && \
-    rosdep install -i -y --from-paths /ros
+    . /prebuilt_ws/install/local_setup.bash && \
+    rosdep install -i --skip-keys micro_ros_agent -y --from-paths /ros
 
 # Install editting tool of Behavior Tree
 RUN cd /prebuilt_ws && apt -y install qtbase5-dev libqt5svg5-dev libzmq3-dev libdw-dev && \
