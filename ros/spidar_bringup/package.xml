@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>spidar_bringup</name>
+  <version>0.0.0</version>
+  <description>Bringup (hardware + runtime) launch files for SPIDAR platform.</description>
+  <maintainer email="cub@todo.todo">cub</maintainer>
+  <license>TODO: License declaration</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <exec_depend>micro_ros_agent</exec_depend>
+  <exec_depend>bno055</exec_depend>
+  <exec_depend>ublox_gps</exec_depend>
+  <exec_depend>pointcloud_to_laserscan</exec_depend>
+  <exec_depend>cub_bringup</exec_depend>
+  <exec_depend>cub_visualization</exec_depend>
+  <exec_depend>cub_description</exec_depend>
+  <exec_depend>robot_state_publisher</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

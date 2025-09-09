@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>cub3_bringup</name>
+  <version>0.0.0</version>
+  <description>Bringup (hardware + runtime) launch files for Cub3 platform.</description>
+  <maintainer email="cub@todo.todo">cub</maintainer>
+  <license>TODO: License declaration</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <exec_depend>micro_ros_agent</exec_depend>
+  <exec_depend>cxd5602pwbimu_localizer_node</exec_depend>
+  <exec_depend>velodyne_driver</exec_depend>
+  <exec_depend>velodyne_pointcloud</exec_depend>
+  <exec_depend>realsense2_camera</exec_depend>
+  <exec_depend>sllidar_ros2</exec_depend>
+  <exec_depend>ublox_gps</exec_depend>
+  <exec_depend>pointcloud_to_laserscan</exec_depend>
+  <exec_depend>cub_visualization</exec_depend>
+  <exec_depend>cub_description</exec_depend>
+  <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>cub_bringup</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
