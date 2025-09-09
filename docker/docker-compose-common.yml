@@ -20,7 +20,6 @@ x-template: &cub_ros_common_setting # デフォルト設定。この値は下に
   group_add: 
     - dialout                  # シリアルポートをsudo無しでアクセス可能にする
     - ${INPUT_GROUP_ID:-input} # joystickをsudo無しでアクセス可能にする
-    - docker                   # dockerコマンドをsudoなしでアクセス可能にする(dood)
     - plugdev
     - root                     # 上のmac版
     - video
