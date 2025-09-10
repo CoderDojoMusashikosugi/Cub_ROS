@@ -30,6 +30,17 @@ load_config() {
     
     return 0
 }
+# Portable sed -i wrapper: use GNU sed when available, otherwise use BSD-style with an empty backup suffix.
+safe_sed_inplace() {
+    local expr="$1"
+    local file="$2"
+    # If sed supports --version it's GNU sed; otherwise assume BSD sed (macOS)
+    if sed --version >/dev/null 2>&1; then
+        sed -i "$expr" "$file"
+    else
+        sed -i '' "$expr" "$file"
+    fi
+}
 
 # Get the base image tag suffix
 get_base_image_tag() {
@@ -58,7 +69,7 @@ get_conf_value() {
         echo "Error: Config file not found: $conf_file"
         return 1
     fi
-    
+
     # Use grep and cut to extract the value
     local value=$(grep "^${key}=" "$conf_file" | cut -d'=' -f2)
     
@@ -80,14 +91,19 @@ update_image_version() {
     local new_version=$2
     
     # Check if the config file exists
+
     if [ ! -f "$conf_file" ]; then
         echo "Error: Config file not found: $conf_file"
         return 1
     fi
     
-    # Use sed to update the IMAGE_VERSION
-    sed -i "s/^IMAGE_VERSION=.*/IMAGE_VERSION=${new_version}/" "$conf_file"
-    
+    # Use sed in a portable way via safe_sed_inplace; append if key doesn't exist
+    if grep -q "^IMAGE_VERSION=" "$conf_file"; then
+        safe_sed_inplace "s/^IMAGE_VERSION=.*/IMAGE_VERSION=${new_version}/" "$conf_file"
+    else
+        echo "IMAGE_VERSION=${new_version}" >> "$conf_file"
+    fi
+
     echo "Updated IMAGE_VERSION in $conf_file to $new_version"
 }
 
@@ -104,12 +120,12 @@ update_base_image_version() {
     
     # Check if BASE_IMAGE_VERSION exists
     if grep -q "^BASE_IMAGE_VERSION=" "$conf_file"; then
-        # Update existing BASE_IMAGE_VERSION
-        sed -i "s/^BASE_IMAGE_VERSION=.*/BASE_IMAGE_VERSION=${new_version}/" "$conf_file"
+        # Update existing BASE_IMAGE_VERSION using portable sed wrapper
+        safe_sed_inplace "s/^BASE_IMAGE_VERSION=.*/BASE_IMAGE_VERSION=${new_version}/" "$conf_file"
     else
         # Add BASE_IMAGE_VERSION if it doesn't exist
         echo "BASE_IMAGE_VERSION=${new_version}" >> "$conf_file"
     fi
-    
+
     echo "Updated BASE_IMAGE_VERSION in $conf_file to $new_version"
 }
