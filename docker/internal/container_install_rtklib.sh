@@ -8,3 +8,4 @@ make
 cd /RTKLIB/app/consapp
 make
 make install
+cd / && rm -rf /RTKLIB
