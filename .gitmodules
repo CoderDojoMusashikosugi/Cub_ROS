@@ -25,3 +25,7 @@
 [submodule "spresense/cxd5602pwbimu_localizer_arduino"]
 	path = spresense/cxd5602pwbimu_localizer_arduino
 	url = https://github.com/nobu323/cxd5602pwbimu_localizer_arduino.git
+[submodule "ros/livox_ros_driver2"]
+	path = ros/livox_ros_driver2
+	url = https://github.com/atinfinity/livox_ros_driver2.git
+	branch = humble
