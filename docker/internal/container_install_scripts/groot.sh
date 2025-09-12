@@ -1,4 +1,4 @@
-apt -y install qtbase5-dev libqt5svg5-dev libzmq3-dev libdw-dev
+apt -y install qtbase5-dev libqt5svg5-dev libzmq3-dev libdw-dev cmake
 git clone --recurse-submodules https://github.com/BehaviorTree/Groot.git
 cd Groot
 cmake -S . -B build
