@@ -4,8 +4,8 @@ from launch.actions import IncludeLaunchDescription
 from launch.substitutions import PathJoinSubstitution
 from launch_ros.substitutions import FindPackageShare
 from launch.conditions import IfCondition
-from launch.substitutions import LaunchConfiguration, EnvironmentVariable
 import os
+
 
 def generate_launch_description():
     cub_target = os.getenv('CUB_TARGET', 'cub3')
@@ -20,19 +20,19 @@ def generate_launch_description():
         ),
         IncludeLaunchDescription(
             PathJoinSubstitution(
-                [FindPackageShare("cub_bringup"), "launch", "cub3" , "target_cub3.launch.py"]
+                [FindPackageShare("cub3_bringup"), "launch", "cub.launch.py"]
             ),
             condition=IfCondition("true" if cub_target == 'cub3' else "false")
         ),
         IncludeLaunchDescription(
             PathJoinSubstitution(
-                [FindPackageShare("cub_bringup"), "launch", "mcub" , "target_mcub.launch.py"]
+                [FindPackageShare("mcub_bringup"), "launch", "cub.launch.py"]
             ),
             condition=IfCondition("true" if (cub_target == 'mcub' or cub_target == 'mcub_direct') else "false")
         ),
         IncludeLaunchDescription(
             PathJoinSubstitution(
-                [FindPackageShare("cub_bringup"), "launch", "spidar" , "target_spidar.launch.py"]
+                [FindPackageShare("spidar_bringup"), "launch", "cub.launch.py"]
             ),
             condition=IfCondition("true" if cub_target == 'spidar' else "false")
         ),

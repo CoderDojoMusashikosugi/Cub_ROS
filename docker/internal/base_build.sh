@@ -23,8 +23,8 @@ if [ "$UPDATE_VERSION" = true ]; then
     # Source config_utils.sh to get access to update functions
     source docker/internal/config_utils.sh
     
-    # Update BASE_IMAGE_VERSION for all configs that share the same IMAGE_NAME and BASE_IMAGE
-    update_shared_base_versions "$CUB_TARGET" "$CONFIG_BASE_IMAGE_VERSION"
+    # Update BASE_IMAGE_VERSION for the config file matching the IMAGE_TYPE
+    update_base_image_version "docker/environment/${CONFIG_IMAGE_TYPE}.conf" "$CONFIG_BASE_IMAGE_VERSION"
     
-    echo "Base build successful! Updated BASE_IMAGE_VERSION to ${CONFIG_BASE_IMAGE_VERSION} for all configs sharing the same image configuration"
+    echo "Base build successful! Updated BASE_IMAGE_VERSION to ${CONFIG_BASE_IMAGE_VERSION} for ${CONFIG_IMAGE_TYPE}.conf"
 fi

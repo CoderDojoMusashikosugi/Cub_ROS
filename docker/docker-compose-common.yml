@@ -20,7 +20,6 @@ x-template: &cub_ros_common_setting # デフォルト設定。この値は下に
   group_add: 
     - dialout                  # シリアルポートをsudo無しでアクセス可能にする
     - ${INPUT_GROUP_ID:-input} # joystickをsudo無しでアクセス可能にする
-    - docker                   # dockerコマンドをsudoなしでアクセス可能にする(dood)
     - plugdev
     - root                     # 上のmac版
     - video
@@ -59,6 +58,6 @@ services:
       network: host
       args:
         - BASE_IMAGE=${CONFIG_BASE_IMAGE:-nvidia/cuda:12.2.2-cudnn8-devel-ubuntu22.04}
-        - NEEDS_ROS_INSTALL=${CONFIG_NEEDS_ROS_INSTALL:-true}
+        - CONTAINER_INSTALL_SCRIPTS=${CONFIG_CONTAINER_INSTALL_SCRIPTS}
     network_mode: "none"
     image: ghcr.io/coderdojomusashikosugi/cub_ros_base:${CONFIG_BASE_IMAGE_VERSION:-latest}_${CONFIG_IMAGE_TYPE:-default}_${ARCH:-default} # dockerにイメージ名:タグ名を付ける

@@ -1,6 +1,6 @@
 from launch import LaunchDescription
 from launch_ros.actions import Node
-from launch.actions import IncludeLaunchDescription, GroupAction
+from launch.actions import IncludeLaunchDescription, GroupAction, ExecuteProcess
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import PathJoinSubstitution
 from launch_ros.substitutions import FindPackageShare
@@ -65,28 +65,26 @@ def generate_launch_description():
     )
     sllidar_R_launch_delayed = TimerAction(period=3.0, actions=[sllidar_R_launch])
     
-    # GPSのlaunchファイル
-    # gps_launch = IncludeLaunchDescription(
-    #     PythonLaunchDescriptionSource(
-    #         os.path.join(
-    #             FindPackageShare('nmea_navsat_driver').find('nmea_navsat_driver'),
-    #             'launch',
-    #             'nmea_serial_driver.launch.py'
-    #         )
-    #     )
-    # )
-    
-    ublox_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            os.path.join(
-                FindPackageShare('ublox_gps').find('ublox_gps'),
-                "launch",
-                "ublox_gps_node_zedf9p-launch.py"
-            )
-
-        )
+    cub_bringup_params_path = os.path.join(get_package_share_directory('cub3_bringup'),'config')
+    zed_f9p_params = os.path.join(cub_bringup_params_path, 'zed_f9p.yaml')
+    rtklib = ExecuteProcess(
+        cmd=['str2str', '-in','ntrip://guest:guest@160.16.134.72:80/CQ-F9P','-out','serial://ttyGPS:230400'],
+        output='both',
+        respawn=True,
+        respawn_delay=10.0
     )
-    ublox_launch_delayed = TimerAction(period=3.0, actions=[ublox_launch])
+    ublox_gps_delayed = TimerAction( # str2strをublox_gpsより先に起動しておく必要がある。
+        period=5.0,
+        actions=[
+            Node(package='ublox_gps',
+                executable='ublox_gps_node',
+                output='both',
+                parameters=[zed_f9p_params],
+                respawn=True,
+                respawn_delay=5.0
+            ),
+        ]
+    )
 
     realsense_launch=IncludeLaunchDescription(
         PythonLaunchDescriptionSource(os.path.join(realsense_launch_file_dir, "rs_launch.py")),
@@ -131,9 +129,9 @@ def generate_launch_description():
         slc_L_group,
         slc_R_group,
 
-        # GPS launch
-        #gps_launch,
-        # ublox_launch_delayed,
+        rtklib,
+        ublox_gps_delayed,
+
         velodyne_driver_node,
         velodyne_transform_node,
         realsense_launch,

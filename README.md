@@ -102,6 +102,12 @@
 ### その他便利機能
 - ストレージが一杯の時は
   - Dockerイメージがストレージを圧迫している場合は、`./docker/remove.sh`で最新の以外を削除できる。
+- コーディングエージェントを使うには
+  - 全体的には、コード生成はそのままやってくれる。コンテナ内でしか使えない機能をAIに操作してもらうために./docker/run_in_container.shを用意している。
+  - gemini-cli向けにはGEMINI.mdが配置されているので、これを読んで操作してもらう。
+  - github-copilot向けには.github/copilot-instructions.mdがある。実はGEMINI.mdへのシンボリックリンク。
+  - claude code向けにはCLAUDE.mdがある。実はGEMINI.mdへのシンボリックリンク。
+
 
 ## Dockerの技術情報
 [dockerディレクトリ内のREADME.md](./docker/README.md)を参照

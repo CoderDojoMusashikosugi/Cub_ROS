@@ -117,8 +117,13 @@ if ! shopt -oq posix; then
 fi
 
 source /opt/ros/humble/setup.bash
-source /prebuilt_ws/install/local_setup.bash
-source ~/colcon_ws/install/setup.bash
+if [ -f /prebuilt_ws/install/local_setup.bash ]; then
+    source /prebuilt_ws/install/local_setup.bash
+fi
+if [ -f ~/colcon_ws/install/setup.bash ]; then
+    source ~/colcon_ws/install/setup.bash
+fi
+
 source ~/.user_config.bash
 
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
@@ -126,9 +131,17 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
 alias ros='ros2'
 alias bashrc='source ~/.bashrc'
 alias cb="cd ~/colcon_ws && colcon build --symlink-install ; cd - > /dev/null 2>&1"
+alias cbj1="cd ~/colcon_ws && MAKEFLAGS="-j1" colcon build --symlink-install ; cd - > /dev/null 2>&1"
 cbs(){
   cd ~/colcon_ws
   colcon build --symlink-install --packages-select $1
   cd - > /dev/null 2>&1
 }
+cbsj1(){
+  cd ~/colcon_ws
+  MAKEFLAGS="-j1" colcon build --symlink-install --packages-select $1
+  cd - > /dev/null 2>&1
+}
 source /usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash
+
+export CMAKE_BUILD_TYPE=Release #for livox_ros_driver2

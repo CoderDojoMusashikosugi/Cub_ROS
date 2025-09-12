@@ -20,22 +20,27 @@ load_config() {
     export CONFIG_IMAGE_TYPE="$IMAGE_TYPE"
     export CONFIG_IMAGE_VERSION="$IMAGE_VERSION"
     export CONFIG_BASE_IMAGE_VERSION="${BASE_IMAGE_VERSION:-$IMAGE_VERSION}"
-    
-    # Determine if ROS installation is needed based on base image
-    if [[ "$BASE_IMAGE" == ros:* ]]; then
-        export CONFIG_NEEDS_ROS_INSTALL="false"
+
+    if declare -p container_install_scripts >/dev/null 2>&1; then
+        # スペース区切りに直列化（末尾スペース除去）
+        local _joined="$(printf '%s ' "${container_install_scripts[@]}")"
+        export CONFIG_CONTAINER_INSTALL_SCRIPTS="${_joined% }"
     else
-        export CONFIG_NEEDS_ROS_INSTALL="true"
+        export CONFIG_CONTAINER_INSTALL_SCRIPTS=""
     fi
     
     return 0
 }
-
-# Get the unified image name for similar configurations
-get_unified_image_name() {
-    local target=$1
-    load_config "$target"
-    echo "$CONFIG_IMAGE_TYPE"
+# Portable sed -i wrapper: use GNU sed when available, otherwise use BSD-style with an empty backup suffix.
+safe_sed_inplace() {
+    local expr="$1"
+    local file="$2"
+    # If sed supports --version it's GNU sed; otherwise assume BSD sed (macOS)
+    if sed --version >/dev/null 2>&1; then
+        sed -i "$expr" "$file"
+    else
+        sed -i '' "$expr" "$file"
+    fi
 }
 
 # Get the base image tag suffix
@@ -55,90 +60,73 @@ get_main_image_tag() {
     echo "${CONFIG_IMAGE_VERSION}_${ARCH}"
 }
 
-# Check if two targets share the same image configuration
-targets_share_image() {
-    local target1=$1
-    local target2=$2
+# Get a value for a specific key from a config file
+get_conf_value() {
+    local conf_file=$1
+    local key=$2
     
-    load_config "$target1"
-    local image1="$CONFIG_IMAGE_TYPE"
-    local base1="$CONFIG_BASE_IMAGE"
-    local pkgs1="$CONFIG_ADDITIONAL_PKGS"
-    
-    load_config "$target2"
-    local image2="$CONFIG_IMAGE_TYPE"
-    local base2="$CONFIG_BASE_IMAGE"
-    local pkgs2="$CONFIG_ADDITIONAL_PKGS"
-    
-    if [ "$image1" = "$image2" ] && [ "$base1" = "$base2" ] && [ "$pkgs1" = "$pkgs2" ]; then
-        return 0
-    else
+    # Check if the config file exists
+    if [ ! -f "$conf_file" ]; then
+        echo "Error: Config file not found: $conf_file"
         return 1
     fi
+
+    # Use grep and cut to extract the value
+    local value=$(grep "^${key}=" "$conf_file" | cut -d'=' -f2)
+    
+    # Remove leading/trailing quotes if they exist
+    value=$(echo "$value" | sed -e 's/^"//' -e 's/"$//')
+    
+    echo "$value"
 }
 
-# Update IMAGE_VERSION for all config files that share the same IMAGE_TYPE
-update_shared_image_versions() {
-    local target_config=$1
-    local new_version=$2
-    
-    # Load the current target's config to get IMAGE_TYPE
-    load_config "$target_config"
-    local target_image_type="$CONFIG_IMAGE_TYPE"
-    
-    echo "Updating IMAGE_VERSION to $new_version for all configs with IMAGE_TYPE=$target_image_type"
-    
-    # Find all config files in the environment directory
-    for config_file in docker/environment/*.conf; do
-        if [ -f "$config_file" ]; then
-            # Extract the config name from the file path
-            local config_name=$(basename "$config_file" .conf)
-            
-            # Load this config to check its IMAGE_TYPE
-            load_config "$config_name"
-            
-            # If IMAGE_TYPE matches, update the IMAGE_VERSION
-            if [ "$CONFIG_IMAGE_TYPE" = "$target_image_type" ]; then
-                echo "  Updating $config_file"
-                sed -i "s/^IMAGE_VERSION=.*/IMAGE_VERSION=${new_version}/" "$config_file"
-            fi
-        fi
-    done
+# Get IMAGE_VERSION from a config file
+get_image_version() {
+    local conf_file=$1
+    get_conf_value "$conf_file" "IMAGE_VERSION"
 }
 
-# Update BASE_IMAGE_VERSION for all config files that share the same IMAGE_TYPE and BASE_IMAGE
-update_shared_base_versions() {
-    local target_config=$1
+# Update IMAGE_VERSION in a config file
+update_image_version() {
+    local conf_file=$1
     local new_version=$2
     
-    # Load the current target's config to get IMAGE_TYPE and BASE_IMAGE
-    load_config "$target_config"
-    local target_image_type="$CONFIG_IMAGE_TYPE"
-    local target_base_image="$CONFIG_BASE_IMAGE"
+    # Check if the config file exists
+
+    if [ ! -f "$conf_file" ]; then
+        echo "Error: Config file not found: $conf_file"
+        return 1
+    fi
     
-    echo "Updating BASE_IMAGE_VERSION to $new_version for all configs with IMAGE_TYPE=$target_image_type and BASE_IMAGE=$target_base_image"
+    # Use sed in a portable way via safe_sed_inplace; append if key doesn't exist
+    if grep -q "^IMAGE_VERSION=" "$conf_file"; then
+        safe_sed_inplace "s/^IMAGE_VERSION=.*/IMAGE_VERSION=${new_version}/" "$conf_file"
+    else
+        echo "IMAGE_VERSION=${new_version}" >> "$conf_file"
+    fi
+
+    echo "Updated IMAGE_VERSION in $conf_file to $new_version"
+}
+
+# Update BASE_IMAGE_VERSION in a config file
+update_base_image_version() {
+    local conf_file=$1
+    local new_version=$2
     
-    # Find all config files in the environment directory
-    for config_file in docker/environment/*.conf; do
-        if [ -f "$config_file" ]; then
-            # Extract the config name from the file path
-            local config_name=$(basename "$config_file" .conf)
-            
-            # Load this config to check its IMAGE_TYPE and BASE_IMAGE
-            load_config "$config_name"
-            
-            # If IMAGE_TYPE and BASE_IMAGE match, update the BASE_IMAGE_VERSION
-            if [ "$CONFIG_IMAGE_TYPE" = "$target_image_type" ] && [ "$CONFIG_BASE_IMAGE" = "$target_base_image" ]; then
-                echo "  Updating $config_file"
-                # Check if BASE_IMAGE_VERSION exists in the config file
-                if grep -q "^BASE_IMAGE_VERSION=" "$config_file"; then
-                    # Update existing BASE_IMAGE_VERSION
-                    sed -i "s/^BASE_IMAGE_VERSION=.*/BASE_IMAGE_VERSION=${new_version}/" "$config_file"
-                else
-                    # Add BASE_IMAGE_VERSION if it doesn't exist
-                    echo "BASE_IMAGE_VERSION=${new_version}" >> "$config_file"
-                fi
-            fi
-        fi
-    done
+    # Check if the config file exists
+    if [ ! -f "$conf_file" ]; then
+        echo "Error: Config file not found: $conf_file"
+        return 1
+    fi
+    
+    # Check if BASE_IMAGE_VERSION exists
+    if grep -q "^BASE_IMAGE_VERSION=" "$conf_file"; then
+        # Update existing BASE_IMAGE_VERSION using portable sed wrapper
+        safe_sed_inplace "s/^BASE_IMAGE_VERSION=.*/BASE_IMAGE_VERSION=${new_version}/" "$conf_file"
+    else
+        # Add BASE_IMAGE_VERSION if it doesn't exist
+        echo "BASE_IMAGE_VERSION=${new_version}" >> "$conf_file"
+    fi
+
+    echo "Updated BASE_IMAGE_VERSION in $conf_file to $new_version"
 }

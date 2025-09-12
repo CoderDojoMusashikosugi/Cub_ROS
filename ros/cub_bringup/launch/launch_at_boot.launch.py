@@ -14,19 +14,19 @@ def generate_launch_description():
     return LaunchDescription([
         IncludeLaunchDescription(
             PathJoinSubstitution(
-                [FindPackageShare("cub_bringup"), "launch", "cub3" , "hardware_cub3.launch.py"]
+                [FindPackageShare("cub3_bringup"), "launch", "launch_at_boot.launch.py"]
             ),
             condition=IfCondition("true" if cub_target == 'cub3' else "false")
         ),
         IncludeLaunchDescription(
             PathJoinSubstitution(
-                [FindPackageShare("cub_bringup"), "launch", "mcub" , "hardware_mcub.launch.py"]
+                [FindPackageShare("mcub_bringup"), "launch", "launch_at_boot.launch.py"]
             ),
             condition=IfCondition("true" if (cub_target == 'mcub' or cub_target == 'mcub_direct') else "false")
         ),
         IncludeLaunchDescription(
             PathJoinSubstitution(
-                [FindPackageShare("cub_bringup"), "launch", "spidar" , "hardware_spidar.launch.py"]
+                [FindPackageShare("spidar_bringup"), "launch", "launch_at_boot.launch.py"]
             ),
             condition=IfCondition("true" if cub_target == 'spidar' else "false")
         ),
