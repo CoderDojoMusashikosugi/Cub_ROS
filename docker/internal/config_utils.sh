@@ -20,6 +20,14 @@ load_config() {
     export CONFIG_IMAGE_TYPE="$IMAGE_TYPE"
     export CONFIG_IMAGE_VERSION="$IMAGE_VERSION"
     export CONFIG_BASE_IMAGE_VERSION="${BASE_IMAGE_VERSION:-$IMAGE_VERSION}"
+
+    if declare -p container_install_scripts >/dev/null 2>&1; then
+        # スペース区切りに直列化（末尾スペース除去）
+        local _joined="$(printf '%s ' "${container_install_scripts[@]}")"
+        export CONFIG_CONTAINER_INSTALL_SCRIPTS="${_joined% }"
+    else
+        export CONFIG_CONTAINER_INSTALL_SCRIPTS=""
+    fi
     
     # Determine if ROS installation is needed based on base image
     if [[ "$BASE_IMAGE" == ros:* ]]; then

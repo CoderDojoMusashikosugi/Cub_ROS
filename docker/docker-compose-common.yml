@@ -59,5 +59,6 @@ services:
       args:
         - BASE_IMAGE=${CONFIG_BASE_IMAGE:-nvidia/cuda:12.2.2-cudnn8-devel-ubuntu22.04}
         - NEEDS_ROS_INSTALL=${CONFIG_NEEDS_ROS_INSTALL:-true}
+        - CONTAINER_INSTALL_SCRIPTS=${CONFIG_CONTAINER_INSTALL_SCRIPTS}
     network_mode: "none"
     image: ghcr.io/coderdojomusashikosugi/cub_ros_base:${CONFIG_BASE_IMAGE_VERSION:-latest}_${CONFIG_IMAGE_TYPE:-default}_${ARCH:-default} # dockerにイメージ名:タグ名を付ける
