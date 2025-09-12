@@ -29,13 +29,6 @@ load_config() {
         export CONFIG_CONTAINER_INSTALL_SCRIPTS=""
     fi
     
-    # Determine if ROS installation is needed based on base image
-    if [[ "$BASE_IMAGE" == ros:* ]]; then
-        export CONFIG_NEEDS_ROS_INSTALL="false"
-    else
-        export CONFIG_NEEDS_ROS_INSTALL="true"
-    fi
-    
     return 0
 }
 # Portable sed -i wrapper: use GNU sed when available, otherwise use BSD-style with an empty backup suffix.
