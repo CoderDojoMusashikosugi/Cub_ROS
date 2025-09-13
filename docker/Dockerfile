@@ -8,7 +8,7 @@ ARG ADDITIONAL_PKGS=""
 RUN --mount=type=bind,source=ros/,dst=/ros \
     apt update && \
     apt -y install $ADDITIONAL_PKGS && \
-    . /opt/ros/humble/setup.sh && \
+    . /opt/ros/jazzy/setup.sh && \
     rosdep install -i --skip-keys micro_ros_agent -y --from-paths /ros
 
 COPY docker/internal/entrypoint.sh /entrypoint.sh

@@ -116,7 +116,7 @@ if ! shopt -oq posix; then
   fi
 fi
 
-source /opt/ros/humble/setup.bash
+source /opt/ros/jazzy/setup.bash
 if [ -f /prebuilt_ws/install/local_setup.bash ]; then
     source /prebuilt_ws/install/local_setup.bash
 fi
@@ -143,5 +143,6 @@ cbsj1(){
   cd - > /dev/null 2>&1
 }
 source /usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash
+source /opt/ros/jazzy/setup.bash
 
 export CMAKE_BUILD_TYPE=Release #for livox_ros_driver2
