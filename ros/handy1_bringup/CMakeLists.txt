@@ -3,7 +3,17 @@ project(handy1_bringup)
 
 find_package(ament_cmake REQUIRED)
 
+add_executable(pwm_timesync src/pwm_timesync.cpp)
+target_link_libraries(pwm_timesync pigpio pthread)
+
+install(TARGETS pwm_timesync
+  DESTINATION lib/${PROJECT_NAME})
+
 install(DIRECTORY launch
+  DESTINATION share/${PROJECT_NAME}
+)
+
+install(DIRECTORY config
   DESTINATION share/${PROJECT_NAME}
 )
 
