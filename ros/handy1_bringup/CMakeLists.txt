@@ -17,4 +17,13 @@ install(DIRECTORY config
   DESTINATION share/${PROJECT_NAME}
 )
 
+install(DIRECTORY web
+  DESTINATION share/${PROJECT_NAME}
+)
+
+install(PROGRAMS
+  scripts/web_control_node.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 ament_package()
