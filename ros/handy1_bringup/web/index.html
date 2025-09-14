@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rosbag Control</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 0;
+            padding: 15px;
+            box-sizing: border-box;
+            background-color: #f0f0f0;
+        }
+        .container, .shutdown-container {
+            width: 90%;
+            max-width: 1200px;
+            margin-left: auto;
+            margin-right: auto;
+            text-align: center;
+        }
+        h1 {
+            color: #333;
+        }
+        .buttons {
+            margin: 20px 0;
+        }
+        button {
+            width: 45%;
+            height: 150px;
+            font-size: 2em;
+            margin: 10px;
+            border: none;
+            border-radius: 15px;
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        #startBtn {
+            background-color: #4CAF50; /* Green */
+        }
+        #startBtn:hover {
+            background-color: #45a049;
+        }
+        #stopBtn {
+            background-color: #f44336; /* Red */
+        }
+        #stopBtn:hover {
+            background-color: #da190b;
+        }
+        #log-container {
+            width: 100%;
+            height: 40vh; /* Reverted height */
+            min-height: 150px;
+            border: 1px solid #ccc;
+            background-color: #fff;
+            overflow-y: scroll;
+            text-align: left;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+        pre {
+            margin: 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        #status {
+            margin-top: 10px;
+            font-size: 1.2em;
+        }
+        .shutdown-container {
+            margin-top: 40px;
+        }
+        #shutdownBtn {
+            background-color: #e67e22;
+            height: 100px;
+            font-size: 1.5em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Rosbag Control</h1>
+        <div class="buttons">
+            <button id="startBtn">Start Recording</button>
+            <button id="stopBtn">Stop Recording</button>
+        </div>
+        <div id="log-container">
+            <pre id="log"></pre>
+        </div>
+        <div id="status">WebSocket: Disconnected</div>
+    </div>
+
+    <div class="shutdown-container" style="margin-top: 40px; text-align: center;">
+        <button id="shutdownBtn" style="background-color: #e67e22; width: 45%; height: 100px;">Shutdown Host</button>
+    </div>
+
+    <script>
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const logContainer = document.getElementById('log-container');
+        const logElement = document.getElementById('log');
+        const statusElement = document.getElementById('status');
+        const shutdownBtn = document.getElementById('shutdownBtn');
+
+        shutdownBtn.addEventListener('click', () => {
+            if (confirm('Are you sure you want to shut down the host machine?')) {
+                fetch('/shutdown')
+                    .then(response => response.text())
+                    .then(data => {
+                        console.log(data);
+                        alert(data);
+                    });
+            }
+        });
+
+        startBtn.addEventListener('click', () => {
+            fetch('/start_rosbag')
+                .then(response => response.text())
+                .then(data => {
+                    console.log(data);
+                    logElement.innerHTML += `> ${data}\n`;
+                });
+        });
+
+        stopBtn.addEventListener('click', () => {
+            fetch('/stop_rosbag')
+                .then(response => response.text())
+                .then(data => {
+                    console.log(data);
+                    logElement.innerHTML += `> ${data}\n`;
+                });
+        });
+
+        function connectWebSocket() {
+            const ws = new WebSocket(`ws://${window.location.hostname}:8765`);
+
+            ws.onopen = () => {
+                statusElement.textContent = 'WebSocket: Connected';
+                statusElement.style.color = 'green';
+                console.log('WebSocket connection established');
+            };
+
+            ws.onmessage = (event) => {
+                logElement.innerHTML += event.data;
+                logContainer.scrollTop = logContainer.scrollHeight; // Auto-scroll
+            };
+
+            ws.onclose = () => {
+                statusElement.textContent = 'WebSocket: Disconnected';
+                statusElement.style.color = 'red';
+                console.log('WebSocket connection closed. Reconnecting in 3 seconds...');
+                setTimeout(connectWebSocket, 3000);
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                ws.close();
+            };
+        }
+
+        connectWebSocket();
+    </script>
+</body>
+</html>

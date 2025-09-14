@@ -20,6 +20,11 @@ def generate_launch_description():
     return LaunchDescription([
         Node(
             package='handy1_bringup',
+            executable='web_control_node.py',
+            output='screen',
+        ),
+        Node(
+            package='handy1_bringup',
             executable='pwm_timesync',
             prefix='sudo -E',
             output='both',
