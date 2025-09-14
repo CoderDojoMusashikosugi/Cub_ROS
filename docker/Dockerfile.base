@@ -13,4 +13,5 @@ RUN --mount=type=bind,source=docker/internal/container_install_scripts/,dst=/con
     apt update && \
     apt -y install sudo vim x11-apps net-tools iputils-ping terminator screen neovim tmux emacs && \
     ./container_install_scripts/container_install_scripts.sh ${CONTAINER_INSTALL_SCRIPTS} && \
+    apt -y install ros-humble-foxglove-bridge && \
     rm -rf /var/lib/apt/lists/

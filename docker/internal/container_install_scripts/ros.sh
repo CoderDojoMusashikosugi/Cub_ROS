@@ -13,7 +13,6 @@ rm /tmp/ros2-apt-source.deb
 apt update
 apt -y upgrade
 
-apt -y install ros-humble-desktop
-apt -y install ros-humble-foxglove-bridge ros-dev-tools
+apt -y install ros-humble-desktop ros-dev-tools
 rosdep init
 rosdep update --rosdistro=humble
