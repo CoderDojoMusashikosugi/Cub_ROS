@@ -19,6 +19,7 @@ def generate_launch_description():
         # "/camera/image_raw",
         "/camera/image_raw/compressed",
         "/livox/lidar",
+        "/livox/imu",
     ]
     return LaunchDescription([
         TimerAction(period=1.0, actions=[ExecuteProcess(
