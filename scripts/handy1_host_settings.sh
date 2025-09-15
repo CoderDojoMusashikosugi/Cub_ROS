@@ -18,5 +18,16 @@ echo "metric 4000" >> /etc/dhcpcd.conf
 echo "interface eth0" >> /etc/dhcpcd.conf
 echo "static ip_address=192.168.1.2/24" >> /etc/dhcpcd.conf
 
+mkdir -p ~/.config/autostart
+cat > ~/.config/autostart/cub-ros-journal.desktop <<'EOF'
+[Desktop Entry]
+Type=Application
+Name=ROS Logs (cub_ros)
+Comment=Open a terminal that tails the cub_ros service journal
+Exec=/usr/bin/x-terminal-emulator -T "ROS Logs (cub_ros)" -e bash -lc 'journalctl -f -u cub_ros'
+Terminal=false
+X-GNOME-Autostart-enabled=true
+EOF
+
 echo "setting completed. reboot to apply."
 
