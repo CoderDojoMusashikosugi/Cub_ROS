@@ -132,8 +132,20 @@
                 });
         });
 
-        function connectWebSocket() {
-            const ws = new WebSocket(`ws://${window.location.hostname}:8765`);
+        async function connectWebSocket() {
+            let port = 8765;
+            try {
+                const resp = await fetch('/ws_port', {cache: 'no-store'});
+                if (resp.ok) {
+                    const data = await resp.json();
+                    if (data && typeof data.port === 'number') {
+                        port = data.port;
+                    }
+                }
+            } catch (e) {
+                console.warn('Failed to fetch ws_port; fallback to default 8765');
+            }
+            const ws = new WebSocket(`ws://${window.location.hostname}:${port}`);
 
             ws.onopen = () => {
                 statusElement.textContent = 'WebSocket: Connected';
