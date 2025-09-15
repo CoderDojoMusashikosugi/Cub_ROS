@@ -7,8 +7,8 @@ if [ $(whoami) != "root" ]; then
     exit
 fi
 
-raspi-config noint do_serial_hw 0
-raspi-config noint do_serial_cons 1
+raspi-config nonint do_serial_hw 0
+raspi-config nonint do_serial_cons 1
 
 sudo apt install dhcpcd5
 
