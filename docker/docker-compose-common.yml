@@ -31,6 +31,8 @@ x-template: &cub_ros_common_setting # デフォルト設定。この値は下に
     - ../support_tools:/home/${USER_NAME:-cub}/support_tools # ./support_toolsに置いているフォルダ/ファイルをsupport_toolsという名前でコンテナ内に配置する
     - /var/run/docker.sock:/var/run/docker.sock              # Hostのdockerをコンテナ内から操作可能にする
     - /dev:/dev                                              # USB-シリアルデバイス等をコンテナ内から操作可能にする
+    - /etc/localtime:/etc/localtime:ro                       # ホストのタイムゾーンをコンテナと共有する
+    - /etc/timezone:/etc/timezone:ro                         # ホストのタイムゾーン情報をコンテナと共有する
   working_dir: /home/${USER_NAME:-cub} # シェル起動時はホームディレクトリから開始
   environment:                    # コンテナ内で使う環境変数の設定
     # ユーザー設定関連
