@@ -4,7 +4,39 @@ from rclpy.node import Node
 import threading
 import subprocess
 import asyncio
+"""
+Compatibility shim for Python 3.10 + old websockets (<=9.x):
+websockets 9.x passes loop=... to asyncio.Lock(), which raises on 3.10.
+Monkey-patch asyncio.Lock to ignore the deprecated 'loop' kwarg.
+"""
+_orig_asyncio_Lock = asyncio.Lock
+def _lock_no_loop_kwarg(*args, **kwargs):
+    kwargs.pop('loop', None)
+    return _orig_asyncio_Lock(*args, **kwargs)
+asyncio.Lock = _lock_no_loop_kwarg  # type: ignore
+
+# Also ignore 'loop' kwarg in asyncio.wait_for and asyncio.ensure_future
+_orig_asyncio_wait_for = asyncio.wait_for
+def _wait_for_no_loop_kwarg(awaitable, timeout, *args, **kwargs):
+    kwargs.pop('loop', None)
+    return _orig_asyncio_wait_for(awaitable, timeout, *args, **kwargs)
+asyncio.wait_for = _wait_for_no_loop_kwarg  # type: ignore
+
+_orig_asyncio_ensure_future = asyncio.ensure_future
+def _ensure_future_no_loop_kwarg(coro_or_future, *args, **kwargs):
+    kwargs.pop('loop', None)
+    return _orig_asyncio_ensure_future(coro_or_future, *args, **kwargs)
+asyncio.ensure_future = _ensure_future_no_loop_kwarg  # type: ignore
+
+# asyncio.sleep
+_orig_asyncio_sleep = asyncio.sleep
+async def _sleep_no_loop_kwarg(delay, *args, **kwargs):
+    kwargs.pop('loop', None)
+    return await _orig_asyncio_sleep(delay, *args, **kwargs)
+asyncio.sleep = _sleep_no_loop_kwarg  # type: ignore
+
 import websockets
+import json
 import os
 import signal
 from flask import Flask, send_from_directory
@@ -14,6 +46,8 @@ from ament_index_python.packages import get_package_share_directory
 rosbag_process = None
 websocket_clients = set()
 asyncio_loop = None
+ws_port_actual = None
+WS_PORT_DEFAULT = int(os.environ.get('HANDY1_WS_PORT', '8765'))
 
 # Flask App
 app = Flask(__name__)
@@ -26,6 +60,14 @@ def index():
 @app.route('/<path:path>')
 def send_web_files(path):
     return send_from_directory(web_dir, path)
+
+@app.route('/ws_port')
+def get_ws_port():
+    # Provide the actual port the WS server is listening on
+    # so the frontend can connect even if the default port is busy.
+    global ws_port_actual
+    port = ws_port_actual if ws_port_actual is not None else WS_PORT_DEFAULT
+    return json.dumps({"port": port}), 200, {"Content-Type": "application/json"}
 
 @app.route('/start_rosbag')
 def start_rosbag():
@@ -128,7 +170,7 @@ def read_process_output(process, loop):
         process.stdout.close()
 
 # WebSocket Server
-async def websocket_handler(websocket):
+async def websocket_handler(websocket, path=None):
     websocket_clients.add(websocket)
     try:
         await websocket.wait_closed()
@@ -137,20 +179,46 @@ async def websocket_handler(websocket):
 
 async def broadcast_message(message):
     if websocket_clients:
-        await asyncio.gather(
-            *[client.send(message) for client in websocket_clients],
-            return_exceptions=False,
-        )
+        # Send to each client independently to avoid one failure breaking all.
+        coros = []
+        for client in list(websocket_clients):
+            async def _send(c=client):
+                try:
+                    await c.send(message)
+                except Exception:
+                    # Drop broken client
+                    try:
+                        websocket_clients.remove(c)
+                    except KeyError:
+                        pass
+            coros.append(_send())
+        if coros:
+            await asyncio.gather(*coros, return_exceptions=True)
 
 def run_asyncio_loop():
     global asyncio_loop
+    global ws_port_actual
     asyncio_loop = asyncio.new_event_loop()
     asyncio.set_event_loop(asyncio_loop)
 
     async def main_async():
-        # Start WebSocket server
-        async with websockets.serve(websocket_handler, "0.0.0.0", 8765):
-            await asyncio.Future()  # run forever
+        # Start WebSocket server with port auto-selection in case of conflicts
+        port = WS_PORT_DEFAULT
+        last_exc = None
+        for _ in range(20):  # try a range of ports
+            try:
+                async with websockets.serve(websocket_handler, "0.0.0.0", port):
+                    ws_port_actual = port
+                    # Informatively print to stdout for ros2 logs
+                    print(f"[web_control_node] WebSocket server bound on ws://0.0.0.0:{port}")
+                    await asyncio.Future()  # run forever
+            except OSError as e:
+                last_exc = e
+                port += 1
+                continue
+        # If we get here, all attempts failed
+        print(f"[web_control_node] Failed to bind WebSocket server starting at {WS_PORT_DEFAULT}: {last_exc}")
+        raise last_exc
     
     asyncio_loop.run_until_complete(main_async())
 
@@ -171,7 +239,7 @@ class WebControlNode(Node):
         ws_thread = threading.Thread(target=run_asyncio_loop)
         ws_thread.daemon = True
         ws_thread.start()
-        self.get_logger().info('WebSocket server is running on ws://0.0.0.0:8765')
+        self.get_logger().info('WebSocket server thread started (dynamic port). Open /ws_port for actual port.')
 
 def main(args=None):
     rclpy.init(args=args)
