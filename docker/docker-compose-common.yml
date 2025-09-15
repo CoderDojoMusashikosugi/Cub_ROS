@@ -36,6 +36,8 @@ x-template: &cub_ros_common_setting # デフォルト設定。この値は下に
     - /etc/timezone:/etc/timezone:ro                         # ホストのタイムゾーン情報をコンテナと共有する
     - /run/udev:/run/udev:ro   # handy1のraspi camera向け https://qiita.com/SSS-ryotamurakami/items/1208d9fe996c8177c3a7
     - /var/run/dbus:/var/run/dbus # ホストのdbusをコンテナと共有する
+    - /etc/localtime:/etc/localtime:ro                       # ホストのタイムゾーンをコンテナと共有する
+    - /etc/timezone:/etc/timezone:ro                         # ホストのタイムゾーン情報をコンテナと共有する
   working_dir: /home/${USER_NAME:-cub} # シェル起動時はホームディレクトリから開始
   environment:                    # コンテナ内で使う環境変数の設定
     # ユーザー設定関連
