@@ -68,6 +68,11 @@
             margin-top: 10px;
             font-size: 1.2em;
         }
+        #sync-status {
+            margin-top: 6px;
+            font-size: 1.1em;
+            color: #333;
+        }
         .shutdown-container {
             margin-top: 40px;
         }
@@ -89,6 +94,7 @@
             <pre id="log"></pre>
         </div>
         <div id="status">WebSocket: Disconnected</div>
+        <div id="sync-status">Sync: -</div>
     </div>
 
     <div class="shutdown-container" style="margin-top: 40px; text-align: center;">
@@ -102,6 +108,7 @@
         const logElement = document.getElementById('log');
         const statusElement = document.getElementById('status');
         const shutdownBtn = document.getElementById('shutdownBtn');
+        const syncStatusElement = document.getElementById('sync-status');
 
         shutdownBtn.addEventListener('click', () => {
             if (confirm('Are you sure you want to shut down the host machine?')) {
@@ -154,7 +161,21 @@
             };
 
             ws.onmessage = (event) => {
-                logElement.innerHTML += event.data;
+                const data = event.data || '';
+                if (typeof data === 'string' && data.startsWith('SYNC_STATUS::')) {
+                    const label = data.split('::')[1] || '-';
+                    syncStatusElement.textContent = `Sync: ${label}`;
+                    // Optional coloring
+                    if (label === 'NO') {
+                        syncStatusElement.style.color = 'red';
+                    } else if (label === 'PTP' || label === 'GPS') {
+                        syncStatusElement.style.color = 'green';
+                    } else {
+                        syncStatusElement.style.color = '#333';
+                    }
+                    return; // Do not log this control message
+                }
+                logElement.innerHTML += data;
                 logContainer.scrollTop = logContainer.scrollHeight; // Auto-scroll
             };
 

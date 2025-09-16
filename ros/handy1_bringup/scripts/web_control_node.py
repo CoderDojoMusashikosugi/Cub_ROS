@@ -41,6 +41,7 @@ import os
 import signal
 from flask import Flask, send_from_directory
 from ament_index_python.packages import get_package_share_directory
+from std_msgs.msg import Int32
 
 # Global variables
 rosbag_process = None
@@ -48,6 +49,8 @@ websocket_clients = set()
 asyncio_loop = None
 ws_port_actual = None
 WS_PORT_DEFAULT = int(os.environ.get('HANDY1_WS_PORT', '8765'))
+# Latest sync status label (e.g., "NO", "PTP", "GPS") for initial push to clients
+latest_sync_label = None
 
 # Flask App
 app = Flask(__name__)
@@ -173,6 +176,12 @@ def read_process_output(process, loop):
 async def websocket_handler(websocket, path=None):
     websocket_clients.add(websocket)
     try:
+        # Send initial sync status to newly connected client
+        if latest_sync_label is not None:
+            try:
+                await websocket.send(f"SYNC_STATUS::{latest_sync_label}")
+            except Exception:
+                pass
         await websocket.wait_closed()
     finally:
         websocket_clients.remove(websocket)
@@ -241,6 +250,32 @@ class WebControlNode(Node):
         ws_thread.start()
         self.get_logger().info('WebSocket server thread started (dynamic port). Open /ws_port for actual port.')
 
+        
+        # Subscribe to livox/time_type to monitor sync state
+        self._last_time_type = None
+        self._time_type_sub = self.create_subscription(Int32, 'livox/time_type', self._on_time_type, 10)
+
+    def _on_time_type(self, msg: Int32):
+        global latest_sync_label
+        value = int(msg.data)
+        if value == 0:
+            label = 'NO'
+        elif value == 1:
+            label = 'PTP'
+        elif value == 2:
+            label = 'GPS'
+        else:
+            label = f'UNKNOWN({value})'
+
+        # Only broadcast when changed
+        if label != latest_sync_label:
+            latest_sync_label = label
+            self.get_logger().info(f'Livox Sync state: {label}')
+            if asyncio_loop:
+                asyncio.run_coroutine_threadsafe(
+                    broadcast_message(f"SYNC_STATUS::{label}"),
+                    asyncio_loop
+                )
 def main(args=None):
     rclpy.init(args=args)
     node = WebControlNode()
