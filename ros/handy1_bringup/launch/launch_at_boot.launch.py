@@ -49,4 +49,12 @@ def generate_launch_description():
                 [FindPackageShare("handy1_bringup"), "launch", "msg_MID360.launch.py"]
             ),
         ),
+        Node(
+            package='rqt_image_view',
+            executable='rqt_image_view',
+            name='rqt_image_view_camera',
+            output='screen',
+            arguments=['/camera/image_raw/compressed'],
+            remappings=[('image', '/camera/image_raw/compressed')],
+        ),
     ])
