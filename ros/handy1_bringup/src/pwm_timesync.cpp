@@ -113,14 +113,18 @@ int main()
     options.c_oflag &= ~OPOST; // 生出力
     tcsetattr(fd, TCSANOW, &options);
 
-    int freq = 10;
-    int duty = 350000;
-
     struct::timespec time1, time2, time3;
     clock_gettime(CLOCK_MONOTONIC, &time1);
     clock_gettime(CLOCK_MONOTONIC, &time2);
 
-    gpioHardwarePWM(SHUTTER, 10, 100000);
+    const uint64_t exposure_time_us = 1000; // 露光時間 1ms
+    const uint64_t exposure_time_ns = exposure_time_us * 1000;
+    const uint64_t gscam_exposure_time_ns = exposure_time_ns-14260; // パルス幅+14.26usが露光時間
+    const unsigned int gscam_fps = 10; // 10fps
+    const uint64_t duty_max = 1000000;
+    const unsigned int gscam_duty = duty_max * gscam_exposure_time_ns / (1000000000 / gscam_fps);
+
+    gpioHardwarePWM(SHUTTER, gscam_fps, gscam_duty);
     clock_gettime(CLOCK_MONOTONIC, &time3);
     gpioHardwarePWM(PPS_OUTPUT, 1, 25000); //ここが33.3usズレる
 
