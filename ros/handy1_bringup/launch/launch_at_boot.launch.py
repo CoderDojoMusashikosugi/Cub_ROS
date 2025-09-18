@@ -8,6 +8,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration, EnvironmentVariable
+from launch.actions import TimerAction
 import os
 
 def generate_launch_description():
@@ -44,17 +45,27 @@ def generate_launch_description():
                         }],
             output='both',
         ),
-        IncludeLaunchDescription(
-            PathJoinSubstitution(
-                [FindPackageShare("handy1_bringup"), "launch", "msg_MID360.launch.py"]
+        TimerAction( 
+            period=5.0,
+            actions=[
+            IncludeLaunchDescription(
+                PathJoinSubstitution(
+                    [FindPackageShare("handy1_bringup"), "launch", "msg_MID360.launch.py"]
+                ),
             ),
+            ]
         ),
-        Node(
-            package='rqt_image_view',
-            executable='rqt_image_view',
-            name='rqt_image_view_camera',
-            output='screen',
-            arguments=['/camera/image_raw/compressed'],
-            remappings=[('image', '/camera/image_raw/compressed')],
+        TimerAction( 
+            period=10.0,
+            actions=[
+                Node(
+                    package='rqt_image_view',
+                    executable='rqt_image_view',
+                    name='rqt_image_view_camera',
+                    output='screen',
+                    arguments=['/camera/image_raw/compressed'],
+                    remappings=[('image', '/camera/image_raw/compressed')],
+                ),
+            ]
         ),
     ])
