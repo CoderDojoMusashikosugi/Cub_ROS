@@ -22,10 +22,13 @@ def generate_launch_description():
         "/livox/imu",
         "/livox/time_type",
     ]
+    qos_path = PathJoinSubstitution([FindPackageShare('handy1_bringup'), 'config', 'rosbag_qos.yaml'])
+
     return LaunchDescription([
         TimerAction(period=1.0, actions=[ExecuteProcess(
             cwd=home_directory+"rosbag",
-            cmd=['ros2', 'bag', 'record', '-s', 'mcap'] + topic_list,
+            # cwd='/dev/shm/rosbag',
+            cmd=['ros2', 'bag', 'record', '-s', 'mcap', '--qos-profile-overrides-path', qos_path, '--max-cache-size', '134217728'] + topic_list,
             output='screen'
         )])
     ])
