@@ -135,4 +135,11 @@ def generate_launch_description():
         velodyne_driver_node,
         velodyne_transform_node,
         realsense_launch,
+        Node(
+            package='cub_bringup',
+            executable='distance_logger.py',
+            name='distance_logger',
+            parameters=[{'odom_topic': '/odom'}],
+            output='screen'
+        ),
     ])

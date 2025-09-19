@@ -49,4 +49,11 @@ def generate_launch_description():
             executable='control_mcub_moter_node',
             condition=IfCondition("true" if cub_target == 'mcub_direct' else "false")
         ),
+        Node(
+            package='cub_bringup',
+            executable='distance_logger.py',
+            name='distance_logger',
+            parameters=[{'odom_topic': '/odom'}],
+            output='screen'
+        ),
     ])
