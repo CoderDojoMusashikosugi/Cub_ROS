@@ -1,15 +1,20 @@
 /livox/imu:
-  reliability: best_effort
+  reliability: reliable
   durability: volatile
   history: keep_last
   depth: 2000
 /livox/lidar:
-  reliability: best_effort
+  reliability: reliable
   durability: volatile
   history: keep_last
   depth: 100
 /camera/image_raw/compressed:
-  reliability: best_effort
+  reliability: reliable
+  durability: volatile
+  history: keep_last
+  depth: 100
+/camera/image_raw:
+  reliability: reliable
   durability: volatile
   history: keep_last
   depth: 100

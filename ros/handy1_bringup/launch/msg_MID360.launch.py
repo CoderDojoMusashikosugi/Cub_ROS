@@ -1,4 +1,5 @@
 import os
+import shlex
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch_ros.actions import Node
@@ -33,11 +34,15 @@ livox_ros2_params = [
 
 
 def generate_launch_description():
+    ld_library_path = os.environ.get('LD_LIBRARY_PATH', '')
+    ld_library_path_escaped = shlex.quote(ld_library_path)
+
     livox_driver = Node(
         package='livox_ros_driver2',
         executable='livox_ros_driver2_node',
         name='livox_lidar_publisher',
         output='screen',
+        prefix=f"sudo -E env LD_LIBRARY_PATH={ld_library_path_escaped} nice -n -10",  # sudo使用時にLD_LIBRARY_PATHが消えるのを防ぎつつ優先度を上げる
         parameters=livox_ros2_params
         )
 
