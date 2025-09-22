@@ -11,3 +11,5 @@ make install
 ldconfig
 cd /
 rm -rf Livox-SDK2
+
+echo "export CMAKE_BUILD_TYPE=Release" >> /etc/bash.bashrc  #for livox_ros_driver2
