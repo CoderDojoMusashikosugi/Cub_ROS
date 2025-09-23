@@ -13,4 +13,4 @@ ros2 run micro_ros_setup build_agent.sh
 rm -rf log/ build/ src/
 
 # ROSのセットアップをコンテナ側の.bashrcに追加
-echo "source /prebuilt_ws/install/local_setup.bash" >> /etc/bash.bashrc
+echo "source /prebuilt_ws/install/local_setup.bash" >> /etc/user.bashrc

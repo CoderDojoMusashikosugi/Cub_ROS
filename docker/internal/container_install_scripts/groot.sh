@@ -6,4 +6,4 @@ cmake --build build -j$(($(nproc)-1))
 cmake --install build
 rm -r build
 
-echo "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib" >> /etc/bash.bashrc
+echo "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib" >> /etc/user.bashrc

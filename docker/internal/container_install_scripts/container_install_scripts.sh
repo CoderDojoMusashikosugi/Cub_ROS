@@ -1,10 +1,16 @@
 #!/bin/bash
 apt-get update
 
-# ROSのセットアップをコンテナ側の.bashrcに最初に追加
-echo "source /opt/ros/humble/setup.bash" >> /etc/bash.bashrc
-echo "source /usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash" >> /etc/bash.bashrc
-# この後container_install_scriptsによりprebuilt系のセットアップが増えていく想定
+# コンテナ側の.bashrcに、user.bashrcを登録
+echo "source /etc/user.bashrc" >> /etc/bash.bashrc
+# ROSのセットアップをuser.bashrcに最初に追加
+echo "if [ -f /opt/ros/humble/setup.bash ]; then
+  source /opt/ros/humble/setup.bash
+fi" > /etc/user.bashrc # ここだけ上書きなのに注意
+echo "if [ -f /usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash ]; then
+  source /usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash
+fi" >> /etc/user.bashrc
+# この後container_install_scriptsによりuser.bashrcに対してprebuilt系のセットアップが増えていく想定
 
 for script in "$@"; do
   echo "running: $script"
