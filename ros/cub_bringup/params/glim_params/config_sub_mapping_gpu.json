@@ -50,7 +50,7 @@
     "keyframe_voxelmap_scaling_factor": 2.0,
     // Post processing
     "submap_downsample_resolution": 0.1,
-    "submap_voxel_resolution": 0.5,
-    "submap_target_num_points": 50000
+    "submap_voxel_resolution": 0.1,
+    "submap_target_num_points": 30000
   }
 }

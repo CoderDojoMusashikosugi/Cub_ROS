@@ -21,7 +21,7 @@
     "distance_far_thresh": 100.0,
     "use_random_grid_downsampling": true,
     "downsample_resolution": 1.0,
-    "random_downsample_target": 10000,
+    "random_downsample_target": 20000,
     "random_downsample_rate": 0.1,
     "enable_outlier_removal": false,
     "outlier_removal_k": 10,
@@ -30,7 +30,7 @@
     "crop_bbox_frame": "lidar",
     "crop_bbox_min": [-1.0, -1.0, -1.0],
     "crop_bbox_max": [1.0, 1.0, 1.0],
-    "k_correspondences": 10,
+    "k_correspondences": 20,
     "num_threads": 2
   }
 }

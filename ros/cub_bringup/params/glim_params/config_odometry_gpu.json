@@ -48,7 +48,7 @@
     "isam2_relinearize_thresh": 0.1,
     "fix_imu_bias": false,
     // Voxel params
-    "voxel_resolution": 0.25,
+    "voxel_resolution": 0.1,
     "voxel_resolution_max": 0.5,
     "voxel_resolution_dmin": 5.0,
     "voxel_resolution_dmax": 20.0,
@@ -57,7 +57,7 @@
     "full_connection_window_size": 2,
     // Keyframe params
     "keyframe_update_strategy": "OVERLAP",
-    "max_num_keyframes": 15,
+    "max_num_keyframes": 20,
     "keyframe_min_overlap": 0.01,
     "keyframe_max_overlap": 0.7,
     "keyframe_delta_trans": 2.0,
