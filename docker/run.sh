@@ -2,6 +2,11 @@
 
 set -e
 
+# handy1向けに、外部トリガを有効化
+if [ -e /sys/module/imx296/parameters/trigger_mode ]; then
+    echo 1 | sudo tee /sys/module/imx296/parameters/trigger_mode > /dev/null 2>&1 || true
+fi
+
 # ユーザーごとの設定を書く用のファイルを設置
 if [ ! -e docker/home/.user_config.bash ]; then
     cp docker/.default_do_not_edit/user_config.bash docker/home/.user_config.bash

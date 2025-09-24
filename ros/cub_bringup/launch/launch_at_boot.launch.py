@@ -30,4 +30,10 @@ def generate_launch_description():
             ),
             condition=IfCondition("true" if cub_target == 'spidar' else "false")
         ),
+        IncludeLaunchDescription(
+            PathJoinSubstitution(
+                [FindPackageShare("handy1_bringup"), "launch", "launch_at_boot.launch.py"]
+            ),
+            condition=IfCondition("true" if cub_target == 'handy1' else "false")
+        ),
     ])

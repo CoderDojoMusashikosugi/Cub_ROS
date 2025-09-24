@@ -8,45 +8,68 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration, EnvironmentVariable
+from launch.actions import TimerAction
 import os
+import shlex
 
 def generate_launch_description():
     joy_dev = "/dev/input/js0"
     cub_target = os.getenv('CUB_TARGET', 'mcub')
     print("launch target:", cub_target)
 
+    print("file://" + os.path.join(get_package_share_directory('handy1_bringup'), 'config', 'rpgsc.yaml'))
+
+    ld_library_path = os.environ.get('LD_LIBRARY_PATH', '')
+    ld_library_path_escaped = shlex.quote(ld_library_path)
+
     return LaunchDescription([
         Node(
-            package='cub_commander',
-            executable='cub_commander_node',
+            package='handy1_bringup',
+            executable='web_control_node.py',
             output='screen',
-            parameters=[{'dev': joy_dev}],
         ),
         Node(
-            package='joy_linux',
-            executable='joy_linux_node',
-            parameters=[{'dev': joy_dev}],
+            package='handy1_bringup',
+            executable='pwm_timesync',
+            prefix='sudo -E',
+            output='both',
+            respawn=True,
         ),
-
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource([
-                os.path.join(FindPackageShare('sllidar_ros2').find('sllidar_ros2'), 'launch', 'sllidar_c1_launch.py')
-            ]),
-            launch_arguments={
-                'serial_port': "/dev/ttySLC1",
-                'frame_id': "SLC1_link",
-            }.items()
+        TimerAction( 
+            period=5.0,
+            actions=[
+            IncludeLaunchDescription(
+                PathJoinSubstitution(
+                    [FindPackageShare("handy1_bringup"), "launch", "msg_MID360.launch.py"]
+                ),
+            ),
+            Node(
+                package='camera_ros',
+                executable='camera_node',
+                prefix=f"sudo -E env LD_LIBRARY_PATH={ld_library_path_escaped} nice -n -11",
+                parameters=[{'format': "BGR888", 
+                            'width' : 1456,
+                            'height': 1088,
+                            #  'width' : 1024,
+                            #  'height': 768,
+                            'camera_info_url': "file://" + os.path.join(get_package_share_directory('handy1_bringup'), 'config', 'rpgsc.yaml'),
+                            'role': 'video',
+                            'frame_id': 'gs_camera',
+                            }],
+                output='both',
+            ),
+            ]
         ),
-        Node(
-            package='micro_ros_agent',
-            executable='micro_ros_agent',
-            name='micro_ros_agent',
-            arguments=["serial", "--dev", "/dev/ttyATOM", "-b", "115200", "-v6"],
-            condition=IfCondition("true" if cub_target == 'mcub' else "false")
-        ),
-        Node(
-            package='control_mcub',
-            executable='control_mcub_moter_node',
-            condition=IfCondition("true" if cub_target == 'mcub_direct' else "false")
+        TimerAction(
+            period=15.0,
+            actions=[
+            Node(
+                    package='rqt_image_view',
+                    executable='rqt_image_view',
+                    name='rqt_image_view_camera',
+                    output='screen',
+                    arguments=['/camera/image_raw/compressed'],
+                ),
+            ]
         ),
     ])
