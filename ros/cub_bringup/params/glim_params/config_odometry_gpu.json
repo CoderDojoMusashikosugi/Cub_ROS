@@ -57,7 +57,7 @@
     "full_connection_window_size": 2,
     // Keyframe params
     "keyframe_update_strategy": "OVERLAP",
-    "max_num_keyframes": 20,
+    "max_num_keyframes": 15,
     "keyframe_min_overlap": 0.01,
     "keyframe_max_overlap": 0.7,
     "keyframe_delta_trans": 2.0,
