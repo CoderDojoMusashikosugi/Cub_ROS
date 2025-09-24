@@ -93,6 +93,11 @@
   - ROSのコードを編集したければ、`ros`ディレクトリ内のパッケージを編集すれば良い。
 
 ## 使い方
+### ROSBAGの保存先を変えたい
+- デフォルトでは、コンテナ内の`~/rosbag`は、ホストの`./docker/home/rosbag`にマウントされている。
+- これを例えば`/media/user/rosbag/`に設定したければ、target.envに`ROSBAG_MOUNT_DIR="/media/user/rosbag/"`を追記して./stop.sh&&./run.sh。
+- マウント先を変えても`./docker/home/rosbag`は残ってて、データが消えるわけでは無いからご安心を。
+
 ### Dockerコンテナに新しいaptパッケージを追加したい(ROSとは関係なく)
 1. docker/environment/${CUB_TARGET}.conf のADDITIONAL_PKGSにインストールするパッケージを追加する。
 2. `./docker/build.sh`でコンテナを更新する
