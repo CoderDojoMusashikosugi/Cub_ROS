@@ -51,11 +51,11 @@
     // LiDAR config
     "global_shutter_lidar": false,
     "T_lidar_imu": [
-      0.006,
-      -0.012,
-      0.008,
+      0.000,
       0.0,
+      0.02,
       0.0,
+      0.0361283,
       0.0,
       1.0
     ],
