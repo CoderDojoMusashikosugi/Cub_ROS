@@ -32,3 +32,6 @@
 [submodule "ros/FAST-LIVO2-ROS2-MID360-Fisheye"]
 	path = ros/FAST-LIVO2-ROS2-MID360-Fisheye
 	url = https://github.com/t-nagatani/FAST-LIVO2-ROS2-MID360-Fisheye.git
+[submodule "ros/fast_gicp"]
+	path = ros/fast_gicp
+	url = https://github.com/koide3/fast_gicp.git
