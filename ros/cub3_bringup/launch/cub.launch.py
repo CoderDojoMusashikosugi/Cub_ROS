@@ -13,12 +13,12 @@ def generate_launch_description():
     # Launchファイルの返り値
     return LaunchDescription([
         # wheel_odometryノード
-        # Node(
-        #     package='wheel_odometry',
-        #     executable='wheel_odometry_node',
-        #     name='wheel_odometry_node',
-        #     output='screen'
-        # ),
+        Node(
+            package='wheel_odometry',
+            executable='wheel_odometry_node',
+            name='wheel_odometry_node',
+            output='screen'
+        ),
 
         # pointcloud to laser scan
         Node(

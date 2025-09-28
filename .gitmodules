@@ -35,3 +35,6 @@
 [submodule "ros/fast_gicp"]
 	path = ros/fast_gicp
 	url = https://github.com/koide3/fast_gicp.git
+[submodule "ros/ekf_localizer_ros2"]
+	path = ros/ekf_localizer_ros2
+	url = https://github.com/UNI-shibuya-taku/ekf_localizer_ros2.git
