@@ -196,7 +196,7 @@ local_costmap:
     ros__parameters:
       update_frequency: 5.0
       publish_frequency: 2.0
-      global_frame: odom
+      global_frame: map
       robot_base_frame: base_link
       use_sim_time: False
       rolling_window: true
@@ -361,7 +361,7 @@ recoveries_server:
       plugin: "nav2_recoveries/BackUp"
     wait:
       plugin: "nav2_recoveries/Wait"
-    global_frame: odom
+    global_frame: map
     robot_base_frame: base_link
     transform_timeout: 0.1
     use_sim_time: False
