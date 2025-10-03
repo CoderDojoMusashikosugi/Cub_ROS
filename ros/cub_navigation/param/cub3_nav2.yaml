@@ -141,8 +141,8 @@ controller_server:
     general_goal_checker:
       stateful: False
       plugin: "nav2_controller::SimpleGoalChecker"
-      xy_goal_tolerance: 0.4
-      yaw_goal_tolerance: 0.75
+      xy_goal_tolerance: 1.0
+      yaw_goal_tolerance: 6.28
 
     # DWB parameters
     FollowPath:
@@ -391,7 +391,7 @@ costmap_filter_info_server:
     use_sim_time: False
     type: 0
     filter_info_topic: "/costmap_filter_info"
-    mask_topic: "/keepout_filter_mask"
+    # mask_topic: "/keepout_filter_mask"
     base: 0.0
     multiplier: 1.0
 
