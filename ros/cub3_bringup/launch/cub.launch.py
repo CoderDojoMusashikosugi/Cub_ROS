@@ -17,7 +17,8 @@ def generate_launch_description():
             package='wheel_odometry',
             executable='wheel_odometry_node',
             name='wheel_odometry_node',
-            output='screen'
+            output='screen',
+            # remappings=[('odom', 'wh_odom')]
         ),
 
         # pointcloud to laser scan
@@ -43,10 +44,10 @@ def generate_launch_description():
         ),
 
         # 2Dのマッピングやナビゲーションを実行する際はこれを有効化、3Dでは無効化
-        Node(
-            package='cub_bringup',
-            executable='odom_to_tf',
-        ),
+        # Node(
+        #     package='cub_bringup',
+        #     executable='odom_to_tf',
+        # ),
 
         # RVizの起動
         IncludeLaunchDescription(

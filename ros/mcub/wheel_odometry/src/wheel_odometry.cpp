@@ -12,6 +12,7 @@
 #include <rclcpp/qos.hpp>
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2/LinearMath/Matrix3x3.h>
+#include "builtin_interfaces/msg/time.hpp"
 
 using namespace std::chrono_literals;
 
@@ -126,7 +127,7 @@ private:
 
         // オドメトリメッセージの作成
         auto odometry_msg = nav_msgs::msg::Odometry();
-        odometry_msg.header.stamp = this->get_clock()->now();
+        odometry_msg.header.stamp = cur_time_;
         odometry_msg.header.frame_id = "odom";
         odometry_msg.child_frame_id = "base_link";
         odometry_msg.pose.pose.position.x = x_;
@@ -166,6 +167,7 @@ private:
         tf2::Matrix3x3(quaternion).getRPY(roll,pitch,yaw);
         if(initial_yaw_ == -100) initial_yaw_ = yaw;
         yaw_ = yaw - initial_yaw_;
+        cur_time_ = msg->header.stamp;
         // IMUメッセージをログに出力
         // RCLCPP_INFO(this->get_logger(), "Linear Acceleration:\n x: %.2f, y: %.2f, z: %.2f",
         //             msg->linear_acceleration.x, msg->linear_acceleration.y, msg->linear_acceleration.z);
@@ -235,6 +237,7 @@ private:
     double x_, y_, theta_; // 現在のオドメトリの位置と角度
     double yaw_;
     double initial_yaw_ = -100;
+    builtin_interfaces::msg::Time cur_time_;
 };
 
 int main(int argc, char * argv[])
