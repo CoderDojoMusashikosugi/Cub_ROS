@@ -108,7 +108,7 @@ def generate_launch_description():
         ),
 
         IncludeLaunchDescription(
-            PythonLaunchDescriptionSource([cub_navigation_launch_dir, '/bringup_launch.py']),
+            PythonLaunchDescriptionSource([cub_navigation_launch_dir, '/navigation_launch.py']),
             launch_arguments=[
                 ('map', map_dir),
                 ('use_sim_time', use_sim_time),
