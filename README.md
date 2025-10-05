@@ -66,7 +66,7 @@
   - これはロボットの起動と共に自動で起動させるはずのもの。起動自体の設定をしていない場合はこの通りに手動で実行する。
   - ロボット自体の電源を落とすまで開きっぱなしがおすすめ。
 - Cub3/mCub向けのROS2ノードを実行する
-  - `ros2 launch cub_bringup cub.launch.py`
+  - `ros2 launch cub_bringup common.launch.py`
 - ここまで実行すれば、DualSenseで操作が可能になっている
   - L2(今はL1も同様の機能)を押しながら左スティック前後左右で、前後移動と左右回転ができる。
   - DualSenseの矢印ボタン上下で0.1m/sずつ最高速度の変更ができる。デフォルトでは1.2m/s。
@@ -75,7 +75,7 @@
 
 ### 地図を作成する(2D)
 - 機体を手動で初期位置に持って行く
-  - 理由は後述するが、地図作成開始時にオドメトリが原点のままである場合、その後の作業が楽で大変おすすめ。リセットにはcub.launch.pyを立ち上げ直す。
+  - 理由は後述するが、地図作成開始時にオドメトリが原点のままである場合、その後の作業が楽で大変おすすめ。リセットにはcommon.launch.pyを立ち上げ直す。
 - 地図作成用ノードを立ち上げ
   - `ros2 launch cub_bringup 2d_mapping.launch.py`
 - 正しく起動できていれば、RVizに地図が出来上がっていく。手動操縦して生成される地図の範囲を広げていこう。
@@ -89,11 +89,11 @@
 ### 作成した地図上で自律走行する(2D)
 - ロボットを地図作成開始時の初期位置に持っていく
 - ロボットを起動
-  - `ros2 launch cub_bringup cub.launch.py`
+  - `ros2 launch cub_bringup common.launch.py`
 - 自己位置推定とナビゲーション用ノードを起動、地図のディレクトリ指定を添えて
   - `ros2 launch cub_navigation cub_navigation.launch.py map:=/home/cub/maps/map1/map.yaml`
 - ↑の操作で新しく立ち上がったRVizの画面に初期姿勢を指定する
-  - cub.launch.pyが立ち上げたRVizもあるので取り違えに注意
+  - common.launch.pyが立ち上げたRVizもあるので取り違えに注意
   - [こちらの記事の「Navigation2の実行」の項目](https://qiita.com/porizou1/items/d63a41fc1e478dfa5ab6#navigation2%E3%81%AE%E5%AE%9F%E8%A1%8C)を参考に、初期姿勢に2D Pose Estimateの矢印を置く。この初期姿勢は、今までの手順を守れば地図の原点で向きは赤い棒の方向に設定すれば良くなって便利。
 - ゴールを設定する
   - 上記記事の通りにNavigation2 Goalを設定すると、そこに向けてロボットが走っていくはず。

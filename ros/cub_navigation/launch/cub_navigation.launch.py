@@ -94,7 +94,7 @@ def generate_launch_description():
             description='Use simulation (Gazebo) clock if true'),
 
         IncludeLaunchDescription(
-            PythonLaunchDescriptionSource([cub_bringup_launch_dir, '/cub.launch.py']),
+            PythonLaunchDescriptionSource([cub_bringup_launch_dir, '/common.launch.py']),
             launch_arguments=[
                 ('use_sim_time', use_sim_time),
             ],
