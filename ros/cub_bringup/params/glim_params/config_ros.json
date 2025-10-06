@@ -65,8 +65,9 @@
     "extension_modules": [
       "libmemory_monitor.so",
       "libstandard_viewer.so",
-      "librviz_viewer.so"
+      "librviz_viewer.so",
       // "libimu_validator.so"
+      "libgeoreference.so"
     ],
     // Topics
     "imu_topic": "/imu/data_raw",

@@ -18,7 +18,7 @@
   */
   "preprocess": {
     "distance_near_thresh": 0.5,
-    "distance_far_thresh": 100.0,
+    "distance_far_thresh": 80.0,
     "use_random_grid_downsampling": true,
     "downsample_resolution": 1.0,
     "random_downsample_target": 20000,
