@@ -21,7 +21,7 @@
   <depend>pcl_ros</depend>
   <depend>slam_toolbox</depend>
   <depend>rosbag2_storage_mcap</depend>
-  <depend>joy-linux</depend>
+  <depend>joy_linux</depend>
   <exec_depend>rclpy</exec_depend>
   
   <!-- <depend>Eigen3</depend>  -->
