@@ -1,9 +1,26 @@
 # cub_bringup
 Cub3/mCubの起動用launchファイルと、その他便利ツールの置き場
 
-`cub_bringup common.launch.py` とか実行したらCub3の全てのプロセスやデバッグツールが起動して欲しいなと思っている。
-
-
+# ファイルの説明
+- launch_at_boot.launch.py
+  - Linuxが立ち上がってから落とすまでずっと起動しっぱなし想定のプログラムを纏めたもの。
+  - `scripts/mcub_autostart_settings.sh`のように自動起動に設定してしまっても良い。
+  - 通信する系のROSノードで、一度落とすとLinux再起動しないと再接続できないものがあった時に発生した。
+  - 今は主に手動走行までが自動起動するために使われている。
+- localization.launch.py
+  - Localizationをスタートさせる。
+- navigation.launch.py
+  - Navigationをスタートさせる。
+  - 内部でlocalization.launch.pyを呼んでる。
+- mapping.launch.py
+  - Mappingをスタートさせる。
+  - 機体本体でマッピングするのはmcubだけかも。
+- common.launch.py
+  - mappingでもlocalizationでもnavigationでも共通して使うノードを置く。オドメトリのリセット&スタートなど。
+- 2d/3d_mapping.launch.py
+  - mapping.launch.pyの中身。
+- rosbag.launch.py
+  - (今の所)Cub3のセンサデータを記録開始する。
 
 # glimの起動方法
 コンテナ内で下記コマンドで実行

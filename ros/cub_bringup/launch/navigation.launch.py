@@ -13,6 +13,9 @@ import os
 def generate_launch_description():
     cub_target = os.getenv('CUB_TARGET', 'cub3')
     print("launch target:", cub_target)
+    map_dir = LaunchConfiguration(
+        'map',
+        default = "/home/cub/maps/oudanhodoumade/mapoudanhodoumade_manual_crean.yaml")
 
     return LaunchDescription([
         IncludeLaunchDescription(
@@ -24,25 +27,28 @@ def generate_launch_description():
 
         IncludeLaunchDescription(
             PathJoinSubstitution(
-                [FindPackageShare("cub3_bringup"), "launch", "common.launch.py"]
+                [FindPackageShare("cub_navigation"), "launch", "3d_cub_navigation.launch.py"]
             ),
             condition=IfCondition("true" if cub_target == 'cub3' else "false")
         ),
         IncludeLaunchDescription(
             PathJoinSubstitution(
-                [FindPackageShare("mcub_bringup"), "launch", "common.launch.py"]
+                [FindPackageShare("cub_navigation"), "launch", "cub_navigation.launch.py"]
             ),
+            launch_arguments=[
+                ('map', map_dir)
+            ],
             condition=IfCondition("true" if (cub_target == 'mcub' or cub_target == 'mcub_direct') else "false")
         ),
         IncludeLaunchDescription(
             PathJoinSubstitution(
-                [FindPackageShare("spidar_bringup"), "launch", "common.launch.py"]
+                [FindPackageShare("cub_navigation"), "launch", "3d_cub_navigation.launch.py"]
             ),
             condition=IfCondition("true" if cub_target == 'spidar' else "false")
         ),
         IncludeLaunchDescription(
             PathJoinSubstitution(
-                [FindPackageShare("handy1_bringup"), "launch", "common.launch.py"]
+                [FindPackageShare("cub_navigation"), "launch", "3d_cub_navigation.launch.py"]
             ),
             condition=IfCondition("true" if cub_target == 'handy1' else "false")
         ),

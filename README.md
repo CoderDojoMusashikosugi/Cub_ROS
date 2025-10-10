@@ -75,29 +75,28 @@
 
 ### 地図を作成する(2D)
 - 機体を手動で初期位置に持って行く
-  - 理由は後述するが、地図作成開始時にオドメトリが原点のままである場合、その後の作業が楽で大変おすすめ。リセットにはcommon.launch.pyを立ち上げ直す。
+  - 理由は後述するが、地図作成開始時にオドメトリが原点のままである場合、その後の作業が楽で大変おすすめ。
 - 地図作成用ノードを立ち上げ
-  - `ros2 launch cub_bringup 2d_mapping.launch.py`
+  - `ros2 launch cub_bringup mapping.launch.py`
 - 正しく起動できていれば、RVizに地図が出来上がっていく。手動操縦して生成される地図の範囲を広げていこう。
 - 最後に地図を保存する
   - `mkdir ~/maps/map1 && ros2 run nav2_map_server map_saver_cli -f ~/maps/map1/map --ros-args -p save_map_timeout:=1000.0`
   - これで`~/maps/map1`ディレクトリに地図が保存される。
 - 地図データを確認する
   - 画像データなので普通に開ける。
-- 全て完了したら、立ち上げたノードを(hardware_〇〇.launch.py以外)全部落とす
+- 全て完了したら、mapping.launch.pyを落とす
+  - launch_at_boot.launch.pyは立ち上げっぱなしで大丈夫。
 
 ### 作成した地図上で自律走行する(2D)
 - ロボットを地図作成開始時の初期位置に持っていく
-- ロボットを起動
-  - `ros2 launch cub_bringup common.launch.py`
-- 自己位置推定とナビゲーション用ノードを起動、地図のディレクトリ指定を添えて
-  - `ros2 launch cub_navigation cub_navigation.launch.py map:=/home/cub/maps/map1/map.yaml`
+- ロボットを起動、地図のディレクトリ指定を添えて
+  - `ros2 launch cub_bringup navigation.launch.py map:=/home/cub/maps/map1/map.yaml`
 - ↑の操作で新しく立ち上がったRVizの画面に初期姿勢を指定する
-  - common.launch.pyが立ち上げたRVizもあるので取り違えに注意
   - [こちらの記事の「Navigation2の実行」の項目](https://qiita.com/porizou1/items/d63a41fc1e478dfa5ab6#navigation2%E3%81%AE%E5%AE%9F%E8%A1%8C)を参考に、初期姿勢に2D Pose Estimateの矢印を置く。この初期姿勢は、今までの手順を守れば地図の原点で向きは赤い棒の方向に設定すれば良くなって便利。
 - ゴールを設定する
   - 上記記事の通りにNavigation2 Goalを設定すると、そこに向けてロボットが走っていくはず。
-- 走らせ飽きたら、立ち上げたノードを(hardware_〇〇.launch.py以外)全部落とす
+- 走らせ飽きたら、navigation.launch.pyを落とす
+  - launch_at_boot.launch.pyは立ち上げっぱなしで大丈夫。
 
 ### その他便利機能
 - ストレージが一杯の時は
@@ -107,6 +106,7 @@
   - gemini-cli向けにはGEMINI.mdが配置されているので、これを読んで操作してもらう。
   - github-copilot向けには.github/copilot-instructions.mdがある。実はGEMINI.mdへのシンボリックリンク。
   - claude code向けにはCLAUDE.mdがある。実はGEMINI.mdへのシンボリックリンク。
+  - codex向けにはAGENTS.mdがある。実はGEMINI.mdへのシンボリックリンク。
 
 
 ## Dockerの技術情報
