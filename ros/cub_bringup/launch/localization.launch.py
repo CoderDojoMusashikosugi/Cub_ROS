@@ -23,7 +23,7 @@ def generate_launch_description():
 
         IncludeLaunchDescription(
             PathJoinSubstitution(
-                [FindPackageShare("ekf_localizer"), "launch", "ekf_locali_city_hall.launch.py"]
+                [FindPackageShare("ekf_localizer"), "launch", "ekf_locali.launch.py"]
             ),
             condition=IfCondition("true" if cub_target == 'cub3' else "false")
         ),
@@ -35,7 +35,7 @@ def generate_launch_description():
         # ),
         IncludeLaunchDescription(
             PathJoinSubstitution(
-                [FindPackageShare("ekf_localizer"), "launch", "ekf_locali_city_hall.launch.py"]
+                [FindPackageShare("ekf_localizer"), "launch", "ekf_locali.launch.py"]
             ),
             condition=IfCondition("true" if cub_target == 'spidar' else "false")
         ),
