@@ -172,7 +172,14 @@ private:
         odometry_msg.twist.twist.linear.z = 0.0;  // 上下移動しない
         odometry_msg.twist.twist.angular.x = 0.0;  // ロールなし
         odometry_msg.twist.twist.angular.y = 0.0;  // ピッチなし
-        odometry_msg.twist.twist.angular.z = angular_velocity_z_;  // ヨー角速度 [rad/s]
+        // odometry_msg.twist.twist.angular.z = angular_velocity_z_;  // ヨー角速度 [rad/s]
+        #ifdef CUB_TARGET_CUB3
+            // CUB3ではIMUから直接角速度を取得するため、オドメトリには含めない
+            odometry_msg.twist.twist.angular.z = 0.0;
+        #elif defined(CUB_TARGET_MCUB)
+            // MCUBではホイールオドメトリから計算した角速度を使用
+            odometry_msg.twist.twist.angular.z = angular_velocity_z_;  // ヨー角速度 [rad/s]
+        #endif
 
         // オドメトリメッセージのパブリッシュ
         odometry_publisher_->publish(odometry_msg);
