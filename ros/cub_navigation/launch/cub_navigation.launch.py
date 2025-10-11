@@ -33,7 +33,7 @@ def generate_launch_description():
     use_sim_time = LaunchConfiguration('use_sim_time', default='false')
     map_dir = LaunchConfiguration(
         'map',
-        default = "/home/cub/maps/oudanhodoumade/mapoudanhodoumade_manual_crean.yaml")
+        default = "/home/cub/support_tools/3dmap_converter/kakunin-0920.yaml")
     cub_target = os.getenv('CUB_TARGET', 'cub3')
     if cub_target == 'cub3':
         param_file_name = 'cub3_nav2.yaml'
@@ -51,11 +51,15 @@ def generate_launch_description():
             'param',
             param_file_name))
     
+    cub_bringup_launch_dir = os.path.join(get_package_share_directory('cub_bringup'), "launch")
+
     cub_navigation_launch_dir = os.path.join(get_package_share_directory('cub_navigation'), "launch")
 
     nav2_launch_file_dir = os.path.join(get_package_share_directory('nav2_bringup'), 'launch')
 
     collison_monitor_launch_file_dir = os.path.join(get_package_share_directory('nav2_collision_monitor'), 'launch')
+
+    ekf_licalizer_launch_dir = os.path.join(get_package_share_directory('ekf_localizer'), "launch")
 
     rviz_config_dir = os.path.join(
         get_package_share_directory('nav2_bringup'),
@@ -70,10 +74,10 @@ def generate_launch_description():
             arguments=['-d', rviz_config_dir],
             parameters=[{'use_sim_time': use_sim_time}],
             output='screen'),
-        Node(
-            package='cub_bringup',
-            executable='odom_to_tf',
-        ),
+        # Node(
+        #     package='cub_bringup',
+        #     executable='odom_to_tf',
+        # ),
         DeclareLaunchArgument(
             'map',
             default_value=map_dir,
@@ -90,7 +94,21 @@ def generate_launch_description():
             description='Use simulation (Gazebo) clock if true'),
 
         IncludeLaunchDescription(
-            PythonLaunchDescriptionSource([cub_navigation_launch_dir, '/bringup_launch.py']),
+            PythonLaunchDescriptionSource([cub_bringup_launch_dir, '/cub.launch.py']),
+            launch_arguments=[
+                ('use_sim_time', use_sim_time),
+            ],
+        ),
+
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource([ekf_licalizer_launch_dir, '/ekf_locali.launch.py']),
+            launch_arguments=[
+                ('use_sim_time', use_sim_time),
+            ],
+        ),
+
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource([cub_navigation_launch_dir, '/navigation_launch.py']),
             launch_arguments=[
                 ('map', map_dir),
                 ('use_sim_time', use_sim_time),

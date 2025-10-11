@@ -144,6 +144,7 @@ CRGB lane_led[NUM_LANE_LEDS];
 // #include <EspEasyTask.h>
 
 void connect_dualsense(){
+  // ps5.begin("4C:B9:9B:98:1E:9B"); //replace with your MAC address
   ps5.begin("4C:B9:9B:64:76:1A"); //replace with your MAC address
 }
 
@@ -767,8 +768,8 @@ void setup() {
 }
 
 void loop() {
-  // if (digitalRead(EMERGENCY_MONITOR) == HIGH) {
-  if (false) {  // for temporary disable emergency stop
+  if (digitalRead(EMERGENCY_MONITOR) == HIGH) {
+  // if (false) {  // for temporary disable emergency stop
     debug_message("Emergency stop triggered");
     robo_mode = EMERGENCY;
     leds[4] = CRGB::Red;
