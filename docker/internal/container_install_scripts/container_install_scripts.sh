@@ -1,7 +1,7 @@
 #!/bin/bash
 apt-get update
 
-# コンテナ側にuser.bashrcを登録
+# コンテナ側にuser.bashrcを作成
 touch /etc/user.bashrc
 # コンテナ側の.bashrcに、user.bashrcを登録
 echo "source " >> /etc/bash.bashrc
