@@ -54,9 +54,9 @@
     "points_time_offset": 0.0,
     "acc_scale": 1.0,
     // TF config
-    "imu_frame_id": "imu",
-    "lidar_frame_id": "lidar",
-    "base_frame_id": "",
+    "imu_frame_id": "imu_link",
+    "lidar_frame_id": "velodyne",
+    "base_frame_id": "base_link",
     "odom_frame_id": "odom",
     "map_frame_id": "map",
     "publish_imu2lidar": true,
@@ -65,11 +65,12 @@
     "extension_modules": [
       "libmemory_monitor.so",
       "libstandard_viewer.so",
-      "librviz_viewer.so"
+      "librviz_viewer.so",
       // "libimu_validator.so"
+      "libgeoreference.so"
     ],
     // Topics
-    "imu_topic": "/bno055/imu_raw",
+    "imu_topic": "/imu/data_raw",
     "points_topic": "/velodyne_points",
     "image_topic": "/image",
     // QoS options

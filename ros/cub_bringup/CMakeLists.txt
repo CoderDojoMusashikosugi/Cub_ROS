@@ -46,4 +46,9 @@ install(
   DESTINATION share/${PROJECT_NAME}
 )
 
+install(
+  PROGRAMS scripts/distance_logger.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 ament_package()

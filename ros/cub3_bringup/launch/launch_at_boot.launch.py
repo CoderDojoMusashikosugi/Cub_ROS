@@ -13,6 +13,8 @@ import yaml
 import os
 
 def generate_launch_description():
+    joy_dev = "/dev/input/js0"
+
     # sllidar_ros2パッケージの共有ディレクトリを取得
     sllidar_ros2_share_dir = FindPackageShare('sllidar_ros2').find('sllidar_ros2')
     
@@ -68,7 +70,8 @@ def generate_launch_description():
     cub_bringup_params_path = os.path.join(get_package_share_directory('cub3_bringup'),'config')
     zed_f9p_params = os.path.join(cub_bringup_params_path, 'zed_f9p.yaml')
     rtklib = ExecuteProcess(
-        cmd=['str2str', '-in','ntrip://guest:guest@160.16.134.72:80/CQ-F9P','-out','serial://ttyGPS:230400'],
+        cmd=['str2str', '-in','ntrip://ntrip1.bizstation.jp:2101/3041F3CA','-out','serial://ttyGPS:230400'],  #Tsukuba
+        # cmd=['str2str', '-in','ntrip://ntrip1.bizstation.jp:2101/B4A00B46','-out','serial://ttyGPS:230400'],    #Yokohama
         output='both',
         respawn=True,
         respawn_delay=10.0
@@ -124,6 +127,17 @@ def generate_launch_description():
             }],
             output='screen'
         ),
+        Node(
+            package='cub_commander',
+            executable='cub_commander_node',
+            output='screen',
+            parameters=[{'dev': joy_dev}],
+        ),
+        Node(
+            package='joy_linux',
+            executable='joy_linux_node',
+            parameters=[{'dev': joy_dev}],
+        ),
 
         # グループアクション
         slc_L_group,
@@ -134,5 +148,12 @@ def generate_launch_description():
 
         velodyne_driver_node,
         velodyne_transform_node,
-        realsense_launch,
+        # realsense_launch,
+        Node(
+            package='cub_bringup',
+            executable='distance_logger.py',
+            name='distance_logger',
+            parameters=[{'odom_topic': '/odom'}],
+            output='screen'
+        ),
     ])

@@ -16,6 +16,12 @@
   <exec_depend>livox_ros_driver2</exec_depend>
   <exec_depend>ublox_gps</exec_depend>
 
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>python3-flask</exec_depend>
+  <exec_depend>python3-websockets</exec_depend>
+  <exec_depend>rqt_image_view</exec_depend>
+  <exec_depend>image_transport_plugins</exec_depend>
+
   <export>
     <build_type>ament_cmake</build_type>
   </export>

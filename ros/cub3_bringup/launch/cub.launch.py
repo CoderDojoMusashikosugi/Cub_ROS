@@ -13,12 +13,13 @@ def generate_launch_description():
     # Launchファイルの返り値
     return LaunchDescription([
         # wheel_odometryノード
-        # Node(
-        #     package='wheel_odometry',
-        #     executable='wheel_odometry_node',
-        #     name='wheel_odometry_node',
-        #     output='screen'
-        # ),
+        Node(
+            package='wheel_odometry',
+            executable='wheel_odometry_node',
+            name='wheel_odometry_node',
+            output='screen',
+            # remappings=[('odom', 'wh_odom')]
+        ),
 
         # pointcloud to laser scan
         Node(
@@ -43,19 +44,19 @@ def generate_launch_description():
         ),
 
         # 2Dのマッピングやナビゲーションを実行する際はこれを有効化、3Dでは無効化
-        Node(
-            package='cub_bringup',
-            executable='odom_to_tf',
-        ),
+        # Node(
+        #     package='cub_bringup',
+        #     executable='odom_to_tf',
+        # ),
 
         # RVizの起動
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                PathJoinSubstitution(
-                    [FindPackageShare("cub_visualization"), "launch", "rviz.launch.py"]
-                )
-            )
-        ),
+        # IncludeLaunchDescription(
+        #     PythonLaunchDescriptionSource(
+        #         PathJoinSubstitution(
+        #             [FindPackageShare("cub_visualization"), "launch", "rviz.launch.py"]
+        #         )
+        #     )
+        # ),
 
         # state_publisherの起動
         IncludeLaunchDescription(

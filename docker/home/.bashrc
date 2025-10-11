@@ -126,8 +126,6 @@ fi
 
 source ~/.user_config.bash
 
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
-
 alias ros='ros2'
 alias bashrc='source ~/.bashrc'
 alias cb="cd ~/colcon_ws && colcon build --symlink-install ; cd - > /dev/null 2>&1"

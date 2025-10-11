@@ -66,7 +66,7 @@
   </link>
 
   <!-- SLCL (左センサー) -->
-  <link name="SLCL_link">
+  <link name="SLC1L">
     <visual>
       <geometry>
         <cylinder radius="0.03" length="0.02"/>
@@ -78,7 +78,7 @@
   </link>
 
   <!-- SLCR (右センサー) -->
-  <link name="SLCR_link">
+  <link name="SLC1R">
     <visual>
       <geometry>
         <cylinder radius="0.03" length="0.02"/>
@@ -123,19 +123,19 @@
   <joint name="base_to_imu" type="fixed">
     <parent link="base_link"/>
     <child link="imu_link"/>
-    <origin xyz="0 0 0.1" rpy="0 0 0"/>
+    <origin xyz="0 0 0.48" rpy="0 0 0"/>
   </joint>
 
   <joint name="base_to_SLCL" type="fixed">
     <parent link="base_link"/>
-    <child link="SLCL_link"/>
-    <origin xyz="-0.05 0.1 0.2" rpy="0 0 0"/>
+    <child link="SLC1L"/>
+    <origin xyz="-0.05 0.1 0.2" rpy="0 0 -1.57079632679"/>
   </joint>
 
   <joint name="base_to_SLCR" type="fixed">
     <parent link="base_link"/>
-    <child link="SLCR_link"/>
-    <origin xyz="-0.05 -0.1 0.2" rpy="0 0 0"/>
+    <child link="SLC1R"/>
+    <origin xyz="-0.05 -0.1 0.2" rpy="0 0 1.57079632679"/>
   </joint>
 
   <joint name="base_to_camera" type="fixed">

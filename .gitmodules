@@ -27,5 +27,14 @@
 	url = https://github.com/nobu323/cxd5602pwbimu_localizer_arduino.git
 [submodule "ros/livox_ros_driver2"]
 	path = ros/livox_ros_driver2
-	url = https://github.com/atinfinity/livox_ros_driver2.git
+	url = https://github.com/t-nagatani/livox_ros_driver2.git
 	branch = humble
+[submodule "ros/FAST-LIVO2-ROS2-MID360-Fisheye"]
+	path = ros/FAST-LIVO2-ROS2-MID360-Fisheye
+	url = https://github.com/t-nagatani/FAST-LIVO2-ROS2-MID360-Fisheye.git
+[submodule "ros/fast_gicp"]
+	path = ros/fast_gicp
+	url = https://github.com/koide3/fast_gicp.git
+[submodule "ros/ekf_localizer_ros2"]
+	path = ros/ekf_localizer_ros2
+	url = https://github.com/UNI-shibuya-taku/ekf_localizer_ros2.git
