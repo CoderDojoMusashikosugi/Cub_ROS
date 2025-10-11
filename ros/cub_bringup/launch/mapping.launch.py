@@ -19,8 +19,8 @@ def generate_launch_description():
             PathJoinSubstitution(
                 [FindPackageShare("cub_bringup"), "launch", "common.launch.py"]
             ),
-            condition=IfCondition("true" if cub_target == 'cub3' else "false")
         ),
+
         IncludeLaunchDescription(
             PathJoinSubstitution(
                 [FindPackageShare("cub_bringup"), "launch", "3d_mapping.launch.py"]
