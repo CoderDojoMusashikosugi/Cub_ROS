@@ -41,6 +41,7 @@ public:
         last_left_wheel_pos_ = 0;
         last_right_wheel_pos_ = 0;
         yaw_ = 0;
+        angular_velocity_z_ = 0.0;  // 追加
 #ifdef CUB_TARGET_CUB3
         last_left_rear_wheel_pos_ = 0;
         last_right_rear_wheel_pos_ = 0;
@@ -48,17 +49,30 @@ public:
         x_ = 0.0;
         y_ = 0.0;
         theta_ = 0.0;
+        last_time_ = this->get_clock()->now();  // 追加：初期時刻
+        is_first_callback_ = true;  // 追加
     }
 
 private:
     void wheelPositionCallback(const std_msgs::msg::Int32MultiArray::SharedPtr msg)
     {
+        //   時間差分の計算
+        rclcpp::Time current_time = this->get_clock()->now();
+        double dt = 0.0;
+        if (!is_first_callback_) {
+            dt = (current_time - last_time_).seconds();
+            if (dt <= 0.0) dt = 0.01;  // ゼロ除算防止
+        }
+        
         // メッセージから車輪の位置を取得
         int32_t left_wheel_position = msg->data[0];
         int32_t right_wheel_position = msg->data[1];
         if((last_left_wheel_pos_ == 0) && (last_right_wheel_pos_ == 0)) {
             last_left_wheel_pos_ = left_wheel_position;
             last_right_wheel_pos_ = right_wheel_position;
+            last_time_ = current_time;  // 時刻更新
+            is_first_callback_ = false;  // 追加
+            return;  // 初回は速度計算できないので終了
         }
 #ifdef CUB_TARGET_CUB3
         // メッセージから車輪の位置を取得
@@ -110,12 +124,24 @@ private:
         double delta_right = delta_right_pos * pulse2meter_param_;  // [m]
         double delta_center = (delta_left + delta_right) / 2.0; //[m]
 
+        // 線形速度の計算（ロボット座標系のx方向）
+        double linear_velocity_x = 0.0;
+        if (!is_first_callback_ && dt > 0.0) {
+            linear_velocity_x = delta_center / dt;  // [m/s]
+        }
+
         // 角度の更新
+        double delta_theta = 0.0;  // 追加
 #ifdef CUB_TARGET_CUB3
         theta_ = yaw_;
+        // CUB3の場合、角速度はIMUから取得（imu_callbackで設定済み）
 #elif defined(CUB_TARGET_MCUB)
-        double delta_theta = (delta_right - delta_left) / wheel_distance_;  // [rad]
+        delta_theta = (delta_right - delta_left) / wheel_distance_;  // [rad]
         theta_ += delta_theta;
+        // MCUBの場合、角速度を計算
+        if (!is_first_callback_ && dt > 0.0) {
+            angular_velocity_z_ = delta_theta / dt;  // [rad/s]
+        }
 #endif
 
         // 位置の更新
@@ -127,13 +153,33 @@ private:
 
         // オドメトリメッセージの作成
         auto odometry_msg = nav_msgs::msg::Odometry();
-        odometry_msg.header.stamp = cur_time_;
+        odometry_msg.header.stamp = current_time;  //   変更
         odometry_msg.header.frame_id = "odom";
         odometry_msg.child_frame_id = "base_link";
+        
+        // Pose
         odometry_msg.pose.pose.position.x = x_;
         odometry_msg.pose.pose.position.y = y_;
+        odometry_msg.pose.pose.position.z = 0.0;  //   明示的に0を設定
+        odometry_msg.pose.pose.orientation.x = 0.0;  //   追加
+        odometry_msg.pose.pose.orientation.y = 0.0;  //   追加
         odometry_msg.pose.pose.orientation.z = sin(theta_ / 2.0);
         odometry_msg.pose.pose.orientation.w = cos(theta_ / 2.0);
+
+        //   Twist（速度情報）の追加
+        odometry_msg.twist.twist.linear.x = linear_velocity_x;  // 前進速度 [m/s]
+        odometry_msg.twist.twist.linear.y = 0.0;  // 差動二輪は横移動しない
+        odometry_msg.twist.twist.linear.z = 0.0;  // 上下移動しない
+        odometry_msg.twist.twist.angular.x = 0.0;  // ロールなし
+        odometry_msg.twist.twist.angular.y = 0.0;  // ピッチなし
+        // odometry_msg.twist.twist.angular.z = angular_velocity_z_;  // ヨー角速度 [rad/s]
+        #ifdef CUB_TARGET_CUB3
+            // CUB3ではIMUから直接角速度を取得するため、オドメトリには含めない
+            odometry_msg.twist.twist.angular.z = 0.0;
+        #elif defined(CUB_TARGET_MCUB)
+            // MCUBではホイールオドメトリから計算した角速度を使用
+            odometry_msg.twist.twist.angular.z = angular_velocity_z_;  // ヨー角速度 [rad/s]
+        #endif
 
         // オドメトリメッセージのパブリッシュ
         odometry_publisher_->publish(odometry_msg);
@@ -157,6 +203,10 @@ private:
         last_left_rear_wheel_pos_ = left_wheel_position_2;
         last_right_rear_wheel_pos_ = right_wheel_position_2;
 #endif
+        
+        //   時刻の更新
+        last_time_ = current_time;
+        is_first_callback_ = false;
     }
     
     void imu_callback(const sensor_msgs::msg::Imu::SharedPtr msg) 
@@ -167,7 +217,12 @@ private:
         tf2::Matrix3x3(quaternion).getRPY(roll,pitch,yaw);
         if(initial_yaw_ == -100) initial_yaw_ = yaw;
         yaw_ = yaw - initial_yaw_;
-        cur_time_ = msg->header.stamp;
+        
+        //   CUB3の場合、IMUの角速度を使用
+#ifdef CUB_TARGET_CUB3
+        angular_velocity_z_ = msg->angular_velocity.z;  // [rad/s]
+#endif
+        
         // IMUメッセージをログに出力
         // RCLCPP_INFO(this->get_logger(), "Linear Acceleration:\n x: %.2f, y: %.2f, z: %.2f",
         //             msg->linear_acceleration.x, msg->linear_acceleration.y, msg->linear_acceleration.z);
@@ -237,7 +292,9 @@ private:
     double x_, y_, theta_; // 現在のオドメトリの位置と角度
     double yaw_;
     double initial_yaw_ = -100;
-    builtin_interfaces::msg::Time cur_time_;
+    double angular_velocity_z_;  // 追加：角速度
+    rclcpp::Time last_time_;  // 追加：前回の時刻
+    bool is_first_callback_;  // 追加：初回コールバックフラグ
 };
 
 int main(int argc, char * argv[])

@@ -58,7 +58,13 @@ def generate_launch_description():
         "/wheel_positions",
     ]
     return LaunchDescription([
-        TimerAction(period=1.0, actions=[ExecuteProcess(
+        IncludeLaunchDescription(
+            PathJoinSubstitution(
+                [FindPackageShare("cub_bringup"), "launch", "common.launch.py"]
+            ),
+        ),
+
+        TimerAction(period=3.0, actions=[ExecuteProcess(
             cwd=home_directory+"rosbag",
             cmd=['ros2', 'bag', 'record', '-s', 'mcap'] + topic_list,
             output='screen'

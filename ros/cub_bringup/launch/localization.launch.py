@@ -1,3 +1,6 @@
+# localization.launch.py
+# これをlaunch_at_boot.launch.pyと一緒に起動すると自己位置推定が出来る
+# 自律走行はしない。
 from launch import LaunchDescription
 from launch_ros.actions import Node
 from launch.actions import IncludeLaunchDescription
@@ -12,33 +15,33 @@ def generate_launch_description():
     print("launch target:", cub_target)
 
     return LaunchDescription([
-        Node(# オドメトリをクリアしておく
-            package='cub_bringup',
-            executable='clear_odom',
-            name='clear_odom',
-            output='screen'
-        ),
         IncludeLaunchDescription(
             PathJoinSubstitution(
-                [FindPackageShare("cub3_bringup"), "launch", "cub.launch.py"]
+                [FindPackageShare("cub_bringup"), "launch", "common.launch.py"]
+            ),
+        ),
+
+        IncludeLaunchDescription(
+            PathJoinSubstitution(
+                [FindPackageShare("ekf_localizer"), "launch", "ekf_locali.launch.py"]
             ),
             condition=IfCondition("true" if cub_target == 'cub3' else "false")
         ),
+        # IncludeLaunchDescription(
+        #     PathJoinSubstitution(
+        #         [FindPackageShare("mcub_bringup"), "launch", "localization.launch.py"]
+        #     ),
+        #     condition=IfCondition("true" if (cub_target == 'mcub' or cub_target == 'mcub_direct') else "false")
+        # ),
         IncludeLaunchDescription(
             PathJoinSubstitution(
-                [FindPackageShare("mcub_bringup"), "launch", "cub.launch.py"]
-            ),
-            condition=IfCondition("true" if (cub_target == 'mcub' or cub_target == 'mcub_direct') else "false")
-        ),
-        IncludeLaunchDescription(
-            PathJoinSubstitution(
-                [FindPackageShare("spidar_bringup"), "launch", "cub.launch.py"]
+                [FindPackageShare("ekf_localizer"), "launch", "ekf_locali.launch.py"]
             ),
             condition=IfCondition("true" if cub_target == 'spidar' else "false")
         ),
         IncludeLaunchDescription(
             PathJoinSubstitution(
-                [FindPackageShare("handy1_bringup"), "launch", "cub.launch.py"]
+                [FindPackageShare("handy1_bringup"), "launch", "localization.launch.py"]
             ),
             condition=IfCondition("true" if cub_target == 'handy1' else "false")
         ),
