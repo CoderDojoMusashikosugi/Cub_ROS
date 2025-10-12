@@ -1,4 +1,5 @@
 ARG BASE_IMAGE_NAME=ghcr.io/coderdojomusashikosugi/cub_ros:latest_default_default
+ARG ROS_DISTRO="humble"
 
 FROM ${BASE_IMAGE_NAME}
 
@@ -18,7 +19,7 @@ RUN apt-get update -q && \
 
 # noVNC and Websockify
 RUN git clone https://github.com/AtsushiSaito/noVNC.git -b add_clipboard_support /usr/lib/novnc
-RUN pip install git+https://github.com/novnc/websockify.git@v0.10.0
+RUN pip install git+https://github.com/novnc/websockify.git@v0.10.0 --break-system-packages
 RUN ln -s /usr/lib/novnc/vnc.html /usr/lib/novnc/index.html
 
 # Set remote resize function enabled by default
@@ -32,6 +33,6 @@ COPY docker/internal/entrypoint_vnc.sh /entrypoint_vnc.sh
 RUN dos2unix /entrypoint_vnc.sh
 ENTRYPOINT [ "/bin/bash", "-c", "/entrypoint_vnc.sh" ]
 
-ENV ROS_DISTRO humble
+ENV ROS_DISTRO ${ROS_DISTRO}
 ENV USER cub
 ENV PASSWD cub

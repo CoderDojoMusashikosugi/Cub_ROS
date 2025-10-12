@@ -1,6 +1,8 @@
 
 #!/bin/bash
 
+export ROS_DISTRO=humble
+
 # Load configuration utilities
 source docker/internal/config_utils.sh
 

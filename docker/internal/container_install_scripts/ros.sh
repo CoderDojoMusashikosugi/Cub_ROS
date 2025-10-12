@@ -13,6 +13,6 @@ rm /tmp/ros2-apt-source.deb
 apt update
 apt -y upgrade
 
-apt -y install ros-humble-desktop ros-dev-tools
+apt -y install ros-${ROS_DISTRO}-desktop ros-dev-tools python3-rosdep
 rosdep init
-rosdep update --rosdistro=humble
+rosdep update --rosdistro=${ROS_DISTRO}
