@@ -25,3 +25,4 @@ services:
     entrypoint: /entrypoint_vnc.sh # コンテナ起動時に最初に実行されるスクリプトの設定
     environment:                   # コンテナ内で使う環境変数の設定
       - DISPLAY=:1                 # VNC環境向けの設定
+      - ROS_DISTRO=${ROS_DISTRO}   # ROSのDistro設定を書く。インストールやsourceで使う。

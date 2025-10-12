@@ -75,12 +75,6 @@ command=gosu '$USER' bash '$VNCRUN_PATH'
 command=gosu '$USER' bash -c "websockify --web=/usr/lib/novnc 80 localhost:5901"
 EOF
 
-# colcon
-BASHRC_PATH=$HOME/.bashrc
-grep -F "source /opt/ros/$ROS_DISTRO/setup.bash" $BASHRC_PATH || echo "source /opt/ros/$ROS_DISTRO/setup.bash" >> $BASHRC_PATH
-grep -F "source /usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash" $BASHRC_PATH || echo "source /usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash" >> $BASHRC_PATH
-chown $USER:$USER $BASHRC_PATH
-
 # Fix rosdep permission
 mkdir -p $HOME/.ros
 cp -r /root/.ros/rosdep $HOME/.ros/rosdep

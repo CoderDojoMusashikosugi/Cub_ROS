@@ -1,5 +1,5 @@
 ARG BASE_IMAGE_NAME=ghcr.io/coderdojomusashikosugi/cub_ros:latest_default_default
-ARG ROS_DISTRO="humble"
+ARG ROS_DISTRO=humble
 
 FROM ${BASE_IMAGE_NAME}
 
