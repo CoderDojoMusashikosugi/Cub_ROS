@@ -1,7 +1,7 @@
 
 #!/bin/bash
 
-export ROS_DISTRO=humble
+export ROS_DISTRO=jazzy
 
 # Load configuration utilities
 source docker/internal/config_utils.sh
