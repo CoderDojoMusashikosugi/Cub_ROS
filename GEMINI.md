@@ -1,7 +1,7 @@
 # Gemini Project Context: Cub_ROS
 
 ## プロジェクト概要
-ROS2 Humbleを利用した自律移動ロボットCubの制御ソフトウェア。
+ROS2 Jazzyを利用した自律移動ロボットCubの制御ソフトウェア。
 
 センサ情報をDockerコンテナ上のROS2ノードで処理し制御コマンドを生成、シリアル通信経由でM5 Atomに渡して車体を制御する。
 
@@ -38,7 +38,7 @@ ROS2 Humbleを利用した自律移動ロボットCubの制御ソフトウェア
 
 ## 技術スタック
 - 言語: C++, Python
-- フレームワーク: ROS2 Humble
+- フレームワーク: ROS2 Jazzy
 - ビルド・実行環境: Docker
 
 ## ディレクトリ構成
