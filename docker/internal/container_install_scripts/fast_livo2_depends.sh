@@ -13,7 +13,7 @@ cd / && rm -rf Sophus
 
 # Vikit
 apt update && apt -y install libopencv-dev
-source /opt/ros/humble/setup.bash
+source /opt/ros/${ROS_DISTRO}/setup.bash
 mkdir -p /fast_livo2_depends_ws/src && cd /fast_livo2_depends_ws/src
 git clone https://github.com/Rhymer-Lcy/rpg_vikit_ros2_fisheye.git
 cd rpg_vikit_ros2_fisheye && rm -rf vikit_py

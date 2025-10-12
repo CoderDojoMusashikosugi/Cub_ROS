@@ -5,7 +5,7 @@ services:
   cub_ros:
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix                          # 画面出力用
-      - ~/.Xauthority:/home/${USER_NAME:-cub}/.Xauthority      # 画面出力用
+      - ~/.Xauthority:/home/${USER_NAME_CONTAINER:-cub}/.Xauthority      # 画面出力用
 
   cub_ros_vnc:
     build:
