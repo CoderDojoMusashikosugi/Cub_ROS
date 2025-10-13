@@ -19,6 +19,8 @@
   <exec_depend>rviz2</exec_depend>
   <exec_depend>cub_description</exec_depend>
   <exec_depend>cub_visualization</exec_depend>
+  <exec_depend>diagnostic_aggregator</exec_depend>
+  <exec_depend>cub_diagnostics</exec_depend>
 
   <export>
     <build_type>ament_cmake</build_type>
