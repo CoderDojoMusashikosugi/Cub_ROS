@@ -45,19 +45,23 @@ diagnostic_aggregator:
   ros__parameters:
     pub_rate: 1.0
     analyzers:
-      sensors:
-        type: diagnostic_aggregator/GenericAnalyzer
-        path: Sensors
-        contains: [
-          "TopicMonitor",
-        ]
-      linux:
-        type: diagnostic_aggregator/GenericAnalyzer
-        path: Linux
-        contains: [
-          # "Joystick Driver Status", #繋がってない間Errorになるので外してる
-          "Linux CPU Usage",
-          "Linux Memory Usage",
-          "Linux Swap Usage",
-          "Linux Storage Usage"
-        ]
+      system:
+        type: diagnostic_aggregator/AnalyzerGroup
+        path: Robot
+        analyzers:
+          sensors:
+            type: diagnostic_aggregator/GenericAnalyzer
+            path: Sensors
+            contains: [
+              "TopicMonitor",
+            ]
+          linux:
+            type: diagnostic_aggregator/GenericAnalyzer
+            path: Linux
+            contains: [
+              # "Joystick Driver Status", #繋がってない間Errorになるので外してる
+              "Linux CPU Usage",
+              "Linux Memory Usage",
+              "Linux Swap Usage",
+              "Linux Storage Usage"
+            ]

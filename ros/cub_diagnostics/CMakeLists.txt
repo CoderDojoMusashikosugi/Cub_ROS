@@ -29,8 +29,18 @@ ament_target_dependencies(linux_state_node
   diagnostic_updater
 )
 
+add_executable(jetson_state_node
+  src/jetson_state_node.cpp
+)
+ament_target_dependencies(jetson_state_node
+  rclcpp
+  diagnostic_msgs
+  diagnostic_updater
+)
+
 install(TARGETS topic_hz_node
   linux_state_node
+  jetson_state_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
