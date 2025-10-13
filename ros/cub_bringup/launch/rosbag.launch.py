@@ -33,6 +33,8 @@ def generate_launch_description():
         # "/camera/camera/rgbd",
         "/cmd_vel_atom",
         "/diagnostics",
+        "/diagnostics_agg",
+        "/diagnostics_toplevel_state",
         "/fix",
         "/fix_velocity",
         "/imu/data",
