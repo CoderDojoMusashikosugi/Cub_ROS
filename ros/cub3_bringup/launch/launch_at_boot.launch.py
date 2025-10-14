@@ -148,7 +148,7 @@ def generate_launch_description():
 
         velodyne_driver_node,
         velodyne_transform_node,
-        # realsense_launch,
+        realsense_launch,
         Node(
             package='cub_bringup',
             executable='distance_logger.py',
