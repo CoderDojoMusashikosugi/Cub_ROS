@@ -1,4 +1,5 @@
 ARG BASE_IMAGE_NAME
+ARG ROS_DISTRO=humble
 FROM ${BASE_IMAGE_NAME}
 
 LABEL org.opencontainers.image.source=https://github.com/CoderDojoMusashikosugi/Cub_ROS
