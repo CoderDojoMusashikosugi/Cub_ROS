@@ -1,0 +1,39 @@
+gps_updater:
+  ros__parameters:
+
+    # Topic Names
+    gps_topic_name: /fix                    # GPS入力トピック名
+    gps_pose_topic_name: /gps_pose          # GPS出力トピック名（ローカル座標系）
+    map_frame_id: map                       # 出力フレームID
+
+    # GPS Origin Setting
+    # use_manual_origin: GPS原点を手動設定するか
+    #   false: 最初の有効なGPS信号の位置を自動的に原点に設定（推奨）
+    #   true:  以下の3つのパラメータで指定した位置を原点として使用
+    use_manual_origin: false
+    
+    # 手動原点設定（use_manual_origin: trueの場合のみ有効）
+    # 例: 東京駅付近
+    # gps_origin_lat: 35.6812
+    # gps_origin_lon: 139.7671
+    # gps_origin_alt: 40.0
+    gps_origin_lat: 0.0                     # GPS原点の緯度（度）
+    gps_origin_lon: 0.0                     # GPS原点の経度（度）
+    gps_origin_alt: 0.0                     # GPS原点の高度（m、楕円体高）
+
+    # GPS Quality Filter Parameters
+    # min_satellites: 最小衛星数の閾値（現在未実装）
+    # max_hdop: 最大HDOP値の閾値（現在未実装）
+    min_satellites: 6.0
+    max_hdop: 3.0
+    
+    # max_covariance_threshold: 許容する最大測位誤差（m）
+    #   GPSの水平方向標準偏差がこの値を超えると棄却される
+    #   厳しい設定: 5.0  → 高精度データのみ使用（都市部では使えないことも）
+    #   標準設定: 10.0 → バランスの取れた設定
+    #   緩い設定: 15.0 → 低精度データも許容（位置推定が不安定になる可能性）
+    max_covariance_threshold: 10.0
+
+    # Note: 
+    # - SBAS_FIX（STATUS_SBAS_FIX = 1）以上のGPS測位のみ採用されます
+    # - 共分散タイプがKNOWN(3)またはAPPROXIMATED(1)のデータのみ採用されます
