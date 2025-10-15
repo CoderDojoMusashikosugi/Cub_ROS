@@ -8,6 +8,10 @@ from ament_index_python.packages import get_package_share_directory
 from launch.actions import TimerAction
 from launch_ros.actions import PushRosNamespace
 from launch.substitutions import LaunchConfiguration
+import ament_index_python.packages
+from ament_index_python.packages import get_package_share_directory
+import launch_ros.actions
+import yaml
 import os
 
 def generate_launch_description():
@@ -17,6 +21,34 @@ def generate_launch_description():
         'config',
         'diagnostics.yaml'
     ])
+
+        # velodyneの起動
+    velodyne_driver_share_dir = ament_index_python.packages.get_package_share_directory('velodyne_driver')
+    _velodyne_driver_params_file = os.path.join(velodyne_driver_share_dir, 'config', 'VLP32C-velodyne_driver_node-params.yaml')
+    velodyne_driver_node = launch_ros.actions.Node(package='velodyne_driver',
+                                                   executable='velodyne_driver_node',
+                                                   output='both',
+                                                   parameters=[_velodyne_driver_params_file])
+    velodyne_convert_share_dir = ament_index_python.packages.get_package_share_directory('velodyne_pointcloud')
+    velodyne_convert_params_file = os.path.join(velodyne_convert_share_dir, 'config', 'VLP32C-velodyne_transform_node-params.yaml')
+    with open(velodyne_convert_params_file, 'r') as f:
+        velodyne_convert_params = yaml.safe_load(f)['velodyne_transform_node']['ros__parameters']
+    velodyne_convert_params['calibration'] = os.path.join(velodyne_convert_share_dir, 'params', 'VeloView-VLP-32C.yaml')
+    velodyne_transform_node = launch_ros.actions.Node(package='velodyne_pointcloud',
+                                                      executable='velodyne_transform_node',
+                                                      output='both',
+                                                      parameters=[velodyne_convert_params])
+    realsense_launch_file_dir = os.path.join(
+        get_package_share_directory("realsense2_camera"),
+        'launch'
+    )
+    realsense_launch=IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(os.path.join(realsense_launch_file_dir, "rs_launch.py")),
+        launch_arguments={
+            'config_file': os.path.join(realsense_launch_file_dir, "config", "config.yaml"),
+        }.items()
+    )
+
     # Launchファイルの返り値
     return LaunchDescription([
         # wheel_odometryノード
@@ -26,6 +58,15 @@ def generate_launch_description():
             name='wheel_odometry_node',
             output='screen',
             # remappings=[('odom', 'wh_odom')]
+        ),
+
+        # トリップメーター
+        Node(
+            package='cub_bringup',
+            executable='distance_logger.py',
+            name='distance_logger',
+            parameters=[{'odom_topic': '/odom'}],
+            output='screen'
         ),
 
         # pointcloud to laser scan
@@ -102,4 +143,11 @@ def generate_launch_description():
             output='both',
             parameters=[{'use_sim_time': use_sim_time}, diag_config],
         ),
+
+        # 3D LiDAR -> launch_at_boot.launch.pyから移動
+        velodyne_driver_node,
+        velodyne_transform_node,
+
+        # RGB-D Camera -> launch_at_boot.launch.pyから移動
+        realsense_launch,
     ])

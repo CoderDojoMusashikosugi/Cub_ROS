@@ -13,7 +13,37 @@ import yaml
 import os
 
 def generate_launch_description():
+    micro_ros_agent = Node(
+        package='micro_ros_agent',
+        executable='micro_ros_agent',
+        name='micro_ros_agent',
+        arguments=["serial", "--dev", "/dev/ttyATOM", "-b", "115200", "-v6"]
+    )
+
+    spresense_imu = Node(
+        package='cxd5602pwbimu_localizer_node',
+        executable='localizer_node',
+        name='imu_localizer_node',
+        parameters=[{
+            'serial_port': "/dev/ttyMULIMU",
+            'baud_rate': 1152000,
+        }],
+        output='screen'
+    )
+
     joy_dev = "/dev/input/js0"
+    cub_commander = Node(
+        package='cub_commander',
+        executable='cub_commander_node',
+        output='screen',
+        parameters=[{'dev': joy_dev}],
+    )
+
+    joy_linux = Node(
+        package='joy_linux',
+        executable='joy_linux_node',
+        parameters=[{'dev': joy_dev}],
+    )
 
     # sllidar_ros2パッケージの共有ディレクトリを取得
     sllidar_ros2_share_dir = FindPackageShare('sllidar_ros2').find('sllidar_ros2')
@@ -109,51 +139,28 @@ def generate_launch_description():
     
     # Launchファイルの返り値
     return LaunchDescription([
-        Node(
-            package='micro_ros_agent',
-            executable='micro_ros_agent',
-            name='micro_ros_agent',
-            arguments=["serial", "--dev", "/dev/ttyATOM", "-b", "115200", "-v6"]
-        ),
-
+        # タイヤ
+        micro_ros_agent,
+        
         # spresense IMUノード
-        Node(
-            package='cxd5602pwbimu_localizer_node',
-            executable='localizer_node',
-            name='imu_localizer_node',
-            parameters=[{
-                'serial_port': "/dev/ttyMULIMU",
-                'baud_rate': 1152000,
-            }],
-            output='screen'
-        ),
-        Node(
-            package='cub_commander',
-            executable='cub_commander_node',
-            output='screen',
-            parameters=[{'dev': joy_dev}],
-        ),
-        Node(
-            package='joy_linux',
-            executable='joy_linux_node',
-            parameters=[{'dev': joy_dev}],
-        ),
+        spresense_imu,
+        
+        # 手動操縦
+        cub_commander,        
+        joy_linux,
 
-        # グループアクション
+        # 2D LiDAR
         slc_L_group,
         slc_R_group,
 
+        # GNSS
         rtklib,
         ublox_gps_delayed,
 
-        velodyne_driver_node,
-        velodyne_transform_node,
-        realsense_launch,
-        Node(
-            package='cub_bringup',
-            executable='distance_logger.py',
-            name='distance_logger',
-            parameters=[{'odom_topic': '/odom'}],
-            output='screen'
-        ),
+        # 3D LiDAR -> commmon.launch.pyでの起動に移動
+        # velodyne_driver_node,
+        # velodyne_transform_node,
+
+        # RGB-D Camera -> commmon.launch.pyでの起動に移動
+        # realsense_launch,
     ])
