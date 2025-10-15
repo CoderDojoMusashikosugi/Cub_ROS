@@ -32,7 +32,7 @@ find_package(std_srvs REQUIRED)
 # pkg_check_modules(GeographicLib REQUIRED geographic)
 
 set(GeographicLib_INCLUDE_DIRS "/usr/include")
-set(GeographicLib_LIBRARIES "Geographic")
+set(GeographicLib_LIBRARIES "GeographicLib")
 
 ament_auto_find_build_dependencies()
 
