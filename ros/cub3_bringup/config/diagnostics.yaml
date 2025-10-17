@@ -8,7 +8,7 @@ topic_hz_checker:
         type: "sensor_msgs/msg/NavSatFix"
         expected_hz: 1.0
         tolerance: 0.2
-        window_size: 100
+        window_size: 10
         qos:
           reliability: best_effort
           durability: volatile
@@ -18,17 +18,17 @@ topic_hz_checker:
         type: "sensor_msgs/msg/Imu"
         expected_hz: 386.0
         tolerance: 0.2
-        window_size: 100
+        window_size: 10
         qos:
           reliability: best_effort
           durability: volatile
-          depth: 100
+          depth: 1000
       odom:
         topic: "/odom"
         type: "nav_msgs/msg/Odometry"
         expected_hz: 20.0
         tolerance: 0.2
-        window_size: 100
+        window_size: 10
         qos:
           reliability: best_effort
           durability: volatile
@@ -38,27 +38,27 @@ topic_hz_checker:
         type: "sensor_msgs/msg/CameraInfo"
         expected_hz: 30.0
         tolerance: 0.2
-        window_size: 100
+        window_size: 10
         qos:
           reliability: best_effort
           durability: volatile
           depth: 100
       sllidar_l:
-        topic: "/sllidar_l/scan"
+        topic: "/SLC1L_scan"
         type: "sensor_msgs/msg/LaserScan"
         expected_hz: 10.0
         tolerance: 0.2
-        window_size: 100
+        window_size: 10
         qos:
           reliability: best_effort
           durability: volatile
           depth: 100
       sllidar_r:
-        topic: "/sllidar_r/scan"
+        topic: "/SLC1R_scan"
         type: "sensor_msgs/msg/LaserScan"
         expected_hz: 10.0
         tolerance: 0.2
-        window_size: 100
+        window_size: 10
         qos:
           reliability: best_effort
           durability: volatile
@@ -68,9 +68,9 @@ topic_hz_checker:
         type: "sensor_msgs/msg/PointCloud2"
         expected_hz: 10.0
         tolerance: 0.2
-        window_size: 100
+        window_size: 10
         qos:
-          reliability: best_effort
+          reliability: reliable
           durability: volatile
           depth: 100
       wheel_positions:
@@ -78,7 +78,7 @@ topic_hz_checker:
         type: "std_msgs/msg/Int32MultiArray"
         expected_hz: 20.0
         tolerance: 0.2
-        window_size: 100
+        window_size: 10
         qos:
           reliability: best_effort
           durability: volatile
