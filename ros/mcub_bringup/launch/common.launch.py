@@ -19,6 +19,12 @@ def generate_launch_description():
     with open(urdf, 'r') as infp:
         robot_desc = infp.read()
 
+    diag_config = PathJoinSubstitution([
+        FindPackageShare('mcub_bringup'),
+        'config',
+        'diagnostics.yaml'
+    ])
+
     return LaunchDescription([
         Node(
             package='wheel_odometry',
@@ -38,6 +44,28 @@ def generate_launch_description():
             output='screen',
             parameters=[{'use_sim_time': use_sim_time, 'robot_description': robot_desc}],
             arguments=[urdf]),
+
+        Node(
+            package='cub_diagnostics',
+            executable='topic_hz_node',
+            name='topic_hz_checker',
+            output='screen',
+            parameters=[{'use_sim_time': use_sim_time}, diag_config],
+        ),
+        Node(
+            package='cub_diagnostics',
+            executable='linux_state_node',
+            name='linux_state',
+            output='both',
+            parameters=[{'use_sim_time': use_sim_time}, diag_config],
+        ),
+        Node(
+            package='diagnostic_aggregator',
+            executable='aggregator_node',
+            name='diagnostic_aggregator',
+            output='both',
+            parameters=[{'use_sim_time': use_sim_time}, diag_config],
+        ),
 
         # Node(
         #     package='rviz2',
