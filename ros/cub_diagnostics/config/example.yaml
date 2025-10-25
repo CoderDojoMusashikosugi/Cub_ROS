@@ -1,0 +1,70 @@
+topic_hz_checker:
+  ros__parameters:
+    hardware_id: example
+    update_period: 1.0
+    topics:
+      odom:
+        topic: "/odom"
+        type: "nav_msgs/msg/Odometry"
+        expected_hz: 20.0
+        tolerance: 0.2
+        window_size: 60
+        qos:
+          reliability: best_effort
+          durability: volatile
+          depth: 100
+linux_state:
+  ros__parameters:
+    hardware_id: example
+    update_period: 1.0
+    cpu:
+      warn: 0.8
+      error: 0.95
+    memory:
+      warn: 0.8
+      error: 0.95
+    swap:
+      warn: 0.5
+      error: 0.8
+    storage:
+      paths: ["/"]
+      warn: 0.8
+      error: 0.95
+# jetson_state:
+#   ros__parameters:
+#     hardware_id: example
+#     update_period: 1.0
+#     thermal_zones:
+#       - "cpu-thermal"
+#       - "gpu-thermal"
+#       - "soc0-thermal"
+#       - "soc1-thermal"
+#       - "soc2-thermal"
+#       - "tj-thermal"
+#     warn_temperature: 65.0
+#     error_temperature: 80.0
+diagnostic_aggregator:
+  ros__parameters:
+    pub_rate: 1.0
+    analyzers:
+      system:
+        type: diagnostic_aggregator/AnalyzerGroup
+        path: Robot
+        analyzers:
+          sensors:
+            type: diagnostic_aggregator/GenericAnalyzer
+            path: Sensors
+            contains: [
+              "TopicMonitor",
+            ]
+          linux:
+            type: diagnostic_aggregator/GenericAnalyzer
+            path: Linux
+            contains: [
+              # "Joystick Driver Status", #繋がってない間Errorになるので外してる
+              "Linux CPU Usage",
+              "Linux Memory Usage",
+              "Linux Swap Usage",
+              "Linux Storage Usage",
+              # "Jetson Thermal State"
+            ]
