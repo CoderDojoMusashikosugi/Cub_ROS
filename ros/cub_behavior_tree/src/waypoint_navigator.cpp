@@ -264,6 +264,9 @@ private:
     } else if (result.code == rclcpp_action::ResultCode::ABORTED) {
       RCLCPP_ERROR(this->get_logger(), "Navigation through group '%s' aborted.", 
                    waypoint_groups_[current_group_index_].group_name.c_str());
+      RCLCPP_INFO(this->get_logger(), "retry this groups");
+      send_next_goal();
+      return;
     } else if (result.code == rclcpp_action::ResultCode::CANCELED) {
       RCLCPP_WARN(this->get_logger(), "Navigation through group '%s' canceled.", 
                   waypoint_groups_[current_group_index_].group_name.c_str());

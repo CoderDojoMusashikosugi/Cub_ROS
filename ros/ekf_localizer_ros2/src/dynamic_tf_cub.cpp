@@ -46,7 +46,8 @@ void DynamicTfCub::pub_dynamic_tf()
     geometry_msgs::msg::TransformStamped transformStamped;
     rclcpp::Clock clock(RCL_ROS_TIME);  // ROS時間を使用
     // transformStamped.header.stamp = clock.now();
-    transformStamped.header.stamp =this->get_clock()->now();
+    // transformStamped.header.stamp =this->get_clock()->now();
+    transformStamped.header.stamp = current_pose.header.stamp;
     transformStamped.header.frame_id = "map";
     transformStamped.child_frame_id = "base_link";
     transformStamped.transform.translation.x = current_pose.pose.position.x;
