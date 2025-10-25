@@ -39,9 +39,7 @@ private:
 	void motion_update(double dt);
 	void motion_update_by_imu(double dt);
 	void motion_update_by_odom(double dt);
-	void measurement_update();
 	void measurement_update_3DoF();
-	void measurement_update_6DoF();
 	
 	void publish_ekf_pose();
 	// void publish_tf();
@@ -105,7 +103,6 @@ private:
 	bool has_received_gps_;
 	// bool is_first_;
 	bool is_odom_tf_;
-	bool is_3DoF_;
 
 	bool is_first_odom_ = true;
 	bool is_first_imu_ = true;
