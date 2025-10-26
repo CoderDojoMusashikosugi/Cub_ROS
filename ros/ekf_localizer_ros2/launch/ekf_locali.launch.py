@@ -100,6 +100,11 @@ def generate_launch_description():
         #     executable='draw_moving_trajectory_node',
         #     name='draw_moving_trajectory_node',
         # ),
+        # Node(
+        #     package='cub_bringup',
+        #     executable='ekf_pose_logger.py',
+        #     name='ekf_pose_logger',
+        # ),
     ])
 
 

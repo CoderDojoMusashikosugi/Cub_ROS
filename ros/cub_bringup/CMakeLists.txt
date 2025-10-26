@@ -47,7 +47,9 @@ install(
 )
 
 install(
-  PROGRAMS scripts/distance_logger.py
+  PROGRAMS
+    scripts/distance_logger.py
+    scripts/ekf_pose_logger.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

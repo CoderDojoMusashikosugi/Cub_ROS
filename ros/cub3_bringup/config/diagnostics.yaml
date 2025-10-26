@@ -33,16 +33,16 @@ topic_hz_checker:
           reliability: best_effort
           durability: volatile
           depth: 100
-      realsense:
-        topic: "/camera/camera/color/camera_info"
-        type: "sensor_msgs/msg/CameraInfo"
-        expected_hz: 30.0
-        tolerance: 0.2
-        window_size: 10
-        qos:
-          reliability: best_effort
-          durability: volatile
-          depth: 100
+      # realsense:
+      #   topic: "/camera/camera/color/camera_info"
+      #   type: "sensor_msgs/msg/CameraInfo"
+      #   expected_hz: 30.0
+      #   tolerance: 0.2
+      #   window_size: 10
+      #   qos:
+      #     reliability: best_effort
+      #     durability: volatile
+      #     depth: 100
       sllidar_l:
         topic: "/SLC1L_scan"
         type: "sensor_msgs/msg/LaserScan"

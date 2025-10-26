@@ -77,7 +77,7 @@ def generate_launch_description():
             parameters=[{
                 'target_frame': '',
                 'transform_tolerance': 0.01,
-                'min_height': -0.35,
+                'min_height': -0.15,
                 'max_height': 1.5,
                 'angle_min': -3.14,  # -M_PI
                 'angle_max': 3.14,  # M_PI
@@ -149,5 +149,5 @@ def generate_launch_description():
         velodyne_transform_node,
 
         # RGB-D Camera -> launch_at_boot.launch.pyから移動
-        realsense_launch,
+        # realsense_launch,
     ])
