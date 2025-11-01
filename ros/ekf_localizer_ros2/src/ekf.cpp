@@ -11,7 +11,6 @@ EKF::EKF() : Node("EKF")
     this->declare_parameter<std::string>("map_frame_id", "map");
     this->declare_parameter<std::string>("odom_frame_id", "odom");
     this->declare_parameter<std::string>("base_link_frame_id", "base_link");
-    this->declare_parameter<bool>("is_3DoF", true);
     this->declare_parameter<bool>("is_odom_tf", false);
     this->declare_parameter<bool>("GPS_MEASUREMENT_ENABLE", false);
     this->declare_parameter<bool>("NDT_MEASUREMENT_ENABLE", false);
@@ -45,7 +44,6 @@ EKF::EKF() : Node("EKF")
     this->get_parameter("map_frame_id", map_frame_id_);
     this->get_parameter("odom_frame_id", odom_frame_id_);
     this->get_parameter("base_link_frame_id", base_link_frame_id_);
-    this->get_parameter("is_3DoF", is_3DoF_);
     this->get_parameter("is_odom_tf", is_odom_tf_);
     this->get_parameter("GPS_MEASUREMENT_ENABLE", gps_measurement_enable_);
     this->get_parameter("NDT_MEASUREMENT_ENABLE", ndt_measurement_enable_);
@@ -112,9 +110,7 @@ EKF::~EKF() {}
 
 void EKF::initialize(double x, double y, double z, double roll, double pitch, double yaw)
 {
-	if(is_3DoF_) STATE_SIZE_ = 3;
-	else STATE_SIZE_ = 6;
-
+	STATE_SIZE_ = 3;
 	X_.setZero(STATE_SIZE_);
 	P_.setZero(STATE_SIZE_, STATE_SIZE_);
 	P_ = INIT_SIGMA_*Eigen::MatrixXd::Identity(STATE_SIZE_, STATE_SIZE_);
@@ -123,33 +119,22 @@ void EKF::initialize(double x, double y, double z, double roll, double pitch, do
 
 void EKF::set_pose(double x, double y, double z, double roll, double pitch, double yaw)
 {
-	if(is_3DoF_){
-		if(X_.size() != STATE_SIZE_){
-			std::cout << "No matching STATE SIZE" << std::endl;
-			return;
-		}
-		X_(0) = x;
-		X_(1) = y;
-		X_(2) = yaw;
+	if(X_.size() != STATE_SIZE_){
+		std::cout << "No matching STATE SIZE" << std::endl;
+		return;
 	}
-	else{
-		if(X_.size() != STATE_SIZE_){
-			std::cout << "No matching STATE SIZE" << std::endl;
-		}
-		X_(0) = x;
-		X_(1) = y;
-		X_(2) = z;
-		X_(3) = roll;
-		X_(4) = pitch;
-		X_(5) = yaw;
-	}
+	X_(0) = x;
+	X_(1) = y;
+	X_(2) = yaw;
 }
 
 void EKF::ndt_pose_callback(const geometry_msgs::msg::PoseStamped::ConstSharedPtr msg)
 {
 	ndt_pose_ = *msg;
 	has_received_ndt_pose_ = true;
-	measurement_update();
+	if(ndt_measurement_enable_){
+		measurement_update_3DoF();
+	}
 }
 
 void EKF::odom_callback(const nav_msgs::msg::Odometry::ConstSharedPtr msg)
@@ -309,25 +294,6 @@ void EKF::motion_update_by_imu(double dt)
     P_ = G * P_ * G.transpose() + A * M * A.transpose();
 }
 
-// void EKF::measurement_update()
-// {
-// 	if(is_3DoF_) measurement_update_3DoF();
-// 	// else measurement_update_6DoF();
-// }
-void EKF::measurement_update()
-{
-    if(is_3DoF_) {
-		if(ndt_measurement_enable_){
-        	measurement_update_3DoF();
-		}
-        // GPS measurement update
-        // if(has_received_gps_ && gps_measurement_enable_) {
-        //     measurement_update_gps();
-        // }
-    }
-    // else measurement_update_6DoF();
-}
-
 void EKF::measurement_update_3DoF()
 {
 	if(check_ekf_covariance(ekf_pose_) || check_mahalanobis_distance(ekf_pose_, ndt_pose_)){
@@ -464,30 +430,15 @@ void EKF::publish_ekf_pose()
 	}
 	ekf_pose_.pose.position.x = X_(0);
 	ekf_pose_.pose.position.y = X_(1);
-	if(is_3DoF_){
-		ekf_pose_.pose.position.z = ndt_pose_.pose.position.z;
-		//ekf_pose_.pose.position.z = 0.0;
-		ekf_pose_.pose.orientation = rpy_to_msg(0.0,0.0,X_(2));
+	ekf_pose_.pose.position.z = ndt_pose_.pose.position.z;
+	//ekf_pose_.pose.position.z = 0.0;
+	ekf_pose_.pose.orientation = rpy_to_msg(0.0,0.0,X_(2));
 
-		std::cout << "EKF POSE: " << std::endl;
-		std::cout << "  X   : " << X_(0) << std::endl;
-		std::cout << "  Y   : " << X_(1) << std::endl;
-		std::cout << " YAW  : " << X_(2) << std::endl;
-		std::cout << std::endl;
-	}
-	else{
-		ekf_pose_.pose.position.z = X_(2);
-		ekf_pose_.pose.orientation = rpy_to_msg(X_(3),X_(4),X_(5));
-
-		std::cout << "EKF POSE: " << std::endl;
-		std::cout << "  X   : " << X_(0) << std::endl;
-		std::cout << "  Y   : " << X_(1) << std::endl;
-		std::cout << "  Z   : " << X_(2) << std::endl;
-		std::cout << " ROLL : " << X_(3) << std::endl;
-		std::cout << "PITCH : " << X_(4) << std::endl;
-		std::cout << " YAW  : " << X_(5) << std::endl;
-		std::cout << std::endl;
-	}
+	std::cout << "EKF POSE: " << std::endl;
+	std::cout << "  X   : " << X_(0) << std::endl;
+	std::cout << "  Y   : " << X_(1) << std::endl;
+	std::cout << " YAW  : " << X_(2) << std::endl;
+	std::cout << std::endl;
 
 	// 配列に追加
 	// poses_.push_back(ekf_pose_);
@@ -648,19 +599,6 @@ void EKF::measurement_update_gps()
 
 void EKF::process()
 {
-	// if(!is_first_imu_ && !is_first_odom_){
-	// 	if(has_received_imu_ && has_received_odom_){
-	// 		motion_update(dt_);
-	// 		has_received_imu_ = false;
-	// 		has_received_odom_ = false;
-	// 		publish_ekf_pose();
-	// 	}
-	// 	if(has_received_ndt_pose_){
-	// 		measurement_update();
-	// 		has_received_ndt_pose_ = false;
-	// 		publish_ekf_pose();
-	// 	} 
-	// }
 }
 
 int main(int argc,char** argv)
@@ -679,92 +617,3 @@ int main(int argc,char** argv)
 	}
 	return 0;
 }
-
-// void EKF::motion_update(double dt)
-// {
-// 	if(is_3DoF_) motion_update_3DoF(dt);
-// 	// else motion_update_6DoF(dt);
-// }
-// // dtの行方
-// // motion_update時のタイムスタンプあっていない可能性
-// // 並進速度の算出が位置差分のためノイズがありそ
-// void EKF::motion_update_3DoF(double dt)
-// {
-// 	// twist情報の作成
-// 	auto current_position = odom_.pose.pose.position;
-// 	auto current_time = this->get_clock()->now();
-// 	geometry_msgs::msg::Twist twist_;
-// 	double current_v;
-
-// 	Eigen::Vector3d current_odom_pose_(odom_.pose.pose.position.x, odom_.pose.pose.position.y, 0);
-
-// 	if (!first_callback_) {
-// 		// 位置の変化量を計算
-// 		double dx = current_position.x - last_position_.x;
-// 		double dy = current_position.y - last_position_.y;
-// 		double dz = current_position.z - last_position_.z;
-// 		current_v = (current_odom_pose_ - last_odom_pose_).norm() / dt;
-// 	}
-// 	// 現在の位置と時刻を保存
-// 	last_position_ = current_position;
-// 	first_callback_ = false;
-// 	last_odom_pose_ = current_odom_pose_;
-	
-// 	// ※要改善箇所
-// 	double nu = current_v;
-// 	// double nu = twist_.linear.x;
-// 	// double nu = odom_.twist.twist.linear.x; // 使えるならこれを使うべき
-
-// 	double omega = imu_.angular_velocity.z; // ここは大丈夫そう odomに切り替えてもバックしたので
-// 	// double omega = odom_.twist.twist.angular.z;
-// 	// double omega = get_yaw(odom_.pose.pose.orientation);
-
-// 	if(std::fabs(omega) < 1e-3) omega = 1e-10;
-
-// 	// M
-// 	Eigen::MatrixXd M(X_.size() - 1,X_.size() - 1);
-// 	M.setZero();
-// 	// M(0,0) = SIGMA_ODOM_*SIGMA_ODOM_;
-// 	// M(1,1) = SIGMA_IMU_*SIGMA_IMU_;
-// 	M(0,0) = std::pow(MOTION_NOISE_NN_,2)*std::fabs(nu)/dt + std::pow(MOTION_NOISE_NO_,2)*std::fabs(omega)/dt;
-// 	M(1,1) = std::pow(MOTION_NOISE_ON_,2)*std::fabs(nu)/dt + std::pow(MOTION_NOISE_OO_,2)*std::fabs(omega)/dt;
-
-// 	// A
-// 	Eigen::Matrix<double,3,2> A;
-// 	A.setZero();
-// 	A(0,0) = (std::sin(X_(2) + omega*dt) - std::sin(X_(2)))/omega;
-// 	A(0,1) = -nu/std::pow(omega,2)*(std::sin(X_(2) + omega*dt) - std::sin(X_(2))) + nu/omega*dt*std::cos(X_(2) + omega*dt);
-// 	A(1,0) = (-std::cos(X_(2) + omega*dt) + std::cos(X_(2)))/omega;
-// 	A(1,1) = -nu/std::pow(omega,2)*(-std::cos(X_(2) + omega*dt) + std::cos(X_(2))) + nu/omega*dt*std::sin(X_(2) + omega*dt);
-// 	A(2,0) = 0.0;
-// 	A(2,1) = dt;
-
-// 	// G
-// 	Eigen::MatrixXd G(X_.size(),X_.size());
-// 	G.setIdentity();
-// 	G(0,2) = nu/omega*(std::cos(X_(2) + omega*dt) - std::cos(X_(2)));
-// 	G(1,2) = nu/omega*(std::sin(X_(2) + omega*dt) - std::sin(X_(2)));
-
-// 	// state transition
-// 	if(std::fabs(omega) < 1e-2){
-// 		X_(0) += nu*std::cos(X_(2))*dt;
-// 		X_(1) += nu*std::sin(X_(2))*dt;
-// 		X_(2) += omega*dt;
-// 	}
-// 	else{
-// 		X_(0) += nu/omega*(std::sin(X_(2) + omega*dt) - std::sin(X_(2)));
-// 		X_(1) += nu/omega*(-std::cos(X_(2) + omega*dt) + std::cos(X_(2)));
-// 		X_(2) += omega*dt;
-// 	}
-	
-// 	/*
-// 	X_(0) += nu*std::cos(X_(2))*dt;
-// 	X_(1) += nu*std::sin(X_(2))*dt;
-// 	X_(2) += omega*dt;
-// 	*/
-
-// 	P_ = G*P_*G.transpose() + A*M*A.transpose();
-
-// 	// has_received_imu_ = false;
-// 	// has_received_odom_ = false;
-// }
