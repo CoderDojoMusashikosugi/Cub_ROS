@@ -115,7 +115,7 @@ private:
 	double MAP_OFFSET_PITCH_;
 	double MAP_OFFSET_YAW_;
 	double ndt_hz_;
-	int MAX_ITERATION_;
+	double MAX_ITERATION_;
 };
 
 #endif	// MAP_MATCHER_H_

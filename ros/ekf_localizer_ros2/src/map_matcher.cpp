@@ -17,7 +17,7 @@ MapMatcher::MapMatcher() : Node("MapMatcher")
 	this->declare_parameter<double>("TRANS_EPSILON", {0.001});
 	this->declare_parameter<double>("STEP_SIZE", {0.1});
 	this->declare_parameter<double>("RESOLUTION", {0.5});
-	this->declare_parameter<int>("MAX_ITERATION", {35});
+	this->declare_parameter<double>("MAX_ITERATION", {35.0});
 	this->declare_parameter<double>("MATCHING_SCORE_TH", {0.1});
 	this->declare_parameter<double>("MAP_OFFSET_X", {0.0});
 	this->declare_parameter<double>("MAP_OFFSET_Y", {0.0});
