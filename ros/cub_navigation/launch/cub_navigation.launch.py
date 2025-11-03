@@ -59,7 +59,7 @@ def generate_launch_description():
 
     collison_monitor_launch_file_dir = os.path.join(get_package_share_directory('nav2_collision_monitor'), 'launch')
 
-    ekf_licalizer_launch_dir = os.path.join(get_package_share_directory('ekf_localizer'), "launch")
+    # ekf_licalizer_launch_dir = os.path.join(get_package_share_directory('ekf_localizer'), "launch")
 
     rviz_config_dir = os.path.join(
         get_package_share_directory('nav2_bringup'),
@@ -100,15 +100,15 @@ def generate_launch_description():
             ],
         ),
 
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource([ekf_licalizer_launch_dir, '/ekf_locali.launch.py']),
-            launch_arguments=[
-                ('use_sim_time', use_sim_time),
-            ],
-        ),
+        # IncludeLaunchDescription(
+        #     PythonLaunchDescriptionSource([ekf_licalizer_launch_dir, '/ekf_locali.launch.py']),
+        #     launch_arguments=[
+        #         ('use_sim_time', use_sim_time),
+        #     ],
+        # ),
 
         IncludeLaunchDescription(
-            PythonLaunchDescriptionSource([cub_navigation_launch_dir, '/navigation_launch.py']),
+            PythonLaunchDescriptionSource([cub_navigation_launch_dir, '/bringup_launch.py']),
             launch_arguments=[
                 ('map', map_dir),
                 ('use_sim_time', use_sim_time),
