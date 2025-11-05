@@ -17,7 +17,7 @@ MapMatcher::MapMatcher() : Node("MapMatcher")
 	this->declare_parameter<double>("TRANS_EPSILON", {0.001});
 	this->declare_parameter<double>("STEP_SIZE", {0.1});
 	this->declare_parameter<double>("RESOLUTION", {0.5});
-	this->declare_parameter<double>("MAX_ITERATION", {35});
+	this->declare_parameter<double>("MAX_ITERATION", {35.0});
 	this->declare_parameter<double>("MATCHING_SCORE_TH", {0.1});
 	this->declare_parameter<double>("MAP_OFFSET_X", {0.0});
 	this->declare_parameter<double>("MAP_OFFSET_Y", {0.0});
@@ -100,7 +100,8 @@ void MapMatcher::pc_callback(const sensor_msgs::msg::PointCloud2::ConstSharedPtr
 		geometry_msgs::msg::TransformStamped transform_stamped;
 		try{
 			// lookupTransform("変換のベースとなる座標系","変更したい対象の座標系",変更したい時間(過去データを扱う場合は注意が必要))
-			transform_stamped = tfBuffer_->lookupTransform("base_link", "map", tf2::TimePointZero); //座標系の変換 
+			// transform_stamped = tfBuffer_->lookupTransform("base_link", msg->header.frame_id, tf2::TimePointZero); //座標系の変換 
+			transform_stamped = tfBuffer_->lookupTransform("base_link", msg->header.frame_id, msg->header.stamp); //座標系の変換 
 		}
 		catch(tf2::TransformException& ex){
 			// ROS_WARN("%s", ex.what());
@@ -168,10 +169,10 @@ void MapMatcher::matching(pcl::PointCloud<pcl::PointXYZI>::Ptr map_pcl,pcl::Poin
 		if(current_local_pcl->points.empty()) std::cout << "current_local_pcl is empty" << std::endl;
 		return;
 	}
-	if(current_local_pcl->points.size() > map_local_pcl->points.size()){
-		std::cout << "local clouds > map clouds" << std::endl;
-		return;
-	}
+	// if(current_local_pcl->points.size() > map_local_pcl->points.size()){
+	// 	std::cout << "local clouds > map clouds" << std::endl;
+	// 	return;
+	// }
 
 	// initialize
 	Eigen::AngleAxisf init_rotation(msg_to_quat_eigen(ekf_pose_.pose.orientation));
@@ -193,12 +194,12 @@ void MapMatcher::matching(pcl::PointCloud<pcl::PointXYZI>::Ptr map_pcl,pcl::Poin
 	ndt.align(*ndt_pcl, init_guess);
 	//ndt.align(*ndt_pcl,Eigen::Matrix4f::Identity());
 	if(!ndt.hasConverged()){
-		std::cout << "Has converged" << std::endl;
+		std::cout << "Has not converged" << std::endl;
 		return;
 	}
 
 	std::cout << "FitnessScore: " << ndt.getFitnessScore() << std::endl;
-	if(ndt.getFitnessScore() <= MATCHING_SCORE_TH_){
+	// if(ndt.getFitnessScore() <= MATCHING_SCORE_TH_){
 		Eigen::Matrix4f translation = ndt.getFinalTransformation();	
 		if(translation.isZero(1e-6))
 		{
@@ -225,10 +226,10 @@ void MapMatcher::matching(pcl::PointCloud<pcl::PointXYZI>::Ptr map_pcl,pcl::Poin
 		ndt_msg.header.stamp = pc_time_;
 		ndt_msg.header.frame_id = map_frame_id_;
 		ndt_pc_pub_->publish(ndt_msg);
-	}
-	else{
-		std::cout << "Fitness score is large " << std::endl;
-	}
+	// }
+	// else{
+	// 	std::cout << "Fitness score is large " << std::endl;
+	// }
 }
 
 double MapMatcher::get_yaw_from_quat(geometry_msgs::msg::Quaternion q)
@@ -314,7 +315,7 @@ void MapMatcher::set_pcl(pcl::PointCloud<pcl::PointXYZI>::Ptr input_pcl,pcl::Poi
 
 	pass.setInputCloud(output_pcl);
 	pass.setFilterFieldName("z");
-	pass.setFilterLimits(-15 + z, 15 + z);
+	pass.setFilterLimits(-100 + z, 100 + z);
 	pass.filter(*output_pcl);
 	std::cout << "output_pcl size z: " << output_pcl->points.size() << std::endl;
 

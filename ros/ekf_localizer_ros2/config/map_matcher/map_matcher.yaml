@@ -5,7 +5,7 @@ map_matcher_node:
     # pcd_file_path: /home/cub/colcon_ws/src/cub/ekf_localizer/pcd/map.pcd
     # pcd_file_path: /home/cub/colcon_ws/src/cub/ekf_localizer/pcd/mapoudanhodoumade.pcd
     # pcd_file_path: /home/cub/colcon_ws/src/cub/ekf_localizer/pcd/mapkakunin.pcd
-    pcd_file_path: /home/cub/colcon_ws/src/cub/ekf_localizer_ros2/pcd/tsukuba-map.pcd
+    pcd_file_path: /home/cub/colcon_ws/src/cub/ekf_localizer_ros2/pcd/shiminkan-1101.pcd
 
     # Downsampling Parameter
     # この値が大きいほど処理する点群が減る（計算が軽くなる）
@@ -19,14 +19,14 @@ map_matcher_node:
     # Paththrough Parameter
     # 処理する点群の範囲 (m)
     # 値の距離以内の点群を処理する
-    LIMIT_RANGE: 40.0
+    LIMIT_RANGE: 30.0
 
     # Matching Parameters # 基本ノータッチで大丈夫です
     TRANS_EPSILON: 0.001
     STEP_SIZE: 0.1
     # RESOLUTION: 0.1
     RESOLUTION: 1.5
-    MAX_ITERATION: 30.0 # 最適化計算を最大何回繰り返すか
+    MAX_ITERATION: 20.0 # 最適化計算を最大何回繰り返すか
 
     # Matching Score
     # FitnessScore : 点群地図とLiDAR点群とのマッチング具合を数値化したもの。小さいほどマッチングしている

@@ -107,7 +107,6 @@ private:
 	double TRANS_EPSILON_;
 	double STEP_SIZE_;
 	double RESOLUTION_;
-	double MAX_ITERATION_;
 	double MATCHING_SCORE_TH_;
 	double MAP_OFFSET_X_;
 	double MAP_OFFSET_Y_;
@@ -116,6 +115,7 @@ private:
 	double MAP_OFFSET_PITCH_;
 	double MAP_OFFSET_YAW_;
 	double ndt_hz_;
+	double MAX_ITERATION_;
 };
 
 #endif	// MAP_MATCHER_H_
