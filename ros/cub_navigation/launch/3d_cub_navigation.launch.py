@@ -32,7 +32,8 @@ def generate_launch_description():
     use_sim_time = LaunchConfiguration('use_sim_time', default='false')
     map_dir = LaunchConfiguration(
         'map',
-        default="/home/cub/maps/kakunin-1004/kakunin-1004-modified.yaml")
+        # default="/home/cub/support_tools/3dmap_converter/kakunin-1004-modified.yaml")
+        default = "/home/cub/support_tools/kakunin-1004-modified.yaml")
 
     cub_target = os.getenv('CUB_TARGET', 'cub3')
     if cub_target == 'cub3':

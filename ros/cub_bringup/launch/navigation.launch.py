@@ -16,7 +16,8 @@ def generate_launch_description():
     print("launch target:", cub_target)
     map_dir = LaunchConfiguration(
         'map',
-        default = "/home/cub/maps/oudanhodoumade/mapoudanhodoumade_manual_crean.yaml")
+        # default = "/home/cub/support_tools/kakunin-1004-modified.yaml")
+        default = "/home/cub/maps/shiminkan-1011/output_map.yaml")
 
     return LaunchDescription([
         IncludeLaunchDescription(

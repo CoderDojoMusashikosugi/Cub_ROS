@@ -152,13 +152,13 @@ controller_server:
       min_vel_y: 0.0
       max_vel_x: 1.2
       max_vel_y: 0.0
-      max_vel_theta: 2.0
+      max_vel_theta: 0.7
       min_speed_xy: 0.0
       max_speed_xy: 1.2
       min_speed_theta: 0.0
       # Add high threshold velocity for turtlebot 3 issue.
       # https://github.com/ROBOTIS-GIT/turtlebot3_simulations/issues/75
-      acc_lim_x: 2.5
+      acc_lim_x: 0.5
       acc_lim_y: 0.0
       acc_lim_theta: 3.2
       decel_lim_x: -2.5
@@ -195,8 +195,8 @@ local_costmap:
   local_costmap:
     ros__parameters:
       update_frequency: 5.0
-      publish_frequency: 2.0
-      global_frame: map
+      publish_frequency: 4.0
+      global_frame: odom
       robot_base_frame: base_link
       use_sim_time: False
       rolling_window: true
@@ -213,18 +213,18 @@ local_costmap:
       obstacle_layer:
         plugin: "nav2_costmap_2d::ObstacleLayer"
         enabled: True
-        observation_sources: scan velodyne
-        velodyne:
-          topic: /velodyne_points
-          min_obstacle_height: -0.5
-          max_obstacle_height: 1.8
-          obstacle_min_range: 0.3
-          obstacle_max_range: 4.0
-          raytrace_min_range: 0.0
-          raytrace_max_range: 5.0
-          clearing: false
-          marking: True
-          inf_is_valid: True # default: False (inf_is_valid with PointCloud2 is not used)
+        observation_sources: scan #velodyne
+        # velodyne:
+        #   topic: /velodyne_points
+        #   min_obstacle_height: -0.5
+        #   max_obstacle_height: 1.8
+        #   obstacle_min_range: 0.3
+        #   obstacle_max_range: 4.0
+        #   raytrace_min_range: 0.0
+        #   raytrace_max_range: 5.0
+        #   clearing: True
+        #   marking: True
+        #   inf_is_valid: True # default: False (inf_is_valid with PointCloud2 is not used)
         scan:
           topic: /scan
           min_obstacle_height: -0.0
@@ -266,18 +266,18 @@ global_costmap:
       obstacle_layer:
         plugin: "nav2_costmap_2d::ObstacleLayer"
         enabled: True
-        observation_sources: velodyne
-        velodyne:
-          topic: /velodyne_points
-          min_obstacle_height: -0.5
-          max_obstacle_height: 1.8
-          obstacle_min_range: 0.3
-          obstacle_max_range: 4.0
-          raytrace_min_range: 0.0
-          raytrace_max_range: 5.0
-          clearing: False
-          marking: True
-          inf_is_valid: True # default: False (inf_is_valid with PointCloud2 is not used)
+        observation_sources: scan #velodyne
+        # velodyne:
+        #   topic: /velodyne_points
+        #   min_obstacle_height: -0.5
+        #   max_obstacle_height: 1.8
+        #   obstacle_min_range: 0.3
+        #   obstacle_max_range: 4.0
+        #   raytrace_min_range: 0.0
+        #   raytrace_max_range: 5.0
+        #   clearing: False
+        #   marking: True
+        #   inf_is_valid: True # default: False (inf_is_valid with PointCloud2 is not used)
         scan:
           topic: /scan
           min_obstacle_height: -0.0
@@ -322,7 +322,7 @@ map_saver:
 
 planner_server:
   ros__parameters:
-    expected_planner_frequency: 10.0
+    expected_planner_frequency: 20.0
     use_sim_time: False
     planner_plugins: ["GridBased"]
     GridBased:
@@ -347,7 +347,7 @@ recoveries_server:
       plugin: "nav2_recoveries/BackUp"
     wait:
       plugin: "nav2_recoveries/Wait"
-    global_frame: map
+    global_frame: odom
     robot_base_frame: base_link
     transform_timeout: 0.1
     use_sim_time: False
@@ -363,7 +363,7 @@ robot_state_publisher:
 waypoint_follower:
   ros__parameters:
     use_sim_time: False
-    loop_rate: 20
+    loop_rate: 2000
     stop_on_failure: false
     action_server_result_timeout: 900.0
     waypoint_task_executor_plugin: "wait_at_waypoint"   
@@ -387,3 +387,37 @@ filter_mask_server:
     frame_id: "map"
     topic_name: "/keepout_filter_mask"
     yaml_filename: "/home/cub/maps/near-tent/map.yaml"
+
+collision_monitor:
+  ros__parameters:
+    use_sim_time: False
+    base_frame_id: "base_footprint"
+    odom_frame_id: "odom"
+    cmd_vel_in_topic: "cmd_vel_smoothed"
+    cmd_vel_out_topic: "cmd_vel"
+    transform_tolerance: 0.5
+    source_timeout: 5.0
+    base_shift_correction: True
+    stop_pub_timeout: 2.0
+    polygons: ["PolygonStop", "PolygonSlow"]
+    PolygonStop:
+      type: "polygon"
+      points: [0.4, 0.3, 0.4, -0.3, 0.0, -0.3, 0.0, 0.3]
+      action_type: "stop"
+      min_points: 3  # max_points: 3 for Humble
+      visualize: True
+      polygon_pub_topic: "polygon_stop"
+      enabled: True
+    PolygonSlow:
+      type: "polygon"
+      points: [0.6, 0.4, 0.6, -0.4, 0.0, -0.4, 0.0, 0.4]
+      action_type: "slowdown"
+      min_points: 3  # max_points: 3 for Humble
+      slowdown_ratio: 0.3
+      visualize: True
+      polygon_pub_topic: "polygon_slowdown"
+      enabled: True
+    observation_sources: ["scan"]
+    scan:
+      type: "scan"
+      topic: "scan"
