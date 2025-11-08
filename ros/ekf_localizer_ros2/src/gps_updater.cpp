@@ -13,6 +13,7 @@ GpsUpdater::GpsUpdater() : Node("GpsUpdater")
     this->declare_parameter<double>("min_satellites", 6.0);
     this->declare_parameter<double>("max_hdop", 3.0);
     this->declare_parameter<double>("max_covariance_threshold", 10.0);
+    this->declare_parameter<std::string>("initialpose_topic_name", "/initialpose");
 
     // Get parameters
     this->get_parameter("gps_topic_name", gps_topic_name_);
@@ -25,11 +26,15 @@ GpsUpdater::GpsUpdater() : Node("GpsUpdater")
     this->get_parameter("min_satellites", min_satellites_);
     this->get_parameter("max_hdop", max_hdop_);
     this->get_parameter("max_covariance_threshold", max_covariance_threshold_);
+    this->get_parameter("initialpose_topic_name", initialpose_topic_name_);
 
     // Subscriber
     gps_sub_ = this->create_subscription<sensor_msgs::msg::NavSatFix>(
         gps_topic_name_, rclcpp::QoS(10).reliability(rclcpp::ReliabilityPolicy::BestEffort),
         std::bind(&GpsUpdater::gps_callback, this, std::placeholders::_1));
+    initialpose_sub_ = this->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>(
+        initialpose_topic_name_, rclcpp::QoS(1).reliable(),
+        std::bind(&GpsUpdater::initialpose_callback, this, std::placeholders::_1));
 
     // Publisher
     gps_pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(
@@ -55,7 +60,42 @@ GpsUpdater::GpsUpdater() : Node("GpsUpdater")
 }
 
 GpsUpdater::~GpsUpdater() {}
+void GpsUpdater::reset_gps_origin()
+{
+    RCLCPP_INFO(this->get_logger(), "========================================");
+    RCLCPP_INFO(this->get_logger(), "GPS ORIGIN RESET REQUESTED");
+    
+    // 手動原点設定モードの場合は警告
+    if(use_manual_origin_) {
+        RCLCPP_WARN(this->get_logger(), 
+            "Manual origin mode is enabled. GPS origin will NOT be reset.");
+        RCLCPP_WARN(this->get_logger(), 
+            "To enable automatic reset, set 'use_manual_origin' parameter to false");
+        RCLCPP_INFO(this->get_logger(), "========================================");
+        return;
+    }
+    
+    // GPS初期化フラグをリセット
+    is_gps_initialized_ = false;
+    
+    // GPS projectorをリセット
+    gps_projector_.reset();
+    
+    // 原点情報をクリア
+    gps_origin_lat_ = 0.0;
+    gps_origin_lon_ = 0.0;
+    gps_origin_alt_ = 0.0;
+    
+    RCLCPP_INFO(this->get_logger(), "GPS origin has been reset");
+    RCLCPP_INFO(this->get_logger(), "Next valid GPS message will set new origin (0, 0, 0)");
+    RCLCPP_INFO(this->get_logger(), "========================================");
+}
 
+void GpsUpdater::initialpose_callback(const geometry_msgs::msg::PoseWithCovarianceStamped::ConstSharedPtr msg)
+{
+    RCLCPP_INFO(this->get_logger(), "Received /initialpose - Resetting GPS origin");
+    reset_gps_origin();
+}
 void GpsUpdater::gps_callback(const sensor_msgs::msg::NavSatFix::ConstSharedPtr msg)
 {
     current_gps_ = *msg;
@@ -78,9 +118,16 @@ void GpsUpdater::gps_callback(const sensor_msgs::msg::NavSatFix::ConstSharedPtr 
         
         is_gps_initialized_ = true;
         
+        RCLCPP_INFO(this->get_logger(), "========================================");
+        RCLCPP_INFO(this->get_logger(), "GPS ORIGIN INITIALIZED");
         RCLCPP_INFO(this->get_logger(), 
-            "GPS origin initialized: lat=%.8f, lon=%.8f, alt=%.2f",
-            gps_origin_lat_, gps_origin_lon_, gps_origin_alt_);
+            "  Latitude  : %.8f", gps_origin_lat_);
+        RCLCPP_INFO(this->get_logger(), 
+            "  Longitude : %.8f", gps_origin_lon_);
+        RCLCPP_INFO(this->get_logger(), 
+            "  Altitude  : %.2f m", gps_origin_alt_);
+        RCLCPP_INFO(this->get_logger(), "This GPS position is now (0, 0, 0) in local frame");
+        RCLCPP_INFO(this->get_logger(), "========================================");
         return;
     }
 
