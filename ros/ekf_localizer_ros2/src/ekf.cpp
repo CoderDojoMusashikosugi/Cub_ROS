@@ -36,6 +36,7 @@ EKF::EKF() : Node("EKF")
 	this->declare_parameter<double>("SIGMA_GPS", 3.0);
 	this->declare_parameter<double>("EKF_HZ", 30.0);
 	this->declare_parameter<std::string>("initialpose_topic_name", "/initialpose");
+    this->declare_parameter<double>("measurement_suppress_duration", 2.0);
 
     // Retrieve the parameters
     this->get_parameter("ndt_pose_topic_name", ndt_pose_topic_name_);
@@ -72,6 +73,7 @@ EKF::EKF() : Node("EKF")
 	this->get_parameter("SIGMA_GPS", SIGMA_GPS_);
 	this->get_parameter("EKF_HZ", ekf_hz_);
     this->get_parameter("initialpose_topic_name", initialpose_topic_name_);
+    this->get_parameter("measurement_suppress_duration", measurement_suppress_duration_);
 
     ndt_pose_sub_  = this->create_subscription<geometry_msgs::msg::PoseStamped>(
         ndt_pose_topic_name_, rclcpp::QoS(1).reliable(),
@@ -133,6 +135,80 @@ void EKF::set_pose(double x, double y, double z, double roll, double pitch, doub
 	X_(2) = yaw;
 }
 
+/**
+ * @brief EKFを完全にリセットして指定位置から再スタート
+ * @param x 初期x座標 [m]
+ * @param y 初期y座標 [m]
+ * @param yaw 初期ヨー角 [rad]
+ */
+void EKF::reset_ekf(double x, double y, double yaw)
+{
+    RCLCPP_INFO(this->get_logger(), "=== COMPLETE EKF RESET ===");
+    
+    // 1. 状態ベクトルと共分散を初期化
+    X_.setZero(STATE_SIZE_);
+    P_.setZero(STATE_SIZE_, STATE_SIZE_);
+    P_ = INIT_SIGMA_ * Eigen::MatrixXd::Identity(STATE_SIZE_, STATE_SIZE_);
+    
+    // 2. 指定位置に設定
+    X_(0) = x;
+    X_(1) = y;
+    X_(2) = yaw;
+    
+    RCLCPP_INFO(this->get_logger(), "State initialized: x=%.3f, y=%.3f, yaw=%.3f [rad]", x, y, yaw);
+    
+    // 3. 全てのセンサー受信フラグをリセット
+    has_received_odom_ = false;
+    has_received_imu_ = false;
+    has_received_ndt_pose_ = false;
+    has_received_gps_ = false;
+    
+    // 4. 初回受信フラグをリセット
+    is_first_odom_ = true;
+    is_first_imu_ = true;
+    first_callback_ = true;
+    
+    RCLCPP_INFO(this->get_logger(), "All sensor flags reset to initial state");
+    
+    // 5. オドメトリ関連の履歴をクリア
+    last_odom_eigen = Eigen::Vector3d::Zero();
+    last_odom_pose_ = Eigen::Vector3d::Zero();
+    last_odom_yaw_ = 0.0;
+    
+    // 6. オドメトリメッセージをクリア
+    odom_ = nav_msgs::msg::Odometry();
+    last_odom_pose = nav_msgs::msg::Odometry();
+    
+    // 7. IMUメッセージをクリア
+    imu_ = sensor_msgs::msg::Imu();
+    
+    // 8. NDT・GPSメッセージをクリア
+    ndt_pose_ = geometry_msgs::msg::PoseStamped();
+    gps_pose_ = geometry_msgs::msg::PoseWithCovarianceStamped();
+    
+    // 9. 測定フラグをリセット
+    is_measurement_.data = false;
+    
+    // 10. タイムスタンプを現在時刻にリセット
+    rclcpp::Time now = this->now();
+    time_publish_ = now;
+    last_time_odom_ = now;
+    last_time_imu_ = now;
+    now_time_odom_ = now;
+    now_time_imu_ = now;
+    
+    // 11. 軌跡データをクリア（もし使用している場合）
+    poses_.clear();
+    
+    // 12. 測定更新を一定時間抑制
+    suppress_measurements_after_reset_ = true;
+    measurement_suppress_until_ = now + rclcpp::Duration::from_seconds(measurement_suppress_duration_);
+    
+    RCLCPP_INFO(this->get_logger(), "All history and timestamps cleared");
+    RCLCPP_WARN(this->get_logger(), "⚠️  NDT and GPS measurements SUPPRESSED for %.1f seconds", measurement_suppress_duration_);
+    RCLCPP_INFO(this->get_logger(), "Using only odometry and IMU during suppression period");
+    RCLCPP_INFO(this->get_logger(), "=== EKF RESET COMPLETE ===");
+}
 
 /**
  * @brief RVizの2D Pose Estimateからの初期位置設定コールバック
@@ -141,7 +217,7 @@ void EKF::set_pose(double x, double y, double z, double roll, double pitch, doub
 void EKF::initialpose_callback(const geometry_msgs::msg::PoseWithCovarianceStamped::ConstSharedPtr msg)
 {
     RCLCPP_INFO(this->get_logger(), "========================================");
-    RCLCPP_INFO(this->get_logger(), "Received initial pose from RViz 2D Pose Estimate");
+    RCLCPP_INFO(this->get_logger(), "📍 Received initial pose from RViz 2D Pose Estimate");
     
     // クォータニオンからyawのみを計算
     double yaw = calc_yaw_from_quat(msg->pose.pose.orientation);
@@ -151,58 +227,52 @@ void EKF::initialpose_callback(const geometry_msgs::msg::PoseWithCovarianceStamp
     double y = msg->pose.pose.position.y;
     
     RCLCPP_INFO(this->get_logger(), 
-                "Resetting EKF state to:");
+                "Resetting EKF to:");
     RCLCPP_INFO(this->get_logger(),
                 "  Position: x=%.3f, y=%.3f [m]", x, y);
     RCLCPP_INFO(this->get_logger(),
                 "  Orientation: yaw=%.3f [rad] (%.1f deg)", yaw, yaw * 180.0 / M_PI);
     
-    // ✅ 3DoF状態ベクトルの更新 (x, y, yaw)
-    X_(0) = x;
-    X_(1) = y;
-    X_(2) = yaw;
+    // ✅ reset_ekf()関数を使用（完全リセット + 測定抑制）
+    reset_ekf(x, y, yaw);
     
-    // 共分散行列を初期値にリセット
-    P_ = Eigen::MatrixXd::Identity(STATE_SIZE_, STATE_SIZE_) * INIT_SIGMA_;
-    
-    RCLCPP_INFO(this->get_logger(), "Reset covariance matrix (3x3)");
-    
-    // センサー受信フラグのリセット
-    is_first_odom_ = true;
-    is_first_imu_ = true;
-    
-    // オドメトリ関連の変数をリセット
-    last_odom_eigen = Eigen::Vector3d::Zero();
-    last_odom_pose_ = Eigen::Vector3d::Zero();
-    last_odom_yaw_ = 0.0;
-    
-    // タイムスタンプの更新
-    time_publish_ = msg->header.stamp;
-    last_time_odom_ = msg->header.stamp;
-    last_time_imu_ = msg->header.stamp;
-    
-    // 更新後の状態を即座にパブリッシュ
-    ekf_pose_.header.stamp = msg->header.stamp;
+    // ✅ リセット後の状態を即座にパブリッシュ
+    ekf_pose_.header.stamp = this->now();
     ekf_pose_.header.frame_id = map_frame_id_;
     ekf_pose_.pose.position.x = X_(0);
     ekf_pose_.pose.position.y = X_(1);
-    ekf_pose_.pose.position.z = 0.0;  // 3DoFなのでz=0
-    ekf_pose_.pose.orientation = rpy_to_msg(0.0, 0.0, X_(2));  // roll=0, pitch=0, yaw=X_(2)
+    ekf_pose_.pose.position.z = 0.0;
+    ekf_pose_.pose.orientation = rpy_to_msg(0.0, 0.0, X_(2));
     
     ekf_pose_pub_->publish(ekf_pose_);
     
-    RCLCPP_INFO(this->get_logger(), "EKF state reset completed");
+    RCLCPP_INFO(this->get_logger(), "✓ Initial pose published");
+    RCLCPP_INFO(this->get_logger(), "✓ EKF restarted from specified position");
     RCLCPP_INFO(this->get_logger(), "========================================");
 }
 
 void EKF::ndt_pose_callback(const geometry_msgs::msg::PoseStamped::ConstSharedPtr msg)
 {
-	ndt_pose_ = *msg;
-	has_received_ndt_pose_ = true;
-	if(ndt_measurement_enable_){
-		measurement_update_3DoF();
-	}
+    ndt_pose_ = *msg;
+    has_received_ndt_pose_ = true;
+    
+    // ✅ リセット後の抑制期間中はNDT測定更新をスキップ
+    if(suppress_measurements_after_reset_) {
+        if(this->now() < measurement_suppress_until_) {
+            RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
+                "NDT measurement suppressed (reset protection active)");
+            return;
+        } else {
+            suppress_measurements_after_reset_ = false;
+            RCLCPP_INFO(this->get_logger(), "✓ Measurement suppression ended - NDT updates resumed");
+        }
+    }
+    
+    if(ndt_measurement_enable_){
+        measurement_update_3DoF();
+    }
 }
+
 
 void EKF::odom_callback(const nav_msgs::msg::Odometry::ConstSharedPtr msg)
 {
@@ -574,9 +644,22 @@ void EKF::gps_pose_callback(const geometry_msgs::msg::PoseWithCovarianceStamped:
 {
     gps_pose_ = *msg;
     has_received_gps_ = true;
-	if(gps_measurement_enable_){
-		measurement_update_gps();
-	}
+    
+    // ✅ リセット後の抑制期間中はGPS測定更新をスキップ
+    if(suppress_measurements_after_reset_) {
+        if(this->now() < measurement_suppress_until_) {
+            RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
+                "GPS measurement suppressed (reset protection active)");
+            return;
+        } else {
+            suppress_measurements_after_reset_ = false;
+            RCLCPP_INFO(this->get_logger(), "✓ Measurement suppression ended - GPS updates resumed");
+        }
+    }
+    
+    if(gps_measurement_enable_){
+        measurement_update_gps();
+    }
 }
 
 void EKF::measurement_update_gps()

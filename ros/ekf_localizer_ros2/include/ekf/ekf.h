@@ -101,6 +101,10 @@ private:
 
 	std::string measurement_topic_name_;
 
+	bool suppress_measurements_after_reset_ = false;
+    rclcpp::Time measurement_suppress_until_;
+    double measurement_suppress_duration_ = 2.0;
+
 	bool has_received_odom_;
 	bool has_received_imu_;
 	bool has_received_ndt_pose_;
