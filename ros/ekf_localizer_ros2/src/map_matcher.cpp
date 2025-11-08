@@ -189,7 +189,7 @@ void MapMatcher::matching(pcl::PointCloud<pcl::PointXYZI>::Ptr map_pcl,pcl::Poin
 	ndt.setMaximumIterations(MAX_ITERATION_);
 	ndt.setInputTarget(map_local_pcl);
 	ndt.setInputSource(current_local_pcl);
-	ndt.setNumThreads(std::thread::hardware_concurrency());
+	ndt.setNumThreads(std::thread::hardware_concurrency()/2);
   	ndt.setNeighborhoodSearchMethod(pclomp::DIRECT7);
 	ndt.align(*ndt_pcl, init_guess);
 	//ndt.align(*ndt_pcl,Eigen::Matrix4f::Identity());

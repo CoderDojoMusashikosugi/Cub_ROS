@@ -13,7 +13,7 @@ ekf_localizer_node:
     # Parameters
     INIT_SIGMA: 0.00001
     SIGMA_IMU: 0.0001
-    SIGMA_ODOM: 0.0001
+    SIGMA_ODOM: 0.001
     SIGMA_NDT: 0.0001
 
     # 観測更新による推定位置が今までのEKFの位置から閾値以上離れていたら観測更新を行わない
@@ -26,7 +26,7 @@ ekf_localizer_node:
 
     # GPS
     SIGMA_GPS: 3.0  # GPS測位精度 (メートル)
-    GPS_MEASUREMENT_ENABLE: true
+    GPS_MEASUREMENT_ENABLE: false
     NDT_MEASUREMENT_ENABLE: true
 
     MOTION_NOISE_NN: 0.01
