@@ -35,6 +35,7 @@ EKF::EKF() : Node("EKF")
 	this->declare_parameter<std::string>("gps_pose_topic_name", "/gps_pose");
 	this->declare_parameter<double>("SIGMA_GPS", 3.0);
 	this->declare_parameter<double>("EKF_HZ", 30.0);
+	this->declare_parameter<std::string>("initialpose_topic_name", "/initialpose");
 
     // Retrieve the parameters
     this->get_parameter("ndt_pose_topic_name", ndt_pose_topic_name_);
@@ -70,6 +71,7 @@ EKF::EKF() : Node("EKF")
 	this->get_parameter("gps_pose_topic_name", gps_pose_topic_name_);
 	this->get_parameter("SIGMA_GPS", SIGMA_GPS_);
 	this->get_parameter("EKF_HZ", ekf_hz_);
+    this->get_parameter("initialpose_topic_name", initialpose_topic_name_);
 
     ndt_pose_sub_  = this->create_subscription<geometry_msgs::msg::PoseStamped>(
         ndt_pose_topic_name_, rclcpp::QoS(1).reliable(),
@@ -83,6 +85,9 @@ EKF::EKF() : Node("EKF")
 	gps_pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>(
 		gps_pose_topic_name_, rclcpp::QoS(1).reliable(),
 		std::bind(&EKF::gps_pose_callback, this, std::placeholders::_1));
+    initialpose_sub_ = this->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>(
+        initialpose_topic_name_,rclcpp::QoS(1).reliable(),
+        std::bind(&EKF::initialpose_callback, this, std::placeholders::_1));
 
     ekf_pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>(
         ekf_pose_topic_name_, rclcpp::QoS(1).reliable());
@@ -126,6 +131,68 @@ void EKF::set_pose(double x, double y, double z, double roll, double pitch, doub
 	X_(0) = x;
 	X_(1) = y;
 	X_(2) = yaw;
+}
+
+
+/**
+ * @brief RVizの2D Pose Estimateからの初期位置設定コールバック
+ * @param msg 初期位置メッセージ
+ */
+void EKF::initialpose_callback(const geometry_msgs::msg::PoseWithCovarianceStamped::ConstSharedPtr msg)
+{
+    RCLCPP_INFO(this->get_logger(), "========================================");
+    RCLCPP_INFO(this->get_logger(), "Received initial pose from RViz 2D Pose Estimate");
+    
+    // クォータニオンからyawのみを計算
+    double yaw = calc_yaw_from_quat(msg->pose.pose.orientation);
+    
+    // 受信した位置情報を取得 (x, yのみ使用、zは無視)
+    double x = msg->pose.pose.position.x;
+    double y = msg->pose.pose.position.y;
+    
+    RCLCPP_INFO(this->get_logger(), 
+                "Resetting EKF state to:");
+    RCLCPP_INFO(this->get_logger(),
+                "  Position: x=%.3f, y=%.3f [m]", x, y);
+    RCLCPP_INFO(this->get_logger(),
+                "  Orientation: yaw=%.3f [rad] (%.1f deg)", yaw, yaw * 180.0 / M_PI);
+    
+    // ✅ 3DoF状態ベクトルの更新 (x, y, yaw)
+    X_(0) = x;
+    X_(1) = y;
+    X_(2) = yaw;
+    
+    // 共分散行列を初期値にリセット
+    P_ = Eigen::MatrixXd::Identity(STATE_SIZE_, STATE_SIZE_) * INIT_SIGMA_;
+    
+    RCLCPP_INFO(this->get_logger(), "Reset covariance matrix (3x3)");
+    
+    // センサー受信フラグのリセット
+    is_first_odom_ = true;
+    is_first_imu_ = true;
+    
+    // オドメトリ関連の変数をリセット
+    last_odom_eigen = Eigen::Vector3d::Zero();
+    last_odom_pose_ = Eigen::Vector3d::Zero();
+    last_odom_yaw_ = 0.0;
+    
+    // タイムスタンプの更新
+    time_publish_ = msg->header.stamp;
+    last_time_odom_ = msg->header.stamp;
+    last_time_imu_ = msg->header.stamp;
+    
+    // 更新後の状態を即座にパブリッシュ
+    ekf_pose_.header.stamp = msg->header.stamp;
+    ekf_pose_.header.frame_id = map_frame_id_;
+    ekf_pose_.pose.position.x = X_(0);
+    ekf_pose_.pose.position.y = X_(1);
+    ekf_pose_.pose.position.z = 0.0;  // 3DoFなのでz=0
+    ekf_pose_.pose.orientation = rpy_to_msg(0.0, 0.0, X_(2));  // roll=0, pitch=0, yaw=X_(2)
+    
+    ekf_pose_pub_->publish(ekf_pose_);
+    
+    RCLCPP_INFO(this->get_logger(), "EKF state reset completed");
+    RCLCPP_INFO(this->get_logger(), "========================================");
 }
 
 void EKF::ndt_pose_callback(const geometry_msgs::msg::PoseStamped::ConstSharedPtr msg)

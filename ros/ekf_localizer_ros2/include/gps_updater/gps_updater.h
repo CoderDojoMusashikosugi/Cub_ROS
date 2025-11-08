@@ -19,9 +19,13 @@ private:
     void convert_gps_to_local(double lat, double lon, double alt, 
                               double& x, double& y, double& z);
     void publish_gps_pose();
+    void initialpose_callback(const geometry_msgs::msg::PoseWithCovarianceStamped::ConstSharedPtr msg);
+    void reset_gps_origin();
 
     // Subscriber & Publisher
     rclcpp::Subscription<sensor_msgs::msg::NavSatFix>::SharedPtr gps_sub_;
+    rclcpp::Subscription<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr initialpose_sub_;
+
     rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr gps_pose_pub_;
 
     // GPS data
@@ -35,6 +39,7 @@ private:
     std::string gps_topic_name_;
     std::string gps_pose_topic_name_;
     std::string map_frame_id_;
+    std::string initialpose_topic_name_;
     
     double gps_origin_lat_;
     double gps_origin_lon_;

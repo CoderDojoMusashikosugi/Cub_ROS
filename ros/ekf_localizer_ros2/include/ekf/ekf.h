@@ -27,6 +27,7 @@ private:
 	void odom_callback(const nav_msgs::msg::Odometry::ConstSharedPtr msg);
 	void imu_callback(const sensor_msgs::msg::Imu::ConstSharedPtr msg);
 	void gps_pose_callback(const geometry_msgs::msg::PoseWithCovarianceStamped::ConstSharedPtr msg);
+	void initialpose_callback(const geometry_msgs::msg::PoseWithCovarianceStamped::ConstSharedPtr msg);
 	
 	// void measurement_callback(const std_msgs::msg::Bool::ConstSharedPtr msg);
 
@@ -52,6 +53,7 @@ private:
 	void measurement_update_gps();
 	bool check_mahalanobis_distance(geometry_msgs::msg::PoseStamped ekf_pose, geometry_msgs::msg::PoseStamped ndt_pose);
 	bool check_ekf_covariance(geometry_msgs::msg::PoseStamped ekf_pose);
+    void reset_ekf(double x, double y, double yaw);
 
 	// double get_yaw(geometry_msgs::msg::Quaternion q);
 
@@ -59,6 +61,7 @@ private:
     rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr ndt_pose_sub_;
     rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_sub_;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
+	rclcpp::Subscription<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr initialpose_sub_;
 
     rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr ekf_pose_pub_;
 	rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub_;
@@ -94,6 +97,7 @@ private:
 	std::string odom_frame_id_;
 	std::string base_link_frame_id_;
 	std::string gps_pose_topic_name_;
+	std::string initialpose_topic_name_;
 
 	std::string measurement_topic_name_;
 
