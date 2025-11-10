@@ -22,8 +22,7 @@ def generate_launch_description():
         IncludeLaunchDescription(
             PathJoinSubstitution(
                 [FindPackageShare("cub_bringup"), "launch", "localization.launch.py"] # ここでlocalizationを起動
-            ),
-            condition=IfCondition("true" if cub_target == 'cub3' else "false")
+            )
         ),
 
         IncludeLaunchDescription(

@@ -93,19 +93,6 @@ def generate_launch_description():
             default_value='false',
             description='Use simulation (Gazebo) clock if true'),
 
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource([cub_bringup_launch_dir, '/common.launch.py']),
-            launch_arguments=[
-                ('use_sim_time', use_sim_time),
-            ],
-        ),
-
-        # IncludeLaunchDescription(
-        #     PythonLaunchDescriptionSource([ekf_licalizer_launch_dir, '/ekf_locali.launch.py']),
-        #     launch_arguments=[
-        #         ('use_sim_time', use_sim_time),
-        #     ],
-        # ),
 
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource([cub_navigation_launch_dir, '/bringup_launch.py']),
