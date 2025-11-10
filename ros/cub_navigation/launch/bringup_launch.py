@@ -38,6 +38,7 @@ def generate_launch_description():
     namespace = LaunchConfiguration('namespace')
     use_namespace = LaunchConfiguration('use_namespace')
     slam = LaunchConfiguration('slam')
+    localization = LaunchConfiguration('localization')
     map_yaml_file = LaunchConfiguration('map')
     use_sim_time = LaunchConfiguration('use_sim_time')
     params_file = LaunchConfiguration('params_file')
@@ -94,6 +95,11 @@ def generate_launch_description():
         'slam',
         default_value='False',
         description='Whether run a SLAM')
+
+    declare_localization_cmd = DeclareLaunchArgument(
+        'localization',
+        default_value='True',
+        description='Whether run a Localization')
 
     declare_map_yaml_cmd = DeclareLaunchArgument(
         'map',
@@ -153,7 +159,7 @@ def generate_launch_description():
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(os.path.join(launch_dir,
                                                        'localization_launch.py')),
-            condition=IfCondition(PythonExpression(['not ', slam])),
+            condition=IfCondition(localization),
             launch_arguments={'namespace': namespace,
                               'map': map_yaml_file,
                               'use_sim_time': use_sim_time,
@@ -186,6 +192,7 @@ def generate_launch_description():
     ld.add_action(declare_namespace_cmd)
     ld.add_action(declare_use_namespace_cmd)
     ld.add_action(declare_slam_cmd)
+    ld.add_action(declare_localization_cmd)
     ld.add_action(declare_map_yaml_cmd)
     ld.add_action(declare_use_sim_time_cmd)
     ld.add_action(declare_params_file_cmd)

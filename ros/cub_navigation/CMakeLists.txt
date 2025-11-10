@@ -17,7 +17,7 @@ find_package(yaml-cpp REQUIRED)
 
 
 install(
-  DIRECTORY launch param
+  DIRECTORY launch param maps
   DESTINATION share/${PROJECT_NAME}
 )
 

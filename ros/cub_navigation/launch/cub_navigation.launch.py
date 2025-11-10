@@ -78,6 +78,12 @@ def generate_launch_description():
         #     package='cub_bringup',
         #     executable='odom_to_tf',
         # ),
+        Node(
+            package='tf2_ros',
+            executable='static_transform_publisher',
+            name='map_to_odom_publisher',
+            arguments=['0', '0', '0', '0', '0', '0', 'map', 'odom'],
+            output='screen'),
         DeclareLaunchArgument(
             'map',
             default_value=map_dir,
@@ -93,15 +99,40 @@ def generate_launch_description():
             default_value='false',
             description='Use simulation (Gazebo) clock if true'),
 
-
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource([cub_navigation_launch_dir, '/bringup_launch.py']),
             launch_arguments=[
                 ('map', map_dir),
                 ('use_sim_time', use_sim_time),
-                ('params_file', param_dir)
+                ('params_file', param_dir),
+                {'localization', 'True'} # 外部の自己位置推定を利用する場合はこれをFalseに
             ],
         ),
+
+        # オドメトリオンリー走行時にグローバル経路計画に使う地図読み込み用
+        # 白紙地図なら /home/cub/colcon_ws/src/cub/cub_navigation/maps/empty/map.yaml を使うと良い
+        # Node(
+        #     package='nav2_map_server',
+        #     executable='map_server',
+        #     name='map_server',
+        #     output='screen',
+        #     respawn_delay=2.0,
+        #     parameters=[{'yaml_filename': map_dir}],
+        # ),
+        # Node(
+        #     package='nav2_lifecycle_manager',
+        #     executable='lifecycle_manager',
+        #     name='lifecycle_manager_cub_navigation',
+        #     output='screen',
+        #     parameters=[{'autostart': True}, {'node_names': ['map_server']}],
+        # ),
+        # Node(
+        #     package='tf2_ros',
+        #     executable='static_transform_publisher',
+        #     name='map_to_odom_publisher',
+        #     arguments=['0', '0', '0', '0', '0', '0', 'map', 'odom'],
+        #     output='screen'),
+
 
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource([collison_monitor_launch_file_dir, '/collision_monitor_node.launch.py']),
