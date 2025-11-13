@@ -182,15 +182,14 @@ void MapMatcher::matching(pcl::PointCloud<pcl::PointXYZI>::Ptr map_pcl,pcl::Poin
 
 	// align
 	PointCloudTypePtr ndt_pcl(new PointCloudType);
-	pclomp::NormalDistributionsTransform<pcl::PointXYZI, pcl::PointXYZI> ndt;
+	fast_gicp::NDTCuda<pcl::PointXYZI, pcl::PointXYZI> ndt;
 	ndt.setTransformationEpsilon(TRANS_EPSILON_);
-	ndt.setStepSize(STEP_SIZE_);
 	ndt.setResolution(RESOLUTION_);
-	ndt.setMaximumIterations(MAX_ITERATION_);
+	ndt.setMaximumIterations(static_cast<int>(MAX_ITERATION_));
 	ndt.setInputTarget(map_local_pcl);
 	ndt.setInputSource(current_local_pcl);
-	ndt.setNumThreads(std::thread::hardware_concurrency()/2);
-  	ndt.setNeighborhoodSearchMethod(pclomp::DIRECT7);
+	// NDTCuda uses CUDA for acceleration, no need for thread settings
+	ndt.setNeighborSearchMethod(fast_gicp::NeighborSearchMethod::DIRECT7);
 	ndt.align(*ndt_pcl, init_guess);
 	//ndt.align(*ndt_pcl,Eigen::Matrix4f::Identity());
 	if(!ndt.hasConverged()){

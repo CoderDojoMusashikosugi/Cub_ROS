@@ -24,6 +24,7 @@ find_package(tf2_ros REQUIRED)
 find_package(pcl_conversions REQUIRED)
 find_package(PCL REQUIRED)
 find_package(ndt_omp REQUIRED)
+find_package(fast_gicp REQUIRED)
 # find_package(pclomp REQUIRED)
 find_package(std_srvs REQUIRED)
 # find_package(GeographicLib REQUIRED)
@@ -54,6 +55,7 @@ include_directories(
   ${Eigen_INCLUDE_DIRS}
   ${ndt_omp_INCLUDE_DIRS}
   ${GeographicLib_INCLUDE_DIRS}
+  ${fast_gicp_INCLUDE_DIRS}
 )
 
 
@@ -90,13 +92,6 @@ add_executable(map_matcher_node
   src/map_matcher.cpp
 )
 
-target_link_libraries(map_matcher_node
-  ${PCL_LIBRARIES}
-  # ${rclcpp_lifecycle_LIBRARIES}
-  ${YAML_CPP_LIBRARIES}
-  ${std_msgs_LIBRARIES}
-  ${ndt_omp_LIBRARIES}
-)
 ament_target_dependencies(map_matcher_node
   rclcpp
   std_msgs
@@ -112,6 +107,13 @@ ament_target_dependencies(map_matcher_node
   # pclomp
   ndt_omp
   # xmlrpcpp
+  fast_gicp
+)
+
+target_link_libraries(map_matcher_node
+  ${PCL_LIBRARIES}
+  ${YAML_CPP_LIBRARIES}
+  ${std_msgs_LIBRARIES}
 )
 install(TARGETS
   map_matcher_node
