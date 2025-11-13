@@ -30,7 +30,7 @@
 
 #include <Eigen/Dense>
 // #include <geometry_msgs/msg/transform_stamped.hpp>
-#include <pclomp/ndt_omp.h>
+#include <fast_gicp/ndt/ndt_cuda.hpp>
 #include <optional>
 
 

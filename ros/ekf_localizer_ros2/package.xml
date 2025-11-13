@@ -68,6 +68,7 @@
   <!-- <depend>eigen_conversions</depend> -->
   <depend>cv_bridge</depend>
   <depend>tf2_eigen</depend>
+  <depend>fast_gicp</depend>
 
   <depend>launch</depend>
   <depend>launch_ros</depend>
