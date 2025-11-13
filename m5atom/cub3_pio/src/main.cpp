@@ -281,6 +281,30 @@ void vehicle_run(int right, int left){
   // }
 } 
 
+void vehicle_run(int left_rear, int right_front, int left_front, int right_rear){
+  // Speed[0]=left_rear;
+  // Speed[1]=-right_front;
+  // Speed[2]=left_front;
+  // Speed[3]=-right_rear;
+
+  Speed[0]=-right_front;
+  Speed[1]=left_front;
+  Speed[2]=-right_rear;
+  Speed[3]=left_rear;
+
+  if(vehicle_stop_exe_count > 10) {
+    brake = Brake_Enable;
+  } else {
+    brake = Brake_Disable;
+  }
+  motor_exec();
+  // if((right == 0) && (left == 0)) {
+  //   ++vehicle_stop_exe_count;
+  // } else {
+  //   vehicle_stop_exe_count = 0;
+  // }
+} 
+
 int16_t get_max_motor_speed()
 {
   int16_t max_speed = 0;
@@ -386,6 +410,7 @@ void initialize_dynamixel() {
 // caluclate velocity for each dinamixel from twist value
 #ifdef CUB_TARGET_CUB3
 const float cub_d = 110;  // [mm] distance between center and wheel
+const float wheel_base = 180; // [mm] distance between front and rear wheel
 float motor_vel_unit = 1;  //[rpm]
 const float diameter = 150; // [mm] diameter of wheel
 uint16_t l_motor_pos = 0;
@@ -454,7 +479,15 @@ void control_motor(const geometry_msgs__msg__Twist* arg_twist) {
   int r_goal_vel = (int)(r_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit); // right goal velocity[rpm] # TODO: check whether need to add dvidid by motor_velocity_unit
   int l_goal_vel = (int)(l_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit); // left goal velocity[rpm]
 
-  vehicle_run(r_goal_vel, l_goal_vel);
+  double rf_goal_vel_m_s = arg_twist->linear.x + (cub_d+wheel_base)/1000.0 * arg_twist->angular.z; // [m/s]
+  double lf_goal_vel_m_s = arg_twist->linear.x - (cub_d+wheel_base)/1000.0 * arg_twist->angular.z; // [m/s]
+  double rf_goal_vel_r = rf_goal_vel_m_s / (diameter / 1000.0 / 2.0); // [rad/s]
+  double lf_goal_vel_r = lf_goal_vel_m_s / (diameter / 1000.0 / 2.0); // [rad/s]
+
+  int rf_goal_vel = (int)(rf_goal_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit);
+  int lf_goal_vel = (int)(lf_goal_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit);
+  
+  vehicle_run(l_goal_vel, rf_goal_vel, lf_goal_vel, r_goal_vel);
   #elif defined(CUB_TARGET_MCUB)
   int32_t r_goal_vel = (int32_t)(r_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit); // right goal velocity
   int32_t l_goal_vel = (int32_t)(l_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit); // left goal velocity
