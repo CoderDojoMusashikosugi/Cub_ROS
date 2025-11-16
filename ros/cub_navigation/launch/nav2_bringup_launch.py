@@ -97,6 +97,11 @@ def generate_launch_description():
         default_value='False',
         description='Whether run a SLAM')
 
+    declare_use_localization_cmd = DeclareLaunchArgument(
+        'use_localization',
+        default_value='True',
+        description='Whether run a Localization')
+
     declare_map_yaml_cmd = DeclareLaunchArgument(
         'map',
         description='Full path to map yaml file to load')
@@ -145,7 +150,7 @@ def generate_launch_description():
 
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(os.path.join(launch_dir, 'slam_launch.py')),
-            condition=IfCondition(PythonExpression([slam, ' and ', use_localization])),
+            condition=IfCondition(slam),
             launch_arguments={'namespace': namespace,
                               'use_sim_time': use_sim_time,
                               'autostart': autostart,
@@ -155,7 +160,7 @@ def generate_launch_description():
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(os.path.join(launch_dir,
                                                        'localization_launch.py')),
-            condition=IfCondition(PythonExpression(['not ', slam, ' and ', use_localization])),
+            condition=IfCondition(use_localization),
             launch_arguments={'namespace': namespace,
                               'map': map_yaml_file,
                               'use_sim_time': use_sim_time,
@@ -183,7 +188,8 @@ def generate_launch_description():
             emulate_tty=True,
             parameters=[{'use_sim_time': False},
                         {'autostart': True},
-                        {'node_names': ['map_server']}]
+                        {'node_names': ['map_server']}],
+            condition=IfCondition(PythonExpression(['not ', use_localization])),
         ),
         
         IncludeLaunchDescription(
@@ -207,6 +213,7 @@ def generate_launch_description():
     ld.add_action(declare_namespace_cmd)
     ld.add_action(declare_use_namespace_cmd)
     ld.add_action(declare_slam_cmd)
+    ld.add_action(declare_use_localization_cmd)
     ld.add_action(declare_map_yaml_cmd)
     ld.add_action(declare_use_sim_time_cmd)
     ld.add_action(declare_params_file_cmd)

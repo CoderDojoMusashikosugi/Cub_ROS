@@ -100,12 +100,12 @@ def generate_launch_description():
             description='Use simulation (Gazebo) clock if true'),
 
         IncludeLaunchDescription(
-            PythonLaunchDescriptionSource([cub_navigation_launch_dir, '/bringup_launch.py']),
+            PythonLaunchDescriptionSource([cub_navigation_launch_dir, '/nav2_bringup_launch.py']),
             launch_arguments=[
                 ('map', map_dir),
                 ('use_sim_time', use_sim_time),
                 ('params_file', param_dir),
-                {'localization', 'True'} # 外部の自己位置推定を利用する場合はこれをFalseに
+                {'use_localization', 'True'} # 外部の自己位置推定を利用する場合はこれをFalseに
             ],
         ),
 
