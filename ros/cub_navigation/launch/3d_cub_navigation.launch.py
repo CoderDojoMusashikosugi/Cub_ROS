@@ -24,6 +24,8 @@ from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from launch.actions import TimerAction
+from launch.conditions import IfCondition
 
 # TURTLEBOT3_MODEL = os.environ['TURTLEBOT3_MODEL']
 
@@ -36,11 +38,13 @@ def generate_launch_description():
 
     cub_target = os.getenv('CUB_TARGET', 'cub3')
     if cub_target == 'cub3':
-        param_file_name = 'cub3_nav2_3d.yaml'
-    elif cub_target == 'mcub':
+        param_file_name = 'cub3_nav2.yaml'
+    elif cub_target == 'mcub' or cub_target == 'mcub_direct':
         param_file_name = 'mcub_nav2.yaml'
+    elif cub_target == 'spidar':
+        param_file_name = 'spidar.yaml'
     else:
-        param_file_name = 'cub3_nav2_3d.yaml'
+        param_file_name = 'cub3_nav2.yaml'
 
     param_dir = LaunchConfiguration(
         'params_file',
@@ -48,8 +52,10 @@ def generate_launch_description():
             get_package_share_directory('cub_navigation'),
             'param',
             param_file_name))
+    cub_navigation_launch_dir = os.path.join(get_package_share_directory('cub_navigation'), 'launch')
 
-    nav2_launch_file_dir = os.path.join(get_package_share_directory('cub_navigation'), 'launch')
+    collison_monitor_launch_file_dir = os.path.join(get_package_share_directory('nav2_collision_monitor'), 'launch')
+
 
     rviz_config_dir = os.path.join(
         get_package_share_directory('nav2_bringup'),
@@ -57,10 +63,6 @@ def generate_launch_description():
         'nav2_default_view.rviz')
 
     return LaunchDescription([
-        # Node(
-        #     package='cub_bringup',
-        #     executable='odom_to_tf',
-        # ),
         DeclareLaunchArgument(
             'map',
             default_value=map_dir,
@@ -77,18 +79,38 @@ def generate_launch_description():
             description='Use simulation (Gazebo) clock if true'),
 
         IncludeLaunchDescription(
-            PythonLaunchDescriptionSource([nav2_launch_file_dir, '/nav2_bringup_launch.py']),
+            PythonLaunchDescriptionSource([cub_navigation_launch_dir, '/nav2_bringup_launch.py']),
             launch_arguments={
                 'map': map_dir,
                 'use_sim_time': use_sim_time,
                 'params_file': param_dir,
-                'use_localization': 'False'}.items(),
+                'use_localization': "True" if cub_target == 'mcub' else "False"}.items(), # 外部の自己位置推定を利用する場合はこれをFalseに
         ),
+        # オドメトリオンリー走行時にグローバル経路計画に使う地図読み込み用
+        # 白紙地図なら /home/cub/colcon_ws/src/cub/cub_navigation/maps/empty/map.yaml を使うと良い
+        # Node(
+        #     package='nav2_map_server',
+        #     executable='map_server',
+        #     name='map_server',
+        #     output='screen',
+        #     respawn_delay=2.0,
+        #     parameters=[{'yaml_filename': map_dir}],
+        # ),
+        # Node(
+        #     package='nav2_lifecycle_manager',
+        #     executable='lifecycle_manager',
+        #     name='lifecycle_manager_cub_navigation',
+        #     output='screen',
+        #     parameters=[{'autostart': True}, {'node_names': ['map_server']}],
+        # ),
 
+        # 通常のmcub(map->odom->base_link環境)では不要、オドメトリオンリーなmcubでは必要
+        # Cub3(ekf_localiがmap->base_linkを出す)では必要
         Node(
-        package='tf2_ros',
-        executable='static_transform_publisher',
-        arguments=['0','0','0','0','0','0','1','map','odom']
+            package='tf2_ros',
+            executable='static_transform_publisher',
+            arguments=['0','0','0','0','0','0','1','map','odom'],
+            condition=IfCondition("true" if cub_target == 'cub3' else "false"),
         ),
 
         Node(
@@ -110,4 +132,13 @@ def generate_launch_description():
             arguments=['-d', rviz_config_dir],
             parameters=[{'use_sim_time': use_sim_time}],
             output='screen'),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource([collison_monitor_launch_file_dir, '/collision_monitor_node.launch.py']),
+            launch_arguments=[
+                ('use_sim_time', use_sim_time),
+            ],
+        ),
+        
+        TimerAction(period=5.0, actions=[IncludeLaunchDescription(
+            PythonLaunchDescriptionSource([cub_navigation_launch_dir, '/cub_costmapfilter.launch.py']),)]),
     ])
