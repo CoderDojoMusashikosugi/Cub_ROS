@@ -34,7 +34,7 @@ def generate_launch_description():
     use_sim_time = LaunchConfiguration('use_sim_time', default='false')
     map_dir = LaunchConfiguration(
         'map',
-        default="/home/cub/maps/kakunin-1004/kakunin-1004-modified.yaml")
+        default="/home/cub/maps/kakunin-1004/kakunin-1004-modified.yaml") # cub_bringup navigation.launch.pyで呼び出し時に上書きされる。デフォルト値設定はそちらに。
 
     cub_target = os.getenv('CUB_TARGET', 'cub3')
     if cub_target == 'cub3':

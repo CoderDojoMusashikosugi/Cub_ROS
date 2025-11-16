@@ -27,29 +27,10 @@ def generate_launch_description():
 
         IncludeLaunchDescription(
             PathJoinSubstitution(
-                [FindPackageShare("cub_navigation"), "launch", "3d_cub_navigation.launch.py"]
+                [FindPackageShare("cub_navigation"), "launch", "cub_navigation.launch.py"],
+                launch_arguments=[
+                    ('map', map_dir)
+                ],
             ),
-            condition=IfCondition("true" if cub_target == 'cub3' else "false")
-        ),
-        IncludeLaunchDescription(
-            PathJoinSubstitution(
-                [FindPackageShare("cub_navigation"), "launch", "cub_navigation.launch.py"]
-            ),
-            launch_arguments=[
-                ('map', map_dir)
-            ],
-            condition=IfCondition("true" if (cub_target == 'mcub' or cub_target == 'mcub_direct') else "false")
-        ),
-        IncludeLaunchDescription(
-            PathJoinSubstitution(
-                [FindPackageShare("cub_navigation"), "launch", "3d_cub_navigation.launch.py"]
-            ),
-            condition=IfCondition("true" if cub_target == 'spidar' else "false")
-        ),
-        IncludeLaunchDescription(
-            PathJoinSubstitution(
-                [FindPackageShare("cub_navigation"), "launch", "3d_cub_navigation.launch.py"]
-            ),
-            condition=IfCondition("true" if cub_target == 'handy1' else "false")
         ),
     ])
