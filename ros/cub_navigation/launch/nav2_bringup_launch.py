@@ -193,7 +193,7 @@ def generate_launch_description():
         ),
         
         IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(os.path.join(cub_navigation_launch_dir, 'navigation_launch.py')),
+            PythonLaunchDescriptionSource(os.path.join(cub_navigation_launch_dir, 'nav2_navigation_launch.py')),
             launch_arguments={'namespace': namespace,
                               'use_sim_time': use_sim_time,
                               'autostart': autostart,
