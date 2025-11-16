@@ -78,12 +78,6 @@ def generate_launch_description():
         #     package='cub_bringup',
         #     executable='odom_to_tf',
         # ),
-        Node(
-            package='tf2_ros',
-            executable='static_transform_publisher',
-            name='map_to_odom_publisher',
-            arguments=['0', '0', '0', '0', '0', '0', 'map', 'odom'],
-            output='screen'),
         DeclareLaunchArgument(
             'map',
             default_value=map_dir,
