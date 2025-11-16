@@ -158,8 +158,8 @@ def generate_launch_description():
                               'params_file': params_file}.items()),
 
         IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(os.path.join(launch_dir,
-                                                       'localization_launch.py')),
+            PythonLaunchDescriptionSource(os.path.join(cub_navigation_launch_dir,
+                                                       'nav2_localization_launch.py')),
             condition=IfCondition(use_localization),
             launch_arguments={'namespace': namespace,
                               'map': map_yaml_file,
@@ -169,6 +169,8 @@ def generate_launch_description():
                               'use_composition': use_composition,
                               'use_respawn': use_respawn,
                               'container_name': 'nav2_container'}.items()),
+        
+        # 経路計画用の地図読み込み。
         Node(
             package='nav2_map_server',
             executable='map_server',
@@ -178,7 +180,6 @@ def generate_launch_description():
             respawn_delay=2.0,
             parameters=[{'yaml_filename': map_yaml_file}],
             arguments=['--ros-args', '--log-level', log_level],
-            condition=IfCondition(PythonExpression(['not ', use_localization])),
             remappings=remappings),
         Node(
             package='nav2_lifecycle_manager',
@@ -189,7 +190,6 @@ def generate_launch_description():
             parameters=[{'use_sim_time': False},
                         {'autostart': True},
                         {'node_names': ['map_server']}],
-            condition=IfCondition(PythonExpression(['not ', use_localization])),
         ),
         
         IncludeLaunchDescription(
