@@ -32,6 +32,9 @@ from launch.conditions import IfCondition
 
 def generate_launch_description():
     use_sim_time = LaunchConfiguration('use_sim_time', default='false')
+
+    # ここの地図は経路計画専用
+    # 白紙地図なら /home/cub/colcon_ws/src/cub/cub_navigation/maps/empty/map.yaml を使うと良い
     map_dir = LaunchConfiguration(
         'map',
         default="/home/cub/maps/kakunin-1004/kakunin-1004-modified.yaml") # cub_bringup navigation.launch.pyで呼び出し時に上書きされる。デフォルト値設定はそちらに。
@@ -86,26 +89,10 @@ def generate_launch_description():
                 'params_file': param_dir,
                 'use_localization': "True" if (cub_target == 'mcub' or cub_target == 'mcub_direct') else "False"}.items(), # 外部の自己位置推定を利用する場合はこれをFalseに
         ),
-        # オドメトリオンリー走行時にグローバル経路計画に使う地図読み込み用
-        # 白紙地図なら /home/cub/colcon_ws/src/cub/cub_navigation/maps/empty/map.yaml を使うと良い
-        # Node(
-        #     package='nav2_map_server',
-        #     executable='map_server',
-        #     name='map_server',
-        #     output='screen',
-        #     respawn_delay=2.0,
-        #     parameters=[{'yaml_filename': map_dir}],
-        # ),
-        # Node(
-        #     package='nav2_lifecycle_manager',
-        #     executable='lifecycle_manager',
-        #     name='lifecycle_manager_cub_navigation',
-        #     output='screen',
-        #     parameters=[{'autostart': True}, {'node_names': ['map_server']}],
-        # ),
 
         # 通常のmcub(map->odom->base_link環境)では不要、オドメトリオンリーなmcubでは必要
         # Cub3(ekf_localiがmap->base_linkを出す)では必要
+        # TODO: ここだけnavigationの中に自己位置推定関係の話が残ってる
         Node(
             package='tf2_ros',
             executable='static_transform_publisher',

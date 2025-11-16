@@ -22,7 +22,10 @@ def generate_launch_description():
         IncludeLaunchDescription(
             PathJoinSubstitution(
                 [FindPackageShare("cub_bringup"), "launch", "localization.launch.py"] # ここでlocalizationを起動
-            )
+            ),
+            launch_arguments=[
+                ('map_localization', map_dir)
+            ],
         ),
 
         IncludeLaunchDescription(

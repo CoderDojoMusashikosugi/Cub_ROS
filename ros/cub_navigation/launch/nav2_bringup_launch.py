@@ -157,18 +157,19 @@ def generate_launch_description():
                               'use_respawn': use_respawn,
                               'params_file': params_file}.items()),
 
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(os.path.join(cub_navigation_launch_dir,
-                                                       'nav2_localization_launch.py')),
-            condition=IfCondition(use_localization),
-            launch_arguments={'namespace': namespace,
-                              'map': map_yaml_file,
-                              'use_sim_time': use_sim_time,
-                              'autostart': autostart,
-                              'params_file': params_file,
-                              'use_composition': use_composition,
-                              'use_respawn': use_respawn,
-                              'container_name': 'nav2_container'}.items()),
+        # 2D自己位置推定はcub_navigation 2d_localization.launch.pyに移動
+        # IncludeLaunchDescription(
+        #     PythonLaunchDescriptionSource(os.path.join(cub_navigation_launch_dir,
+        #                                                'nav2_localization_launch.py')),
+        #     condition=IfCondition(use_localization),
+        #     launch_arguments={'namespace': namespace,
+        #                       'map': map_yaml_file,
+        #                       'use_sim_time': use_sim_time,
+        #                       'autostart': autostart,
+        #                       'params_file': params_file,
+        #                       'use_composition': use_composition,
+        #                       'use_respawn': use_respawn,
+        #                       'container_name': 'nav2_container'}.items()),
         
         # 経路計画用の地図読み込み。
         Node(
