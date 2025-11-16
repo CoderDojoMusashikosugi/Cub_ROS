@@ -84,7 +84,7 @@ def generate_launch_description():
                 'map': map_dir,
                 'use_sim_time': use_sim_time,
                 'params_file': param_dir,
-                'use_localization': "True" if cub_target == 'mcub' else "False"}.items(), # 外部の自己位置推定を利用する場合はこれをFalseに
+                'use_localization': "True" if (cub_target == 'mcub' or cub_target == 'mcub_direct') else "False"}.items(), # 外部の自己位置推定を利用する場合はこれをFalseに
         ),
         # オドメトリオンリー走行時にグローバル経路計画に使う地図読み込み用
         # 白紙地図なら /home/cub/colcon_ws/src/cub/cub_navigation/maps/empty/map.yaml を使うと良い
@@ -110,7 +110,7 @@ def generate_launch_description():
             package='tf2_ros',
             executable='static_transform_publisher',
             arguments=['0','0','0','0','0','0','1','map','odom'],
-            condition=IfCondition("true" if cub_target == 'cub3' else "false"),
+            condition=IfCondition("false" if (cub_target == 'mcub' or cub_target == 'mcub_direct') else "true"),
         ),
 
         Node(

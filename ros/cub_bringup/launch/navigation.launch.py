@@ -27,10 +27,10 @@ def generate_launch_description():
 
         IncludeLaunchDescription(
             PathJoinSubstitution(
-                [FindPackageShare("cub_navigation"), "launch", "cub_navigation.launch.py"],
-                launch_arguments=[
-                    ('map', map_dir)
-                ],
+                [FindPackageShare("cub_navigation"), "launch", "cub_navigation.launch.py"]
             ),
+            launch_arguments=[
+                ('map', map_dir)
+            ],
         ),
     ])
