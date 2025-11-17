@@ -276,6 +276,7 @@ void EKF::ndt_pose_callback(const geometry_msgs::msg::PoseStamped::ConstSharedPt
 
 void EKF::odom_callback(const nav_msgs::msg::Odometry::ConstSharedPtr msg)
 {
+    msg->twist.twist.angular.z = 0.0; // 角速度はimuから取得するため0とする。
 	odom_ = *msg;
 	has_received_odom_ = true;
 	time_publish_ = msg->header.stamp;
