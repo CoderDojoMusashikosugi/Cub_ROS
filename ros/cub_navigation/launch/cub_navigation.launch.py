@@ -61,9 +61,9 @@ def generate_launch_description():
 
 
     rviz_config_dir = os.path.join(
-        get_package_share_directory('nav2_bringup'),
-        'rviz',
-        'nav2_default_view.rviz')
+        get_package_share_directory('cub_navigation'),
+        'param',
+        'nav2_rviz_view.rviz')
 
     return LaunchDescription([
         DeclareLaunchArgument(
