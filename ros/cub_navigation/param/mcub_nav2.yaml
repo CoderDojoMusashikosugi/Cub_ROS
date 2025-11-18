@@ -54,11 +54,6 @@ map_localization_server:
     use_sim_time: False
     yaml_filename: "map.yaml"
 
-map_server:
-  ros__parameters:
-    use_sim_time: False
-    yaml_filename: "map.yaml"
-
 map_saver:
   ros__parameters:
     use_sim_time: False
@@ -67,6 +62,7 @@ map_saver:
     occupied_thresh_default: 0.65
     map_subscribe_transient_local: True
 
+# BT
 bt_navigator:
   ros__parameters:
     use_sim_time: False
@@ -111,6 +107,9 @@ bt_navigator:
     - nav2_planner_selector_bt_node
     - nav2_controller_selector_bt_node
     - nav2_goal_checker_selector_bt_node
+bt_navigator_rclcpp_node:
+  ros__parameters:
+    use_sim_time: False
 
 # ユーティリティ系
 robot_state_publisher:
@@ -128,9 +127,6 @@ waypoint_follower:
       enabled: True
       waypoint_pause_duration: 200
 
-bt_navigator_rclcpp_node:
-  ros__parameters:
-    use_sim_time: False
 
 recoveries_server:
   ros__parameters:
@@ -154,6 +150,10 @@ recoveries_server:
     rotational_acc_lim: 3.2
 
 # globalプランニング
+map_server:
+  ros__parameters:
+    use_sim_time: False
+    yaml_filename: "map.yaml"
 
 global_costmap:
   global_costmap:
