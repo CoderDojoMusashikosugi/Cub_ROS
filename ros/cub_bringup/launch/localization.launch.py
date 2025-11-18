@@ -31,8 +31,18 @@ def generate_launch_description():
             PathJoinSubstitution(
                 [FindPackageShare("ekf_localizer"), "launch", "ekf_locali.launch.py"]
             ),
+            launch_arguments=[
+                ('map_localization', map_dir)
+            ],
             condition=IfCondition("true" if cub_target == 'cub3' else "false")
         ),
+        Node(
+            package='tf2_ros',
+            executable='static_transform_publisher',
+            arguments=['0','0','0','0','0','0','1','map','odom'],
+            condition=IfCondition("true" if cub_target == 'cub3' else "false")
+        ),
+
         IncludeLaunchDescription(
             PathJoinSubstitution(
                 [FindPackageShare("cub_navigation"), "launch", "2d_localization.launch.py"]
@@ -54,4 +64,19 @@ def generate_launch_description():
             ),
             condition=IfCondition("true" if cub_target == 'handy1' else "false")
         ),
+
+        # IncludeLaunchDescription(
+        #     PathJoinSubstitution(
+        #         [FindPackageShare("cub_navigation"), "launch", "2d_localization.launch.py"]
+        #     ),
+        #     launch_arguments=[
+        #         ('map_localization', map_dir)
+        #     ],
+        # ),
+        # IncludeLaunchDescription(
+        #     PathJoinSubstitution(
+        #         [FindPackageShare("cub_navigation"), "launch", "odom_as_localization.launch.py"]
+        #     ),
+        # ),
+
     ])

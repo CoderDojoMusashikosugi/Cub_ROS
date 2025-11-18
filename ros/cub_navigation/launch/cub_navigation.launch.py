@@ -90,16 +90,6 @@ def generate_launch_description():
                 'use_localization': "True" if (cub_target == 'mcub' or cub_target == 'mcub_direct') else "False"}.items(), # 外部の自己位置推定を利用する場合はこれをFalseに
         ),
 
-        # 通常のmcub(map->odom->base_link環境)では不要、オドメトリオンリーなmcubでは必要
-        # Cub3(ekf_localiがmap->base_linkを出す)では必要
-        # TODO: ここだけnavigationの中に自己位置推定関係の話が残ってる
-        Node(
-            package='tf2_ros',
-            executable='static_transform_publisher',
-            arguments=['0','0','0','0','0','0','1','map','odom'],
-            condition=IfCondition("false" if (cub_target == 'mcub' or cub_target == 'mcub_direct') else "true"),
-        ),
-
         Node(
             package='cub_behavior_tree',
             executable='waypoint_navigator',
