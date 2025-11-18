@@ -228,22 +228,29 @@ void motor_exec(){
       motor_handler.Control_Motor(Speed[i], i+1, Acce, brake, &Receiv[i]);//スピード0：モーター停止
       // debug_message("i = %d send speed %d receiver id %d temp %d err %d", i, Speed[i], Receiv.ID, Receiv.Temp, Receiv.ErrCode);
       vTaskDelay(5 / portTICK_PERIOD_MS);//1回の通信ごとに5msのWaitが必要（RS485の半二重通信の問題と思われる） 
-      switch (i)
-      {
-      case 0:
-        rear_left_wheel_position = Receiv[i].Position;
-        break;
-      case 1:
-        front_right_wheel_position = Receiv[i].Position;
-        break;
-      case 2:
-        front_left_wheel_position = Receiv[i].Position;
-        break;
-      case 3:
-        rear_right_wheel_position = Receiv[i].Position;
-        break;
-      default:
-        break;
+
+      uint8_t motor_id = i + 1;
+      if (motor_id - Receiv[i].ID == 1 || motor_id - Receiv[i].ID == -3) {
+        // 例えばモーターのIDが2に対してControl_Motor掛けたら、Receiv[2-1].IDが帰ってくるはずが何故か一つ前のID:1のデータが帰ってくる。1のときは4。
+        // この状態で一年以上運用出来てた実績はあるのでこれはもう正常な状態とする。
+        // で、さらにエラーとして上記の条件から外れる場合もあって、それは異常として値を読み飛ばす。
+        switch (i)
+        {
+        case 0:
+          rear_left_wheel_position = Receiv[i].Position;
+          break;
+        case 1:
+          front_right_wheel_position = Receiv[i].Position;
+          break;
+        case 2:
+          front_left_wheel_position = Receiv[i].Position;
+          break;
+        case 3:
+          rear_right_wheel_position = Receiv[i].Position;
+          break;
+        default:
+          break;
+        }
       }
     }
     xSemaphoreGive(mutex);
