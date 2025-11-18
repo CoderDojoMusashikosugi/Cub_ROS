@@ -777,8 +777,8 @@ void setup() {
   delay(10);
 
 #ifdef CUB_TARGET_CUB3
-  for(int i=1;i<=4;i++){
-    motor_handler.Control_Motor(0, i, Acce, Brake_P, &Receiv[i]); //4つのモーター
+  for(int i=0;i<4;i++){
+    motor_handler.Control_Motor(0, i+1, Acce, Brake_P, &Receiv[i]); //4つのモーター
   }
 #elif defined(CUB_TARGET_MCUB)
   initialize_dynamixel();
