@@ -109,13 +109,13 @@ def generate_launch_description():
             arguments=['-d', rviz_config_dir],
             parameters=[{'use_sim_time': use_sim_time}],
             output='screen'),
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource([collison_monitor_launch_file_dir, '/collision_monitor_node.launch.py']),
-            launch_arguments=[
-                ('use_sim_time', use_sim_time),
-            ],
-        ),
+        # IncludeLaunchDescription(
+        #     PythonLaunchDescriptionSource([collison_monitor_launch_file_dir, '/collision_monitor_node.launch.py']),
+        #     launch_arguments=[
+        #         ('use_sim_time', use_sim_time),
+        #     ],
+        # ),
         
-        TimerAction(period=5.0, actions=[IncludeLaunchDescription(
-            PythonLaunchDescriptionSource([cub_navigation_launch_dir, '/cub_costmapfilter.launch.py']),)]),
+        # TimerAction(period=5.0, actions=[IncludeLaunchDescription(
+        #     PythonLaunchDescriptionSource([cub_navigation_launch_dir, '/cub_costmapfilter.launch.py']),)]),
     ])
