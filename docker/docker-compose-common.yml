@@ -17,7 +17,6 @@ x-template: &cub_ros_common_setting # デフォルト設定。この値は下に
   ipc: host                    # コンテナとホストとのDDSの通信のためにホストとIPCを共有
   privileged: true             # ホストのシリアルポートをコンテナに持ってくる
   network_mode: "host"         # ネットワーク関連のアプリを、コンテナ内でもホストと同じ動きが出来るようにする。
-  shm_size: "1024m"
   group_add: 
     - dialout                  # シリアルポートをsudo無しでアクセス可能にする
     - ${INPUT_GROUP_ID:-input} # joystickをsudo無しでアクセス可能にする
