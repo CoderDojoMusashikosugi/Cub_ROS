@@ -13,6 +13,8 @@
   <depend>diagnostic_updater</depend>
   <depend>diagnostic_aggregator</depend>
   <depend>rclcpp</depend>
+  <depend>std_msgs</depend>
+  <depend>rviz_2d_overlay_msgs</depend>
 
   <export>
     <build_type>ament_cmake</build_type>

@@ -143,6 +143,13 @@ def generate_launch_description():
             output='both',
             parameters=[{'use_sim_time': use_sim_time}, diag_config],
         ),
+        Node(
+            package='cub_diagnostics',
+            executable='diag_rviz_converter_node',
+            name='diag_rviz_converter',
+            output='both',
+            parameters=[{'use_sim_time': use_sim_time}],
+        ),
 
         # 3D LiDAR -> launch_at_boot.launch.pyから移動
         velodyne_driver_node,
