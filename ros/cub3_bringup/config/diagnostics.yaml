@@ -89,8 +89,8 @@ linux_state:
     hardware_id: cub3
     update_period: 1.0
     cpu:
-      warn: 0.8
-      error: 0.9
+      warn: 0.95
+      error: 0.98
     memory:
       warn: 0.8
       error: 0.9
