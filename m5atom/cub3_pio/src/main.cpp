@@ -835,9 +835,12 @@ void loop() {
     fill_solid(lane_led, NUM_LANE_LEDS, CRGB::Yellow);
 #endif
   } else if (robo_mode == AUTONOMOUS) {
-    leds[4] = CRGB::Green;
+    if(subscribe_twist_msg.angular.y == 0.0) leds[4] = CRGB::Green;
+    else leds[4] = CRGB::Yellow;
 #ifdef CUB_TARGET_CUB3
-    fill_solid(lane_led, NUM_LANE_LEDS, CRGB::Green);
+    // 使ってないangularのyについて、速度指令の出所が自律なら0、手動なら0以外にする。
+    if(subscribe_twist_msg.angular.y == 0.0) fill_solid(lane_led, NUM_LANE_LEDS, CRGB::Green);
+    else fill_solid(lane_led, NUM_LANE_LEDS, CRGB::Yellow);
 #endif
   } else if (robo_mode == IDLE) {
     leds[4] = CRGB::Blue;

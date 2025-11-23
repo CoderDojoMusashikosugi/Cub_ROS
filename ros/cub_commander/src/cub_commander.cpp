@@ -112,6 +112,7 @@ class CubCommander : public rclcpp::Node
       if(autonomous==false){
         cmd_vel_.linear.x = linear*joy.lx();
         cmd_vel_.angular.z = angular*joy.ly();
+        cmd_vel_.angular.y = 100.0; // 使ってないangularのyについて、速度指令の出所が自律なら0、手動なら0以外にする。
       }
     }
 
@@ -121,6 +122,7 @@ class CubCommander : public rclcpp::Node
       if(autonomous){
         cmd_vel_.linear.x  = msg.linear.x;
         cmd_vel_.angular.z = msg.angular.z;
+        cmd_vel_.angular.y = 0.0; // 使ってないangularのyについて、速度指令の出所が自律なら0、手動なら0以外にする。
       }
     }
 
