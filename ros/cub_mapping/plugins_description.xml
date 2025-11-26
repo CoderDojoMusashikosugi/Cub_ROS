@@ -1,0 +1,20 @@
+<library path="cub_mapping_plugin">
+  <class name="cub_mapping/PointCloudTo2DTool"
+         type="cub_mapping::PointCloudTo2DTool"
+         base_class_type="rviz_common::Tool">
+    <description>
+      Interactive tool to convert 3D point clouds to 2D occupancy grid maps.
+      Use mouse to position, scroll to adjust height, Shift+scroll for width,
+      Ctrl+scroll for height range. Press 'z' to activate, left-click to add region.
+    </description>
+  </class>
+  <class name="cub_mapping/WaypointEditTool"
+         type="cub_mapping::WaypointEditTool"
+         base_class_type="rviz_common::Tool">
+    <description>
+      Interactive tool for creating and editing navigation waypoints.
+      Press 'w' to activate. Move mouse to position waypoint, scroll wheel to adjust orientation.
+      Left-click to place waypoint. Press 'a' for Add mode, 's' for Select, 'm' for Move, 'r' for Rotate.
+    </description>
+  </class>
+</library>

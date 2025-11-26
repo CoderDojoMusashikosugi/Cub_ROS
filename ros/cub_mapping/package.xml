@@ -1,0 +1,56 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>cub_mapping</name>
+  <version>0.1.0</version>
+  <description>3D point cloud to 2D occupancy grid map conversion tool for Cub robot</description>
+  <maintainer email="you@example.com">Cub Developer</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>ament_cmake_ros</buildtool_depend>
+
+  <!-- ROS2 Core Dependencies -->
+  <depend>rclcpp</depend>
+  <depend>std_msgs</depend>
+  <depend>std_srvs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>visualization_msgs</depend>
+  <depend>tf2</depend>
+  <depend>tf2_ros</depend>
+  <depend>tf2_geometry_msgs</depend>
+
+  <!-- RViz2 Plugin Dependencies -->
+  <depend>rviz_common</depend>
+  <depend>rviz_rendering</depend>
+  <depend>rviz_ogre_vendor</depend>
+  <depend>pluginlib</depend>
+  <depend>qtbase5-dev</depend>
+  <build_depend>qt5-qmake</build_depend>
+
+  <!-- Point Cloud Processing -->
+  <depend>pcl_conversions</depend>
+  <depend>pcl_ros</depend>
+
+  <!-- OpenCV for image processing -->
+  <depend>cv_bridge</depend>
+
+  <!-- YAML parsing for waypoint files -->
+  <depend>yaml-cpp-vendor</depend>
+
+  <!-- Interface Generation -->
+  <buildtool_depend>rosidl_default_generators</buildtool_depend>
+  <exec_depend>rosidl_default_runtime</exec_depend>
+  <member_of_group>rosidl_interface_packages</member_of_group>
+
+  <!-- Testing -->
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+    <rviz plugin="${prefix}/plugins_description.xml"/>
+  </export>
+</package>

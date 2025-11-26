@@ -1,0 +1,37 @@
+waypoint_groups:
+  - group_name: "Go to left top of city hall"
+    require_input: false
+    waypoints:
+      - x: 0
+        y: 0
+        yaw: 0
+  - group_name: "Go to left bottom of city hall"
+    require_input: false
+    waypoints:
+      - x: 0
+        y: 0
+        yaw: 0
+  - group_name: "Go to right bottom of city hall"
+    require_input: true
+    waypoints:
+      - x: 0
+        y: 0
+        yaw: 0
+  - group_name: "Go to first closswalk"
+    require_input: true
+    waypoints:
+      - x: 0
+        y: 0
+        yaw: 0
+  - group_name: "Go to second closswalk"
+    require_input: true
+    waypoints:
+      - x: 0
+        y: 0
+        yaw: 0
+  - group_name: "Go to long walk road"
+    require_input: true
+    waypoints:
+      - x: 0
+        y: 0
+        yaw: 0

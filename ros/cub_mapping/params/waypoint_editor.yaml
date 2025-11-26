@@ -1,0 +1,17 @@
+waypoint_manager_node:
+  ros__parameters:
+    # Frame for waypoint visualization
+    frame_id: "map"
+
+    # Waypoint file to auto-load (empty = no auto-load)
+    waypoint_file: ""
+
+    # Marker publishing rate (Hz)
+    publish_rate: 10.0
+
+    # Auto-save after modifications
+    auto_save: false
+
+    # Visualization settings
+    show_waypoint_numbers: true
+    show_connections: true

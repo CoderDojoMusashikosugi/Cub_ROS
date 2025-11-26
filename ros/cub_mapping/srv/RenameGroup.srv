@@ -1,0 +1,6 @@
+# Rename a waypoint group
+int32 group_index       # Index of group to rename
+string new_name         # New name for the group
+---
+bool success            # True if group was renamed successfully
+string message          # Status message

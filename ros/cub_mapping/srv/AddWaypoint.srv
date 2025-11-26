@@ -1,0 +1,9 @@
+# Add a waypoint to a specific group
+int32 group_index       # Index of group to add waypoint to (-1 = current group)
+float64 x               # X coordinate in map frame
+float64 y               # Y coordinate in map frame
+float64 yaw             # Orientation in radians
+---
+bool success            # True if waypoint was added successfully
+string message          # Status message
+int32 waypoint_index    # Index of newly created waypoint in the group
