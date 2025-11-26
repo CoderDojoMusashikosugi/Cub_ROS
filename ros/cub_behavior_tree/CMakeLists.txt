@@ -13,6 +13,12 @@ find_package(nav2_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(yaml-cpp REQUIRED)
 find_package(rclcpp_action REQUIRED)
+find_package(nav2_behavior_tree REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_ros REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(pluginlib REQUIRED)
 
 include_directories(
   include
@@ -20,6 +26,7 @@ include_directories(
 )
 
 add_executable(waypoint_navigator src/waypoint_navigator.cpp)
+add_library(bt_follow_zone_plugins SHARED src/follow_zone_plugins.cpp)
 
 ament_target_dependencies(waypoint_navigator
   rclcpp
@@ -33,9 +40,28 @@ target_link_libraries(waypoint_navigator
   yaml-cpp
 )
 
-install(TARGETS
-  waypoint_navigator
-  DESTINATION lib/${PROJECT_NAME}
+ament_target_dependencies(bt_follow_zone_plugins
+  rclcpp
+  tf2
+  tf2_ros
+  tf2_geometry_msgs
+  geometry_msgs
+  sensor_msgs
+  pluginlib
+  nav2_behavior_tree
+)
+
+pluginlib_export_plugin_description_file(nav2_behavior_tree bt_plugins.xml)
+
+install(TARGETS waypoint_navigator
+  DESTINATION lib/${PROJECT_NAME})
+
+install(TARGETS bt_follow_zone_plugins
+  DESTINATION lib)
+
+install(FILES
+  bt_plugins.xml
+  DESTINATION share/${PROJECT_NAME}
 )
 
 ament_package()

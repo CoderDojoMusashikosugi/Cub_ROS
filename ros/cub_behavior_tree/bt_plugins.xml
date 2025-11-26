@@ -1,0 +1,12 @@
+<library path="bt_follow_zone_plugins">
+  <class name="cub_behavior_tree::IsInFollowZone"
+         type="cub_behavior_tree::IsInFollowZone"
+         base_class_type="BT::ConditionNode">
+    <description>Checks if the robot is within a follow zone around the goal or an explicitly provided center.</description>
+  </class>
+  <class name="cub_behavior_tree::AcquireFrontTarget"
+         type="cub_behavior_tree::AcquireFrontTarget"
+         base_class_type="BT::SyncActionNode">
+    <description>Selects a front object aligned with the goal heading and writes it to the blackboard.</description>
+  </class>
+</library>
