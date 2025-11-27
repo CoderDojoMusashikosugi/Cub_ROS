@@ -50,6 +50,8 @@ ament_target_dependencies(bt_follow_zone_plugins
   pluginlib
   nav2_behavior_tree
 )
+target_compile_definitions(bt_follow_zone_plugins
+  PRIVATE BT_PLUGIN_EXPORT)
 
 pluginlib_export_plugin_description_file(nav2_behavior_tree bt_plugins.xml)
 
