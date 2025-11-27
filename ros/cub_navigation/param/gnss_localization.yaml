@@ -1,0 +1,41 @@
+gps_updater:
+  ros__parameters:
+
+    # Topic Names
+    gps_topic_name: /fix                    # GPS input topic (sensor_msgs/NavSatFix)
+    gps_pose_topic_name: /gps_pose          # GPS output topic in local coordinates
+    map_frame_id: map                       # Output frame ID
+    initialpose_topic_name: /initialpose    # Topic to reset GPS origin
+
+    # GPS Origin Setting
+    # use_manual_origin: Manually set GPS origin or auto-initialize
+    #   false: Automatically set origin from first valid GPS signal (not recommended for nav2)
+    #   true:  Use the specified lat/lon/alt below as the origin (recommended for nav2)
+    use_manual_origin: true
+
+    # Manual origin setting (effective only when use_manual_origin: true)
+    # IMPORTANT: Set these values to your map origin coordinates
+    # Example: Tokyo Station area
+    # gps_origin_lat: 35.6812
+    # gps_origin_lon: 139.7671
+    # gps_origin_alt: 40.0
+    gps_origin_lat: 36.082628231             # GPS origin latitude (degrees) - MUST BE SET
+    gps_origin_lon: 140.076144739            # GPS origin longitude (degrees) - MUST BE SET
+    gps_origin_alt: 67.078                   # GPS origin altitude (m, ellipsoidal height)
+
+    # GPS Quality Filter Parameters
+    # min_satellites: Minimum satellite count threshold (currently not implemented)
+    # max_hdop: Maximum HDOP threshold (currently not implemented)
+    min_satellites: 6.0
+    max_hdop: 3.0
+
+    # max_covariance_threshold: Maximum acceptable positioning error (m)
+    #   GPS data with horizontal std deviation exceeding this value will be rejected
+    #   Strict:   5.0  -> Use only high-precision data (may not work in urban areas)
+    #   Standard: 10.0 -> Balanced setting
+    #   Relaxed:  15.0 -> Accept lower precision data (position estimation may become unstable)
+    max_covariance_threshold: 10.0
+
+    # Note:
+    # - Only GPS fixes with status >= STATUS_SBAS_FIX (1) are accepted
+    # - Only data with covariance type KNOWN(3) or APPROXIMATED(1) are accepted
