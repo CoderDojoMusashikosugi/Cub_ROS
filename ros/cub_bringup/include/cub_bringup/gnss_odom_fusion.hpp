@@ -22,7 +22,6 @@ public:
 
 private:
   void gnss_callback(const sensor_msgs::msg::NavSatFix::ConstSharedPtr msg);
-  void gps_pose_callback(const geometry_msgs::msg::PoseWithCovarianceStamped::ConstSharedPtr msg);
   void odom_callback(const nav_msgs::msg::Odometry::ConstSharedPtr msg);
   void initialpose_callback(const geometry_msgs::msg::PoseWithCovarianceStamped::ConstSharedPtr msg);
   void timer_callback();
@@ -30,15 +29,16 @@ private:
   void update_yaw_from_odom(const nav_msgs::msg::Odometry & odom);
   void update_yaw_from_gnss_movement(const nav_msgs::msg::Odometry & current_odom);
   bool is_gnss_valid() const;
+  void convert_gnss_to_pose(const sensor_msgs::msg::NavSatFix::ConstSharedPtr msg);
 
   // Subscribers
   rclcpp::Subscription<sensor_msgs::msg::NavSatFix>::SharedPtr gnss_sub_;
-  rclcpp::Subscription<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr gps_pose_sub_;
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
   rclcpp::Subscription<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr initialpose_sub_;
 
-  // Publisher
+  // Publishers
   rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pose_pub_;
+  rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr gps_pose_pub_;
 
   // TF Broadcaster
   std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
@@ -73,6 +73,12 @@ private:
   bool odom_initialized_;
 
   rclcpp::Time last_odom_time_;
+
+  // GNSS origin (map frame origin in lat/lon/alt)
+  double gps_origin_lat_;
+  double gps_origin_lon_;
+  double gps_origin_alt_;
+  bool use_manual_origin_;
 
   // Parameters
   double gnss_timeout_;

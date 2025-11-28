@@ -21,7 +21,11 @@ GnssOdomFusion::GnssOdomFusion()
   odom_correction_reference_valid_(false),
   current_yaw_(0.0),
   last_odom_yaw_(0.0),
-  odom_initialized_(false)
+  odom_initialized_(false),
+  gps_origin_lat_(0.0),
+  gps_origin_lon_(0.0),
+  gps_origin_alt_(0.0),
+  use_manual_origin_(false)
 {
   // Declare parameters
   this->declare_parameter<double>("gnss_timeout", 1.0);
@@ -34,6 +38,12 @@ GnssOdomFusion::GnssOdomFusion()
   this->declare_parameter<double>("max_distance_mismatch_ratio", 0.3);
   this->declare_parameter<double>("gnss_yaw_weight", 0.3);
 
+  // GNSS origin parameters
+  this->declare_parameter<bool>("use_manual_origin", false);
+  this->declare_parameter<double>("gps_origin_lat", 0.0);
+  this->declare_parameter<double>("gps_origin_lon", 0.0);
+  this->declare_parameter<double>("gps_origin_alt", 0.0);
+
   // Get parameters
   this->get_parameter("gnss_timeout", gnss_timeout_);
   this->get_parameter("use_gnss_altitude", use_gnss_altitude_);
@@ -45,6 +55,11 @@ GnssOdomFusion::GnssOdomFusion()
   this->get_parameter("max_distance_mismatch_ratio", max_distance_mismatch_ratio_);
   this->get_parameter("gnss_yaw_weight", gnss_yaw_weight_);
 
+  this->get_parameter("use_manual_origin", use_manual_origin_);
+  this->get_parameter("gps_origin_lat", gps_origin_lat_);
+  this->get_parameter("gps_origin_lon", gps_origin_lon_);
+  this->get_parameter("gps_origin_alt", gps_origin_alt_);
+
   current_yaw_ = initial_yaw_;
   last_gnss_time_ = this->now();
   last_odom_time_ = this->now();
@@ -54,11 +69,6 @@ GnssOdomFusion::GnssOdomFusion()
     "/fix",
     rclcpp::QoS(10).reliability(rclcpp::ReliabilityPolicy::BestEffort),
     std::bind(&GnssOdomFusion::gnss_callback, this, std::placeholders::_1));
-
-  gps_pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>(
-    "/gps_pose",
-    rclcpp::QoS(10).reliability(rclcpp::ReliabilityPolicy::Reliable),
-    std::bind(&GnssOdomFusion::gps_pose_callback, this, std::placeholders::_1));
 
   odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
     "/odom",
@@ -70,9 +80,13 @@ GnssOdomFusion::GnssOdomFusion()
     rclcpp::QoS(10).reliability(rclcpp::ReliabilityPolicy::Reliable),
     std::bind(&GnssOdomFusion::initialpose_callback, this, std::placeholders::_1));
 
-  // Initialize publisher for debugging
+  // Initialize publishers
   pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>(
     "/gnss_pose",
+    rclcpp::QoS(10).reliability(rclcpp::ReliabilityPolicy::Reliable));
+
+  gps_pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(
+    "/gps_pose",
     rclcpp::QoS(10).reliability(rclcpp::ReliabilityPolicy::Reliable));
 
   // Initialize TF broadcaster
@@ -89,6 +103,11 @@ GnssOdomFusion::GnssOdomFusion()
   RCLCPP_INFO(this->get_logger(), "  Use GNSS altitude: %s", use_gnss_altitude_ ? "true" : "false");
   RCLCPP_INFO(this->get_logger(), "  TF publish rate: %.1f Hz", tf_publish_rate_);
   RCLCPP_INFO(this->get_logger(), "  Initial yaw: %.3f rad", initial_yaw_);
+  RCLCPP_INFO(this->get_logger(), "  Use manual origin: %s", use_manual_origin_ ? "true" : "false");
+  if (use_manual_origin_) {
+    RCLCPP_INFO(this->get_logger(), "  GPS origin: lat=%.8f, lon=%.8f, alt=%.3f",
+                gps_origin_lat_, gps_origin_lon_, gps_origin_alt_);
+  }
   RCLCPP_INFO(this->get_logger(), "  Use GNSS yaw correction: %s", use_gnss_yaw_correction_ ? "true" : "false");
   if (use_gnss_yaw_correction_) {
     RCLCPP_INFO(this->get_logger(), "  Min GNSS movement for yaw: %.2f m", min_gnss_movement_for_yaw_);
@@ -114,6 +133,9 @@ void GnssOdomFusion::gnss_callback(const sensor_msgs::msg::NavSatFix::ConstShare
     RCLCPP_DEBUG(this->get_logger(),
       "GNSS valid: status=%d, lat=%.8f, lon=%.8f",
       msg->status.status, msg->latitude, msg->longitude);
+
+    // Convert GNSS to local pose
+    convert_gnss_to_pose(msg);
   } else {
     gnss_valid_ = false;
     RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
@@ -122,13 +144,33 @@ void GnssOdomFusion::gnss_callback(const sensor_msgs::msg::NavSatFix::ConstShare
   }
 }
 
-void GnssOdomFusion::gps_pose_callback(
-  const geometry_msgs::msg::PoseWithCovarianceStamped::ConstSharedPtr msg)
+void GnssOdomFusion::convert_gnss_to_pose(const sensor_msgs::msg::NavSatFix::ConstSharedPtr msg)
 {
-  // Only use GPS position if GNSS is valid
-  if (!is_gnss_valid()) {
-    return;
+  // Initialize origin from first valid GNSS if not using manual origin
+  static bool origin_initialized = false;
+  if (!use_manual_origin_ && !origin_initialized) {
+    gps_origin_lat_ = msg->latitude;
+    gps_origin_lon_ = msg->longitude;
+    gps_origin_alt_ = msg->altitude;
+    origin_initialized = true;
+    RCLCPP_INFO(this->get_logger(),
+      "GPS origin auto-initialized: lat=%.8f, lon=%.8f, alt=%.3f",
+      gps_origin_lat_, gps_origin_lon_, gps_origin_alt_);
   }
+
+  // Convert lat/lon to local ENU coordinates
+  // Using simple Equirectangular projection for short distances
+  constexpr double EARTH_RADIUS = 6378137.0;  // WGS84 equatorial radius (m)
+
+  double lat_rad = msg->latitude * M_PI / 180.0;
+  double lon_rad = msg->longitude * M_PI / 180.0;
+  double origin_lat_rad = gps_origin_lat_ * M_PI / 180.0;
+  double origin_lon_rad = gps_origin_lon_ * M_PI / 180.0;
+
+  // Calculate local coordinates (ENU frame)
+  double x = EARTH_RADIUS * (lon_rad - origin_lon_rad) * std::cos(origin_lat_rad);
+  double y = EARTH_RADIUS * (lat_rad - origin_lat_rad);
+  double z = msg->altitude - gps_origin_alt_;
 
   // Store previous position before updating
   if (gnss_received_) {
@@ -137,16 +179,49 @@ void GnssOdomFusion::gps_pose_callback(
     last_gnss_position_valid_ = true;
   }
 
-  gnss_x_ = msg->pose.pose.position.x;
-  gnss_y_ = msg->pose.pose.position.y;
+  gnss_x_ = x;
+  gnss_y_ = y;
 
   if (use_gnss_altitude_) {
-    gnss_z_ = msg->pose.pose.position.z;
+    gnss_z_ = z;
   } else {
     gnss_z_ = 0.0;
   }
 
   gnss_received_ = true;
+
+  // Publish GPS pose (before fusion)
+  auto gps_pose_msg = geometry_msgs::msg::PoseWithCovarianceStamped();
+  gps_pose_msg.header.stamp = msg->header.stamp;
+  gps_pose_msg.header.frame_id = "map";
+  gps_pose_msg.pose.pose.position.x = x;
+  gps_pose_msg.pose.pose.position.y = y;
+  gps_pose_msg.pose.pose.position.z = z;
+
+  // Set orientation to identity (no orientation from GPS alone)
+  gps_pose_msg.pose.pose.orientation.w = 1.0;
+  gps_pose_msg.pose.pose.orientation.x = 0.0;
+  gps_pose_msg.pose.pose.orientation.y = 0.0;
+  gps_pose_msg.pose.pose.orientation.z = 0.0;
+
+  // Copy covariance from NavSatFix to pose covariance (position only)
+  // NavSatFix covariance: [lat, lon, alt]
+  // PoseWithCovariance: 6x6 matrix [x, y, z, roll, pitch, yaw]
+  for (int i = 0; i < 36; ++i) {
+    gps_pose_msg.pose.covariance[i] = 0.0;
+  }
+
+  // Map lat->y, lon->x, alt->z covariances
+  gps_pose_msg.pose.covariance[0] = msg->position_covariance[4];   // x variance (from lon)
+  gps_pose_msg.pose.covariance[7] = msg->position_covariance[0];   // y variance (from lat)
+  gps_pose_msg.pose.covariance[14] = msg->position_covariance[8];  // z variance (from alt)
+
+  // Set high uncertainty for orientation (not measured by GPS)
+  gps_pose_msg.pose.covariance[21] = 1000.0;  // roll variance
+  gps_pose_msg.pose.covariance[28] = 1000.0;  // pitch variance
+  gps_pose_msg.pose.covariance[35] = 1000.0;  // yaw variance
+
+  gps_pose_pub_->publish(gps_pose_msg);
 
   // Update yaw from GNSS movement if enabled and we have valid odometry
   if (use_gnss_yaw_correction_ && odom_initialized_) {
@@ -154,7 +229,7 @@ void GnssOdomFusion::gps_pose_callback(
   }
 
   RCLCPP_DEBUG(this->get_logger(),
-    "GPS pose updated: x=%.3f, y=%.3f, z=%.3f",
+    "GNSS converted to pose: x=%.3f, y=%.3f, z=%.3f",
     gnss_x_, gnss_y_, gnss_z_);
 }
 

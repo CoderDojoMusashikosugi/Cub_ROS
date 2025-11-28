@@ -19,6 +19,18 @@ gnss_odom_fusion:
     # This can be overridden by RViz 2D Pose Estimate
     initial_yaw: 0.0
 
+    # GPS Origin Setting
+    # use_manual_origin: Manually set GPS origin or auto-initialize
+    #   false: Automatically set origin from first valid GPS signal
+    #   true:  Use the specified lat/lon/alt below as the origin
+    use_manual_origin: true
+
+    # Manual origin setting (effective only when use_manual_origin: true)
+    # IMPORTANT: Set these values to your map origin coordinates
+    gps_origin_lat: 36.082628231     # GPS origin latitude (degrees)
+    gps_origin_lon: 140.076144739    # GPS origin longitude (degrees)
+    gps_origin_alt: 67.078           # GPS origin altitude (m, ellipsoidal height)
+
     # GNSS-based yaw correction
     # Enable correction of yaw angle using GNSS movement direction
     use_gnss_yaw_correction: true
