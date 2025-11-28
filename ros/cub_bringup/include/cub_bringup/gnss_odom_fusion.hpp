@@ -74,6 +74,13 @@ private:
 
   rclcpp::Time last_odom_time_;
 
+  // Cached map->odom transform (updated only when GNSS updates)
+  double map_odom_x_;
+  double map_odom_y_;
+  double map_odom_z_;
+  double map_odom_yaw_;
+  bool map_odom_initialized_;
+
   // GNSS origin (map frame origin in lat/lon/alt)
   double gps_origin_lat_;
   double gps_origin_lon_;

@@ -1,10 +1,14 @@
 # GNSS-based Localization Launch File
-# This launch file provides map->base_link TF using GNSS and odometry fusion
+# This launch file provides map->odom->base_link TF chain using GNSS and odometry fusion
 #
 # Requirements:
 # - GNSS receiver publishing to /fix (sensor_msgs/NavSatFix)
 # - Odometry published to /odom (nav_msgs/Odometry)
 # - Map origin coordinates must be set in gnss_fusion.yaml
+#
+# TF Structure:
+# - map->odom: Published by gnss_odom_fusion (GNSS position correction)
+# - odom->base_link: Published by odom_to_tf (odometry data)
 #
 # Usage:
 #   ros2 launch cub_navigation gnss_as_localization.launch.py
@@ -26,7 +30,7 @@ def generate_launch_description():
         # GNSS-Odom Fusion Node:
         # - Converts GNSS (lat/lon) to local map coordinates (x/y)
         # - Fuses GNSS position with odometry orientation
-        # - Publishes map->base_link TF
+        # - Publishes map->odom TF
         Node(
             package='cub_bringup',
             executable='gnss_odom_fusion',
@@ -38,17 +42,16 @@ def generate_launch_description():
                 # Input: /odom (nav_msgs/Odometry)
                 # Output: /gps_pose (geometry_msgs/PoseWithCovarianceStamped) - GPS position before fusion
                 # Output: /gnss_pose (geometry_msgs/PoseStamped) - Final fused pose for debugging
-                # Output: map->base_link TF
+                # Output: map->odom TF
             ]
         ),
 
-        # Static TF: map->odom (identity transform)
-        # Since we directly publish map->base_link, map and odom frames are identical
+        # Odom to TF Node:
+        # - Publishes odom->base_link TF from odometry data
         Node(
-            package='tf2_ros',
-            executable='static_transform_publisher',
-            name='map_to_odom_publisher',
-            arguments=['0', '0', '0', '0', '0', '0', '1', 'map', 'odom'],
+            package='cub_bringup',
+            executable='odom_to_tf',
+            name='odom_to_tf',
             output='screen'
         ),
     ])

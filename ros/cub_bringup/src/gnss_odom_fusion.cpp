@@ -22,6 +22,11 @@ GnssOdomFusion::GnssOdomFusion()
   current_yaw_(0.0),
   last_odom_yaw_(0.0),
   odom_initialized_(false),
+  map_odom_x_(0.0),
+  map_odom_y_(0.0),
+  map_odom_z_(0.0),
+  map_odom_yaw_(0.0),
+  map_odom_initialized_(false),
   gps_origin_lat_(0.0),
   gps_origin_lon_(0.0),
   gps_origin_alt_(0.0),
@@ -228,6 +233,42 @@ void GnssOdomFusion::convert_gnss_to_pose(const sensor_msgs::msg::NavSatFix::Con
     update_yaw_from_gnss_movement(latest_odom_);
   }
 
+  // Update map->odom transform when GNSS is updated
+  if (odom_initialized_) {
+    // Get current odometry position
+    double odom_x = latest_odom_.pose.pose.position.x;
+    double odom_y = latest_odom_.pose.pose.position.y;
+    double odom_z = latest_odom_.pose.pose.position.z;
+
+    // Extract yaw from current odometry
+    tf2::Quaternion odom_q(
+      latest_odom_.pose.pose.orientation.x,
+      latest_odom_.pose.pose.orientation.y,
+      latest_odom_.pose.pose.orientation.z,
+      latest_odom_.pose.pose.orientation.w);
+    double odom_roll, odom_pitch, odom_yaw;
+    tf2::Matrix3x3(odom_q).getRPY(odom_roll, odom_pitch, odom_yaw);
+
+    // Calculate map->odom rotation
+    map_odom_yaw_ = current_yaw_ - odom_yaw;
+
+    // Calculate map->odom translation
+    // Transform equation: P_map = T_map_odom + R_map_odom * P_odom
+    // Therefore: T_map_odom = P_map - R_map_odom * P_odom
+    double cos_yaw = std::cos(map_odom_yaw_);
+    double sin_yaw = std::sin(map_odom_yaw_);
+
+    map_odom_x_ = gnss_x_ - (odom_x * cos_yaw - odom_y * sin_yaw);
+    map_odom_y_ = gnss_y_ - (odom_x * sin_yaw + odom_y * cos_yaw);
+    map_odom_z_ = gnss_z_ - odom_z;
+
+    map_odom_initialized_ = true;
+
+    RCLCPP_DEBUG(this->get_logger(),
+      "map->odom transform updated: x=%.3f, y=%.3f, z=%.3f, yaw=%.3f",
+      map_odom_x_, map_odom_y_, map_odom_z_, map_odom_yaw_);
+  }
+
   RCLCPP_DEBUG(this->get_logger(),
     "GNSS converted to pose: x=%.3f, y=%.3f, z=%.3f",
     gnss_x_, gnss_y_, gnss_z_);
@@ -425,39 +466,27 @@ void GnssOdomFusion::timer_callback()
 
 void GnssOdomFusion::publish_tf()
 {
+  if (!map_odom_initialized_) {
+    RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
+      "map->odom transform not initialized yet");
+    return;
+  }
+
   auto now = this->now();
 
-  // Create transform
+  // Create transform for map->odom using cached values
   geometry_msgs::msg::TransformStamped transform;
   transform.header.stamp = now;
   transform.header.frame_id = "map";
-  transform.child_frame_id = "base_link";
+  transform.child_frame_id = "odom";
 
-  // Use GNSS position if available, otherwise stay at last known position
-  bool gnss_valid_now = is_gnss_valid();
-  if (gnss_valid_now) {
-    transform.transform.translation.x = gnss_x_;
-    transform.transform.translation.y = gnss_y_;
-    transform.transform.translation.z = gnss_z_;
-  } else {
-    // GNSS lost - continue using last known position with odometry-based orientation
-    transform.transform.translation.x = gnss_x_;
-    transform.transform.translation.y = gnss_y_;
-    transform.transform.translation.z = gnss_z_;
+  // Use cached map->odom transform (smooth, updated only on GNSS updates)
+  transform.transform.translation.x = map_odom_x_;
+  transform.transform.translation.y = map_odom_y_;
+  transform.transform.translation.z = map_odom_z_;
 
-    auto duration = (this->now() - last_gnss_time_).seconds();
-    if (duration > gnss_timeout_) {
-      RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
-        "GNSS timeout (%.2f sec) - using last known position with odometry yaw", duration);
-    } else {
-      RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
-        "GNSS invalid - using last known position with odometry yaw");
-    }
-  }
-
-  // Use current yaw from odometry integration
   tf2::Quaternion q;
-  q.setRPY(0.0, 0.0, current_yaw_);
+  q.setRPY(0.0, 0.0, map_odom_yaw_);
   transform.transform.rotation.x = q.x();
   transform.transform.rotation.y = q.y();
   transform.transform.rotation.z = q.z();
@@ -466,21 +495,48 @@ void GnssOdomFusion::publish_tf()
   // Publish TF
   tf_broadcaster_->sendTransform(transform);
 
-  // Publish pose for debugging
+  // Calculate current base_link position in map frame for debugging
+  // P_map = T_map_odom + R_map_odom * P_odom
+  double odom_x = latest_odom_.pose.pose.position.x;
+  double odom_y = latest_odom_.pose.pose.position.y;
+  double odom_z = latest_odom_.pose.pose.position.z;
+
+  double cos_yaw = std::cos(map_odom_yaw_);
+  double sin_yaw = std::sin(map_odom_yaw_);
+
+  double base_link_x = map_odom_x_ + (odom_x * cos_yaw - odom_y * sin_yaw);
+  double base_link_y = map_odom_y_ + (odom_x * sin_yaw + odom_y * cos_yaw);
+  double base_link_z = map_odom_z_ + odom_z;
+
+  // Extract yaw from odometry
+  tf2::Quaternion odom_q(
+    latest_odom_.pose.pose.orientation.x,
+    latest_odom_.pose.pose.orientation.y,
+    latest_odom_.pose.pose.orientation.z,
+    latest_odom_.pose.pose.orientation.w);
+  double odom_roll, odom_pitch, odom_yaw;
+  tf2::Matrix3x3(odom_q).getRPY(odom_roll, odom_pitch, odom_yaw);
+
+  double base_link_yaw = map_odom_yaw_ + odom_yaw;
+
+  // Publish pose for debugging (in map frame)
   geometry_msgs::msg::PoseStamped pose_msg;
-  pose_msg.header = transform.header;
-  pose_msg.pose.position.x = transform.transform.translation.x;
-  pose_msg.pose.position.y = transform.transform.translation.y;
-  pose_msg.pose.position.z = transform.transform.translation.z;
-  pose_msg.pose.orientation = transform.transform.rotation;
+  pose_msg.header.stamp = now;
+  pose_msg.header.frame_id = "map";
+  pose_msg.pose.position.x = base_link_x;
+  pose_msg.pose.position.y = base_link_y;
+  pose_msg.pose.position.z = base_link_z;
+  tf2::Quaternion pose_q;
+  pose_q.setRPY(0.0, 0.0, base_link_yaw);
+  pose_msg.pose.orientation.x = pose_q.x();
+  pose_msg.pose.orientation.y = pose_q.y();
+  pose_msg.pose.orientation.z = pose_q.z();
+  pose_msg.pose.orientation.w = pose_q.w();
   pose_pub_->publish(pose_msg);
 
   RCLCPP_DEBUG(this->get_logger(),
-    "TF published: x=%.3f, y=%.3f, yaw=%.3f, gnss_valid=%d",
-    transform.transform.translation.x,
-    transform.transform.translation.y,
-    current_yaw_,
-    is_gnss_valid());
+    "TF published: map->odom x=%.3f, y=%.3f, yaw=%.3f",
+    map_odom_x_, map_odom_y_, map_odom_yaw_);
 }
 
 }  // namespace cub_bringup
