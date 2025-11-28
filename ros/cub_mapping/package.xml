@@ -38,7 +38,7 @@
   <depend>cv_bridge</depend>
 
   <!-- YAML parsing for waypoint files -->
-  <depend>yaml-cpp-vendor</depend>
+  <depend>yaml-cpp</depend>
 
   <!-- Interface Generation -->
   <buildtool_depend>rosidl_default_generators</buildtool_depend>
