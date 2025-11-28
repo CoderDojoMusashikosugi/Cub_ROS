@@ -5,7 +5,8 @@ map_matcher_node:
     # pcd_file_path: /home/cub/colcon_ws/src/cub/ekf_localizer/pcd/map.pcd
     # pcd_file_path: /home/cub/colcon_ws/src/cub/ekf_localizer/pcd/mapoudanhodoumade.pcd
     # pcd_file_path: /home/cub/colcon_ws/src/cub/ekf_localizer/pcd/mapkakunin.pcd
-    pcd_file_path: /home/cub/colcon_ws/src/cub/ekf_localizer_ros2/pcd/11-2025tsukuba-map-1004.pcd
+    # pcd_file_path: /home/cub/colcon_ws/src/cub/ekf_localizer_ros2/pcd/11-2025tsukuba-map-1004.pcd
+    pcd_file_path: /home/cub/maps/map_tc25_gnss_0_2.pcd
 
     # Downsampling Parameter
     # この値が大きいほど処理する点群が減る（計算が軽くなる）
