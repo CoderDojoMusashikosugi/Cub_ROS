@@ -55,12 +55,11 @@ int main (int argc,char **argv)
     // ros::init(argc, argv, "dynamic_tf_cub");
     rclcpp::init(argc, argv); // ノードの初期化
     auto node = std::make_shared<DynamicTfCub>();
-    rclcpp::spin(node);
     // DynamicTfCub dynamic_tf_cub;
-//	while(rclcpp::ok()){
-        // node->process();
-//		rclcpp::spin_some(node);
-//	}
+	while(rclcpp::ok()){
+        node->process();
+		rclcpp::spin_some(node);
+	}
     // rclcpp::spin(node);
     return 0;
 }

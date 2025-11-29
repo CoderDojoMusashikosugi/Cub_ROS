@@ -14,6 +14,7 @@ MapMatcher::MapMatcher() : Node("MapMatcher")
 	this->declare_parameter<double>("VOXEL_SIZE", {0.2});
 	this->declare_parameter<double>("VOXEL_SIZE_MAP", {0.2});
 	this->declare_parameter<double>("LIMIT_RANGE", {20.0});
+	this->declare_parameter<double>("LIMIT_RANGE_HEIGHT", {20.0});
 	this->declare_parameter<double>("TRANS_EPSILON", {0.001});
 	this->declare_parameter<double>("STEP_SIZE", {0.1});
 	this->declare_parameter<double>("RESOLUTION", {0.5});
@@ -40,6 +41,7 @@ MapMatcher::MapMatcher() : Node("MapMatcher")
 	this->get_parameter("VOXEL_SIZE", VOXEL_SIZE_);
 	this->get_parameter("VOXEL_SIZE_MAP", VOXEL_SIZE_MAP_);
 	this->get_parameter("LIMIT_RANGE", LIMIT_RANGE_);
+	this->get_parameter("LIMIT_RANGE_HEIGHT", LIMIT_RANGE_HEIGHT_);
 	this->get_parameter("TRANS_EPSILON", TRANS_EPSILON_);
 	this->get_parameter("STEP_SIZE", STEP_SIZE_);
 	this->get_parameter("RESOLUTION", RESOLUTION_);
@@ -182,23 +184,34 @@ void MapMatcher::matching(pcl::PointCloud<pcl::PointXYZI>::Ptr map_pcl,pcl::Poin
 
 	// align
 	PointCloudTypePtr ndt_pcl(new PointCloudType);
-	fast_gicp::NDTCuda<pcl::PointXYZI, pcl::PointXYZI> ndt;
+	pclomp::NormalDistributionsTransform<pcl::PointXYZI, pcl::PointXYZI> ndt;
 	ndt.setTransformationEpsilon(TRANS_EPSILON_);
+	ndt.setStepSize(STEP_SIZE_);
 	ndt.setResolution(RESOLUTION_);
-	ndt.setMaximumIterations(static_cast<int>(MAX_ITERATION_));
+	ndt.setMaximumIterations(MAX_ITERATION_);
 	ndt.setInputTarget(map_local_pcl);
 	ndt.setInputSource(current_local_pcl);
-	// NDTCuda uses CUDA for acceleration, no need for thread settings
-	ndt.setNeighborSearchMethod(fast_gicp::NeighborSearchMethod::DIRECT7);
-	ndt.align(*ndt_pcl, init_guess);
+	ndt.setNumThreads(std::thread::hardware_concurrency()/2);
+  	ndt.setNeighborhoodSearchMethod(pclomp::DIRECT7);
+	// PointCloudTypePtr ndt_pcl(new PointCloudType);
+	// fast_gicp::NDTCuda<pcl::PointXYZI, pcl::PointXYZI> ndt;
+	// ndt.setTransformationEpsilon(TRANS_EPSILON_);
+	// ndt.setResolution(RESOLUTION_);
+	// ndt.setMaximumIterations(static_cast<int>(MAX_ITERATION_));
+	// ndt.setInputTarget(map_local_pcl);
+	// ndt.setInputSource(current_local_pcl);
+	// // NDTCuda uses CUDA for acceleration, no need for thread settings
+	// ndt.setNeighborSearchMethod(fast_gicp::NeighborSearchMethod::DIRECT7);
 	//ndt.align(*ndt_pcl,Eigen::Matrix4f::Identity());
+
+	ndt.align(*ndt_pcl, init_guess);
 	if(!ndt.hasConverged()){
 		std::cout << "Has not converged" << std::endl;
 		return;
 	}
 
 	std::cout << "FitnessScore: " << ndt.getFitnessScore() << std::endl;
-	// if(ndt.getFitnessScore() <= MATCHING_SCORE_TH_){
+	if(ndt.getFitnessScore() <= MATCHING_SCORE_TH_){
 		Eigen::Matrix4f translation = ndt.getFinalTransformation();	
 		if(translation.isZero(1e-6))
 		{
@@ -225,10 +238,10 @@ void MapMatcher::matching(pcl::PointCloud<pcl::PointXYZI>::Ptr map_pcl,pcl::Poin
 		ndt_msg.header.stamp = pc_time_;
 		ndt_msg.header.frame_id = map_frame_id_;
 		ndt_pc_pub_->publish(ndt_msg);
-	// }
-	// else{
-	// 	std::cout << "Fitness score is large " << std::endl;
-	// }
+	}
+	else{
+		std::cout << "Fitness score is large " << std::endl;
+	}
 }
 
 double MapMatcher::get_yaw_from_quat(geometry_msgs::msg::Quaternion q)
@@ -314,7 +327,7 @@ void MapMatcher::set_pcl(pcl::PointCloud<pcl::PointXYZI>::Ptr input_pcl,pcl::Poi
 
 	pass.setInputCloud(output_pcl);
 	pass.setFilterFieldName("z");
-	pass.setFilterLimits(-100 + z, 100 + z);
+	pass.setFilterLimits(-LIMIT_RANGE_HEIGHT_ + z, LIMIT_RANGE_HEIGHT_ + z);
 	pass.filter(*output_pcl);
 	std::cout << "output_pcl size z: " << output_pcl->points.size() << std::endl;
 

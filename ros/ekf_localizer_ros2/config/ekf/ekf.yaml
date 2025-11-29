@@ -1,35 +1,108 @@
+# EKF Parameters with GPS Respawn Feature
 ekf_localizer_node:
   ros__parameters:
-
-    # 初期位置設定[m]
+    # Topic names
+    # ndt_pose_topic_name: "/test/ndt_pose"
+    # imu_topic_name: "/bno055/imu"
+    # odom_topic_name: "/odom"
+    # ekf_pose_topic_name: "/test/ekf_pose"
+    # gps_pose_topic_name: "/gps_pose"
+    # initialpose_topic_name: "/initialpose"
+    
+    # Frame IDs
+    map_frame_id: "map"
+    odom_frame_id: "odom"
+    base_link_frame_id: "base_link"
+    
+    # Feature enables
+    GPS_MEASUREMENT_ENABLE: true      # GPS測定更新を有効化
+    NDT_MEASUREMENT_ENABLE: true      # NDT測定更新を有効化
+    is_odom_tf: false
+    # GPSリスポーン機能の有効/無効（追加）
+    gps_respawn_enable: true  # true: 有効, false: 無効
+    
+    # Initial pose
     INIT_X: 0.0
     INIT_Y: 0.0
-    INIT_Z: 0.0 
-    # 初期姿勢設定[rad]（今回はroll, pitchはいらない？）
+    INIT_Z: 0.0
     INIT_ROLL: 0.0
     INIT_PITCH: 0.0
     INIT_YAW: 0.0
-
-    # Parameters
-    INIT_SIGMA: 0.00001
-    SIGMA_IMU: 0.0001
+    INIT_SIGMA: 0.001
+    
+    # Sensor noise parameters
+    SIGMA_IMU: 0.001
     SIGMA_ODOM: 0.001
-    SIGMA_NDT: 0.0001
-
-    # 観測更新による推定位置が今までのEKFの位置から閾値以上離れていたら観測更新を行わない
-    TH_MAHALANOBIS: 5.0
-
-    # EKFの推定の分散が閾値を超えたらNDT観測更新を行う
-    TH_COVARIANCE: 1.0 # 変更不要
-    TH_POSE_COVARIANCE: 0.4 # 位置の分散の閾値
-    TH_DIRECTION_COVARIANCE: 0.2 # 方位の分散の閾値
-
-    # GPS
-    SIGMA_GPS: 3.0  # GPS測位精度 (メートル)
-    GPS_MEASUREMENT_ENABLE: false
-    NDT_MEASUREMENT_ENABLE: true
-
-    MOTION_NOISE_NN: 0.01
+    SIGMA_NDT: 0.001
+    SIGMA_GPS: 3.0                    # GPS標準測定更新時のノイズ [m]
+    
+    # Motion noise parameters
+    MOTION_NOISE_NN: 0.001
     MOTION_NOISE_NO: 0.001
-    MOTION_NOISE_ON: 0.0001
-    MOTION_NOISE_OO: 0.0001
+    MOTION_NOISE_ON: 0.001
+    MOTION_NOISE_OO: 0.001
+    
+    # Mahalanobis distance and covariance thresholds
+    TH_MAHALANOBIS: 1.5
+    TH_COVARIANCE: 1.0
+    TH_POSE_COVARIANCE: 1.0
+    TH_DIRECTION_COVARIANCE: 1.0
+    
+    # EKF frequency
+    EKF_HZ: 30.0
+    
+    # Measurement suppression (after reset/respawn)
+    measurement_suppress_duration: 2.0  # リセット後の測定抑制時間 [sec]
+    
+    # ========================================
+    # GPS高精度リスポーン機能のパラメータ
+    # ========================================
+    
+    # GPS高精度判定の閾値
+    # RTK-FIXなど高精度GPSの場合は1.0m以下に設定
+    # 通常のGPS（単独測位）の場合は5.0m程度に設定
+    gps_high_confidence_threshold: 1.0  # [m] 水平標準偏差がこの値未満で高精度と判定
+    
+    # リスポーン判定に必要な連続高品質GPS受信回数
+    # この回数連続で高精度GPSを受信したらリスポーンを実行
+    # 値を大きくするほど慎重になり、誤リスポーンを防ぐ
+    gps_high_quality_count_threshold: 3  # [回] 推奨値: 3-5回
+    
+    # リスポーンを実行する最小距離差
+    # GPS-EKF間の距離がこの値未満の場合はリスポーン不要と判定
+    # 小さな誤差で頻繁にリスポーンしないための閾値
+    gps_respawn_distance_threshold: 3.0  # [m] 推奨値: 3-5m
+    
+    # リスポーンを実行する最大許容距離
+    # GPS-EKF間の距離がこの値を超える場合はGPS異常と判定して棄却
+    # あまりに大きな差はGPSの異常値の可能性が高い
+    gps_respawn_max_distance: 50.0       # [m] 推奨値: 30-100m
+
+
+# ========================================
+# パラメータチューニングガイド
+# ========================================
+#
+# 【屋外・RTK-GPS環境の場合】
+# gps_high_confidence_threshold: 0.5    # RTK-FIXは0.01-0.05m程度
+# gps_high_quality_count_threshold: 2   # RTKは安定しているので少なめ
+# gps_respawn_distance_threshold: 2.0   # 小さめでOK
+# gps_respawn_max_distance: 30.0        # RTKで30m以上ずれることは稀
+#
+# 【屋外・通常GPS環境の場合】
+# gps_high_confidence_threshold: 5.0    # 単独測位は3-10m程度
+# gps_high_quality_count_threshold: 5   # 不安定なので多めに
+# gps_respawn_distance_threshold: 5.0   # 大きめに設定
+# gps_respawn_max_distance: 100.0       # 通常GPSは大きな誤差もありえる
+#
+# 【都市部・マルチパス環境の場合】
+# gps_high_confidence_threshold: 3.0
+# gps_high_quality_count_threshold: 5   # 慎重に判定
+# gps_respawn_distance_threshold: 5.0
+# gps_respawn_max_distance: 50.0
+# GPS_MEASUREMENT_ENABLE: false         # または通常測定更新のみ使用
+#
+# 【テスト・デバッグ時】
+# gps_high_quality_count_threshold: 1   # すぐにリスポーンして動作確認
+# gps_respawn_distance_threshold: 1.0   # 小さな差でもリスポーン
+# (ただし本番運用ではNG)
