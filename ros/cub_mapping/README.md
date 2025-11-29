@@ -345,6 +345,197 @@ int32 points_processed  # 処理した点の数
 
 ---
 
+# テライン解析ツール（TerrainAnalysis）
+
+## 概要
+
+TerrainAnalysisノードは、PCDファイルから読み込んだ3D点群データを解析し、地面高さを推定して障害物を自動検出する2D OccupancyGridを生成します。map_converter_nodeの手動領域選択とは異なり、点群全体を自動的に処理して障害物マップを生成します。
+
+### 主な特徴
+
+- **自動地面検出**: 分位点法により各セルの地面高さを自動推定
+- **障害物検出**: 地面からの相対高さで障害物を判定
+- **点群分類**: 地面点群と障害物点群を分離して可視化
+- **Nav2互換**: 生成されたマップはnav2でそのまま使用可能
+
+## システム構成
+
+```
+┌─────────────────┐
+│  PCDファイル    │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────────────────────────┐
+│  pcd_to_pointcloud                   │
+│  (PCL ROS)                           │
+└──────────┬──────────────────────────┘
+           │ /cloud_pcd (PointCloud2)
+           ▼
+┌─────────────────────────────────────┐
+│  TerrainAnalysisNode                 │
+│  - 点群受信                          │
+│  - 地面高さ推定                      │
+│  - 障害物検出                        │
+│  - OccupancyGrid生成                 │
+└──┬──────────┬─────────┬─────────────┘
+   │          │         │
+   │          │         └─> /obstacle_cloud (PointCloud2)
+   │          │
+   │          └─> /ground_cloud (PointCloud2)
+   │
+   └──> /terrain_occupancy_grid (OccupancyGrid)
+
+Services: /generate_terrain_map, /save_terrain_map
+```
+
+## クイックスタート
+
+### 1. Launchファイルを使用して起動
+
+```bash
+ros2 launch cub_mapping terrain_analysis.launch.py
+```
+
+### 2. 点群データの読み込み
+
+```bash
+ros2 run pcl_ros pcd_to_pointcloud \
+  --ros-args -p file_name:=/path/to/pointcloud.pcd -p tf_frame:=map
+```
+
+### 3. マップの生成と保存
+
+```bash
+# マップ生成（auto_generate:=trueの場合は自動実行）
+ros2 service call /generate_terrain_map std_srvs/srv/Trigger {}
+
+# マップ保存
+ros2 service call /save_terrain_map std_srvs/srv/Trigger {}
+```
+
+## パラメータ設定
+
+### terrain_analysis.yaml
+
+```yaml
+terrain_analysis_node:
+  ros__parameters:
+    # グリッド解像度（m/セル）
+    resolution: 0.2
+
+    # 障害物検出の高さ閾値（地面からの相対高さ）
+    obstacle_height_min: 0.15  # この高さ以上が障害物（m）
+    obstacle_height_max: 2.0   # この高さ以下が障害物（m）
+    ground_clearance: 0.1      # 地面判定の許容誤差（m）
+
+    # 地面推定パラメータ
+    quantile_z: 0.25           # 地面推定の分位点（0.0-1.0）
+    min_points_per_cell: 3     # セルの状態判定に必要な最小点数
+
+    # フレーム・トピック設定
+    map_frame: "map"
+    pointcloud_topic: "/cloud_pcd"
+
+    # 出力設定
+    output_directory: "/path/to/maps"
+    auto_generate: true        # 点群受信時に自動でマップ生成
+```
+
+### パラメータの詳細
+
+| パラメータ | 型 | デフォルト | 説明 |
+|-----------|---|----------|------|
+| `resolution` | double | 0.2 | グリッド解像度（m/セル） |
+| `obstacle_height_min` | double | 0.15 | 障害物判定の最小高さ（m） |
+| `obstacle_height_max` | double | 2.0 | 障害物判定の最大高さ（m） |
+| `ground_clearance` | double | 0.1 | 地面判定の許容誤差（m） |
+| `quantile_z` | double | 0.25 | 地面推定の分位点。小さいほど保守的 |
+| `min_points_per_cell` | int | 3 | セル判定に必要な最小点数 |
+| `map_frame` | string | "map" | 固定フレームID |
+| `pointcloud_topic` | string | "/cloud_pcd" | 購読する点群トピック |
+| `output_directory` | string | "/tmp/terrain_maps" | 地図保存先ディレクトリ |
+| `auto_generate` | bool | true | 点群受信時に自動でマップ生成 |
+
+## 提供サービス
+
+### terrain_analysis_node
+
+- **`/generate_terrain_map`** (`std_srvs/srv/Trigger`)
+  - 現在の点群データからテラインマップを生成
+  - `auto_generate: true` の場合は点群受信時に自動実行
+
+  ```bash
+  ros2 service call /generate_terrain_map std_srvs/srv/Trigger {}
+  ```
+
+- **`/save_terrain_map`** (`std_srvs/srv/Trigger`)
+  - 生成されたマップをPGM+YAML形式で保存
+  - タイムスタンプ付きディレクトリ（`terrain_YYYYMMDD_HHMMSS`）に保存
+
+  ```bash
+  ros2 service call /save_terrain_map std_srvs/srv/Trigger {}
+  ```
+
+## パブリッシュされるトピック
+
+### terrain_analysis_node
+
+- **`/terrain_occupancy_grid`** (`nav_msgs/msg/OccupancyGrid`)
+  - 生成された2D障害物マップ（nav2互換）
+  - 値: 0=自由, 100=障害物, -1=未知
+  - パブリッシュ周期: 1.0 Hz
+
+- **`/ground_cloud`** (`sensor_msgs/msg/PointCloud2`)
+  - 地面と判定された点群
+  - RViz2で緑色で表示すると地面を確認可能
+
+- **`/obstacle_cloud`** (`sensor_msgs/msg/PointCloud2`)
+  - 障害物と判定された点群
+  - RViz2で赤色で表示すると障害物を確認可能
+
+## 購読されるトピック
+
+### terrain_analysis_node
+
+- **`/cloud_pcd`** (`sensor_msgs/msg/PointCloud2`)
+  - 入力点群データ
+  - `auto_generate: true` の場合、受信時に自動でマップ生成
+
+## 障害物検出アルゴリズム
+
+1. **点群のグリッド分割**: 点群をXY平面のセルに分割
+2. **高さ情報の収集**: 各セル内の全点のZ座標を収集
+3. **地面高さの推定**: 分位点法（デフォルト25%）で各セルの地面高さを推定
+4. **隣接セル補間**: 点が少ないセルは隣接セルから地面高さを補間
+5. **障害物判定**: 地面からの高さが `obstacle_height_min` ～ `obstacle_height_max` の範囲にある点を障害物として判定
+6. **OccupancyGrid生成**: 障害物が存在するセルを占有（100）、それ以外を自由（0）としてマーク
+
+## 使用例
+
+### map_converter_nodeとの併用
+
+`map_converter_node`で手動領域選択を行い、`terrain_analysis_node`で自動障害物検出を行うことで、より正確なマップを作成できます。
+
+```bash
+# 両方のノードを起動
+ros2 launch cub_mapping mapping_tool.launch.py &
+ros2 launch cub_mapping terrain_analysis.launch.py
+
+# terrain_analysisの結果を確認
+ros2 topic echo /terrain_occupancy_grid --once
+```
+
+### RViz2での可視化
+
+RViz2で以下のディスプレイを追加すると、結果を確認できます：
+
+1. **Map** (`/terrain_occupancy_grid`): 障害物マップ
+2. **PointCloud2** (`/ground_cloud`): 地面点群（緑色推奨）
+3. **PointCloud2** (`/obstacle_cloud`): 障害物点群（赤色推奨）
+
+---
+
 # ウェイポイント編集ツール
 
 ## 概要

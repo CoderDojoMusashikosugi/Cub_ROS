@@ -140,6 +140,34 @@ target_link_libraries(map_converter_node
   "${cpp_typesupport_target}"
 )
 
+# Terrain Analysis Node
+add_executable(terrain_analysis_node
+  src/terrain_analysis.cpp
+)
+
+target_include_directories(terrain_analysis_node PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+  ${PCL_INCLUDE_DIRS}
+  ${OpenCV_INCLUDE_DIRS}
+)
+
+ament_target_dependencies(terrain_analysis_node
+  rclcpp
+  sensor_msgs
+  nav_msgs
+  std_msgs
+  std_srvs
+  geometry_msgs
+  pcl_conversions
+  pcl_ros
+)
+
+target_link_libraries(terrain_analysis_node
+  ${PCL_LIBRARIES}
+  ${OpenCV_LIBS}
+)
+
 # Waypoint Manager Node
 add_executable(waypoint_manager_node
   src/waypoint_manager_node.cpp
@@ -166,6 +194,7 @@ target_link_libraries(waypoint_manager_node
 # Install node executables
 install(TARGETS
   map_converter_node
+  terrain_analysis_node
   waypoint_manager_node
   DESTINATION lib/${PROJECT_NAME}
 )

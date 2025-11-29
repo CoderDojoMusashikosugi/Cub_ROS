@@ -1,0 +1,21 @@
+terrain_analysis_node:
+  ros__parameters:
+    # Grid resolution (m/cell) - same as map_converter for consistency
+    resolution: 0.2
+
+    # Obstacle detection height thresholds (relative to ground)
+    obstacle_height_min: 0.15  # Minimum height above ground to be considered obstacle (m)
+    obstacle_height_max: 1.0   # Maximum height above ground to be considered obstacle (m)
+    ground_clearance: 0.1      # Height tolerance for ground detection (m)
+
+    # Ground estimation parameters
+    quantile_z: 0.25           # Quantile for ground estimation (0.0-1.0, lower = more conservative)
+    min_points_per_cell: 3     # Minimum points in cell to determine status
+
+    # Frame and topic settings
+    map_frame: "map"
+    pointcloud_topic: "/cloud_pcd"  # Same as map_converter
+
+    # Output settings
+    output_directory: "/Users/nyanziba/hobby/texnitis/texnitis-template/cub/cub-mapping/src/cub_mapping/maps"
+    auto_generate: true        # Auto-generate map when PCD is received
