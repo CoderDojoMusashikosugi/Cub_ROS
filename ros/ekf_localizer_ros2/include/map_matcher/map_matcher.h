@@ -31,6 +31,7 @@
 #include <Eigen/Dense>
 // #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <fast_gicp/ndt/ndt_cuda.hpp>
+#include <pclomp/ndt_omp.h>
 #include <optional>
 
 
@@ -104,6 +105,7 @@ private:
 	double VOXEL_SIZE_;
 	double VOXEL_SIZE_MAP_;
 	double LIMIT_RANGE_;
+	double LIMIT_RANGE_HEIGHT_;
 	double TRANS_EPSILON_;
 	double STEP_SIZE_;
 	double RESOLUTION_;

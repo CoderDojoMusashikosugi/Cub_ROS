@@ -14,6 +14,7 @@ EKF::EKF() : Node("EKF")
     this->declare_parameter<bool>("is_odom_tf", false);
     this->declare_parameter<bool>("GPS_MEASUREMENT_ENABLE", false);
     this->declare_parameter<bool>("NDT_MEASUREMENT_ENABLE", false);
+    this->declare_parameter<bool>("gps_respawn_enable", false);
 	this->declare_parameter<double>("INIT_X", {0.0});
 	this->declare_parameter<double>("INIT_Y", {0.0});
 	this->declare_parameter<double>("INIT_Z", {0.0});
@@ -37,6 +38,11 @@ EKF::EKF() : Node("EKF")
 	this->declare_parameter<double>("EKF_HZ", 30.0);
 	this->declare_parameter<std::string>("initialpose_topic_name", "/initialpose");
     this->declare_parameter<double>("measurement_suppress_duration", 2.0);
+	// GPS高精度リスポーン関連のパラメータ
+	this->declare_parameter<double>("gps_high_confidence_threshold", 1.0);
+	this->declare_parameter<int>("gps_high_quality_count_threshold", 3);
+	this->declare_parameter<double>("gps_respawn_distance_threshold", 3.0);
+	this->declare_parameter<double>("gps_respawn_max_distance", 50.0);
 
     // Retrieve the parameters
     this->get_parameter("ndt_pose_topic_name", ndt_pose_topic_name_);
@@ -49,7 +55,7 @@ EKF::EKF() : Node("EKF")
     this->get_parameter("is_odom_tf", is_odom_tf_);
     this->get_parameter("GPS_MEASUREMENT_ENABLE", gps_measurement_enable_);
     this->get_parameter("NDT_MEASUREMENT_ENABLE", ndt_measurement_enable_);
-
+    this->get_parameter("gps_respawn_enable", gps_respawn_enable_);
 	this->get_parameter("INIT_X", INIT_X_);
 	this->get_parameter("INIT_Y", INIT_Y_);
 	this->get_parameter("INIT_Z", INIT_Z_);
@@ -74,6 +80,11 @@ EKF::EKF() : Node("EKF")
 	this->get_parameter("EKF_HZ", ekf_hz_);
     this->get_parameter("initialpose_topic_name", initialpose_topic_name_);
     this->get_parameter("measurement_suppress_duration", measurement_suppress_duration_);
+	// GPS高精度リスポーン関連
+	this->get_parameter("gps_high_confidence_threshold", gps_high_confidence_threshold_);
+	this->get_parameter("gps_high_quality_count_threshold", gps_high_quality_count_threshold_);
+	this->get_parameter("gps_respawn_distance_threshold", gps_respawn_distance_threshold_);
+	this->get_parameter("gps_respawn_max_distance", gps_respawn_max_distance_);
 
     ndt_pose_sub_  = this->create_subscription<geometry_msgs::msg::PoseStamped>(
         ndt_pose_topic_name_, rclcpp::QoS(1).reliable(),
@@ -101,6 +112,10 @@ EKF::EKF() : Node("EKF")
 	initialize(INIT_X_, INIT_Y_, INIT_Z_, INIT_ROLL_, INIT_PITCH_, INIT_YAW_);
 	is_measurement_.data = false;
 	has_received_gps_ = false;
+	// GPS高精度リスポーン関連の初期化
+	gps_high_quality_count_ = 0;
+	gps_respawn_in_progress_ = false;
+	
 	// last_time_ = this->get_clock()->now();
 	ekf_pose_trajectry.header.frame_id = "map"; 
 	std::cout << "\n[THRESHOLD PARAMETERS]" << std::endl;
@@ -109,8 +124,14 @@ EKF::EKF() : Node("EKF")
     std::cout << "  TH_POSE_COVARIANCE      : " << std::fixed << th_pose_covariance_ << std::endl;
     std::cout << "  TH_DIRECTION_COVARIANCE : " << std::fixed << th_direction_covariance_ << std::endl;
 	std::cout << "  SIGMA_GPS               : " << std::fixed << SIGMA_GPS_ << std::endl;
-	std::cout << "  GPS_MEASUREMENT :                : " << std::fixed << gps_measurement_enable_ << std::endl;
-	std::cout << "  NDT_MEASUREMENT :                : " << std::fixed << ndt_measurement_enable_ << std::endl;
+	std::cout << "  GPS_MEASUREMENT_ENABLE  : " << gps_measurement_enable_ << std::endl;
+	std::cout << "  NDT_MEASUREMENT_ENABLE  : " << ndt_measurement_enable_ << std::endl;
+	std::cout << "\n[GPS RESPAWN PARAMETERS]" << std::endl;
+	std::cout << "  GPS_HIGH_CONF_TH        : " << gps_high_confidence_threshold_ << " m" << std::endl;
+	std::cout << "  GPS_QUALITY_COUNT_TH    : " << gps_high_quality_count_threshold_ << " times" << std::endl;
+	std::cout << "  GPS_RESPAWN_DIST_TH     : " << gps_respawn_distance_threshold_ << " m" << std::endl;
+	std::cout << "  GPS_RESPAWN_MAX_DIST    : " << gps_respawn_max_distance_ << " m" << std::endl;
+    std::cout <<"  GPS_RESPAWN_ENABLE      : " << gps_respawn_enable_ << std::endl;
 }
 
 EKF::~EKF() {}
@@ -204,8 +225,11 @@ void EKF::reset_ekf(double x, double y, double yaw)
     suppress_measurements_after_reset_ = true;
     measurement_suppress_until_ = now + rclcpp::Duration::from_seconds(measurement_suppress_duration_);
     
+    // 13. GPS高精度カウンタをリセット
+    gps_high_quality_count_ = 0;
+    
     RCLCPP_INFO(this->get_logger(), "All history and timestamps cleared");
-    RCLCPP_WARN(this->get_logger(), "⚠️  NDT and GPS measurements SUPPRESSED for %.1f seconds", measurement_suppress_duration_);
+    RCLCPP_WARN(this->get_logger(), "  NDT and GPS measurements SUPPRESSED for %.1f seconds", measurement_suppress_duration_);
     RCLCPP_INFO(this->get_logger(), "Using only odometry and IMU during suppression period");
     RCLCPP_INFO(this->get_logger(), "=== EKF RESET COMPLETE ===");
 }
@@ -292,7 +316,6 @@ void EKF::odom_callback(const nav_msgs::msg::Odometry::ConstSharedPtr msg)
 		is_first_odom_ = false;
 	}
 	else{
-		std::cout << "odom motioin_update" << std::endl;
 		motion_update_by_odom(dt_);
 		publish_ekf_pose();
 	}
@@ -391,12 +414,12 @@ void EKF::imu_callback(const sensor_msgs::msg::Imu::ConstSharedPtr msg)
 		is_first_imu_ = false;
 	}
 	else{
-		std::cout << "imu motioin_update" << std::endl;
 		motion_update_by_imu(dt_);
 		publish_ekf_pose();
 	}
 	last_time_imu_ = now_time_imu_;
 }
+
 void EKF::motion_update_by_imu(double dt)
 {
     // IMUからの角速度を取得
@@ -521,15 +544,6 @@ bool EKF::check_mahalanobis_distance(geometry_msgs::msg::PoseStamped ekf_pose, g
 		return true; // 計算失敗時は測定値を受け入れ
 	}
 
-	// // ekf_poseとndt_poseのマハラノビス距離を算出
-  	// double mahalanobis_distance =std::sqrt((ndt_eigen - ekf_eigen).transpose() * P_.inverse() * (ndt_eigen - ekf_eigen));
-	// std::cout << "done calc mahalanobis distance!" << std::endl;
-	// // 閾値を超えていなかったらmeasurement_updateする
-	// if(mahalanobis_distance <= th_mahalanobis_){
-	// 	std::cout << "short distance!" << std::endl;
-	// 	return true;
-	// }
-	// std::cout << "large distance! reject" << std::endl;
 	return false;
 }
 
@@ -561,7 +575,8 @@ bool EKF::check_ekf_covariance(geometry_msgs::msg::PoseStamped ekf_pose)
 void EKF::publish_ekf_pose()
 {
 	ekf_pose_.header.frame_id = map_frame_id_;
-	ekf_pose_.header.stamp = time_publish_; 
+    ekf_pose_.header.stamp = this->get_clock()->now();
+	// ekf_pose_.header.stamp = time_publish_; 
 	if(std::isnan(X_(0) || std::isnan(X_(1)))){
 		std::cout << "ekf_pose val NAN!!!"<< std::endl;
 		return;
@@ -572,11 +587,11 @@ void EKF::publish_ekf_pose()
 	//ekf_pose_.pose.position.z = 0.0;
 	ekf_pose_.pose.orientation = rpy_to_msg(0.0,0.0,X_(2));
 
-	std::cout << "EKF POSE: " << std::endl;
-	std::cout << "  X   : " << X_(0) << std::endl;
-	std::cout << "  Y   : " << X_(1) << std::endl;
-	std::cout << " YAW  : " << X_(2) << std::endl;
-	std::cout << std::endl;
+	// std::cout << "EKF POSE: " << std::endl;
+	// std::cout << "  X   : " << X_(0) << std::endl;
+	// std::cout << "  Y   : " << X_(1) << std::endl;
+	// std::cout << " YAW  : " << X_(2) << std::endl;
+	// std::cout << std::endl;
 
 	// 配列に追加
 	// poses_.push_back(ekf_pose_);
@@ -641,25 +656,322 @@ double EKF::calc_yaw_from_quat(geometry_msgs::msg::Quaternion q)
 	return yaw;
 }
 
+/**
+ * @brief GPS FIX品質判定（RTK-FIXレベルの高精度か）
+ * @param gps_pose GPSポーズメッセージ
+ * @return true: 高精度FIX, false: 通常品質
+ */
+bool EKF::is_gps_fix_quality(const geometry_msgs::msg::PoseWithCovarianceStamped& gps_pose)
+{
+    // 共分散が有効かチェック
+    double sigma_x = std::sqrt(gps_pose.pose.covariance[0]);
+    double sigma_y = std::sqrt(gps_pose.pose.covariance[7]);
+    
+    // NaNチェック
+    if(std::isnan(sigma_x) || std::isnan(sigma_y)) {
+        return false;
+    }
+    
+    // ゼロチェック（共分散情報が無効）
+    if(sigma_x < 1e-9 || sigma_y < 1e-9) {
+        return false;
+    }
+    
+    // 水平標準偏差を計算
+    double horizontal_sigma = std::sqrt(sigma_x * sigma_x + sigma_y * sigma_y);
+    
+    // 高精度判定（RTK-FIX想定: < 1.0m）
+    bool is_high_precision = (horizontal_sigma < gps_high_confidence_threshold_);
+    
+    if(is_high_precision) {
+        std::cout << "✓ GPS HIGH PRECISION: σ_h=" << std::fixed << std::setprecision(3) 
+                  << horizontal_sigma << " m (threshold: " << gps_high_confidence_threshold_ 
+                  << " m)" << std::endl;
+    }
+    
+    return is_high_precision;
+}
+
+/**
+ * @brief GPSリスポーンを実行すべきか判定
+ * @param gps_pose GPSポーズメッセージ
+ * @return true: リスポーン実行, false: 通常のEKF更新
+ */
+bool EKF::should_gps_respawn(const geometry_msgs::msg::PoseWithCovarianceStamped& gps_pose)
+{
+    // GPS品質チェック
+    if(!is_gps_fix_quality(gps_pose)) {
+        gps_high_quality_count_ = 0;
+        return false;
+    }
+    
+    gps_high_quality_count_++;
+    
+    std::cout << "GPS high quality count: " << gps_high_quality_count_ 
+              << "/" << gps_high_quality_count_threshold_ << std::endl;
+    
+    if(gps_high_quality_count_ < gps_high_quality_count_threshold_) {
+        return false;
+    }
+    
+    // 距離計算
+    double gps_x = gps_pose.pose.pose.position.x;
+    double gps_y = gps_pose.pose.pose.position.y;
+    
+    double dx = gps_x - X_(0);
+    double dy = gps_y - X_(1);
+    double distance = std::sqrt(dx * dx + dy * dy);
+    
+    std::cout << "GPS-EKF distance: " << std::fixed << std::setprecision(3) 
+              << distance << " m" << std::endl;
+    
+    // GPS高精度の場合は最小距離チェックをスキップ
+    std::cout << "GPS high precision - respawn approved" << std::endl;
+
+    // 最小距離チェック（オプション: 完全に削除してもOK）
+    if(distance < gps_respawn_distance_threshold_) {
+        std::cout << "Distance too small for respawn (" << std::fixed << std::setprecision(3)
+                  << distance << " < " << gps_respawn_distance_threshold_ 
+                  << " m)" << std::endl;
+        return false;
+    }
+    
+    // 異常値チェック（念のため残す）
+    if(distance > gps_respawn_max_distance_) {
+        std::cout << " Distance too large - possible GPS anomaly (" 
+                  << std::fixed << std::setprecision(3) << distance << " > " 
+                  << gps_respawn_max_distance_ << " m)" << std::endl;
+        gps_high_quality_count_ = 0;
+        return false;
+    }
+    
+    return true;  // GPS高精度なら距離に関係なくリスポーン
+}
+
+/**
+ * @brief オドメトリ基準位置を更新（リスポーン時の整合性確保）
+ * @param dx X方向の移動量
+ * @param dy Y方向の移動量
+ */
+void EKF::update_odometry_reference(double dx, double dy)
+{
+    // オドメトリEigen形式の基準を更新
+    last_odom_eigen(0) += dx;
+    last_odom_eigen(1) += dy;
+    
+    // オドメトリVector3d形式の基準を更新
+    last_odom_pose_(0) += dx;
+    last_odom_pose_(1) += dy;
+    
+    // オドメトリメッセージ形式の基準を更新
+    if(has_received_odom_) {
+        last_odom_pose.pose.pose.position.x += dx;
+        last_odom_pose.pose.pose.position.y += dy;
+    }
+    
+    std::cout << "[DEBUG] Odometry reference updated: dx=" << std::fixed 
+              << std::setprecision(3) << dx << ", dy=" << dy << std::endl;
+}
+
+/**
+ * @brief GPS絶対座標への段階的リスポーン
+ * @param gps_x GPS絶対X座標
+ * @param gps_y GPS絶対Y座標
+ * @details 距離に応じて段階的に補正し、時系列情報を保持
+ */
+void EKF::gps_gradual_respawn(double gps_x, double gps_y)
+{
+    std::cout << "========================================" << std::endl;
+    std::cout << "=== GPS GRADUAL RESPAWN START ===" << std::endl;
+    
+    gps_respawn_in_progress_ = true;
+    
+    // 現在のEKF状態を保存
+    double prev_x = X_(0);
+    double prev_y = X_(1);
+    double prev_yaw = X_(2);
+    
+    // GPS-EKF間の差分を計算
+    double dx = gps_x - prev_x;
+    double dy = gps_y - prev_y;
+    double distance = std::sqrt(dx * dx + dy * dy);
+    
+    std::cout << "GPS-EKF distance: " << std::fixed << std::setprecision(3) 
+              << distance << " m" << std::endl;
+    std::cout << "  EKF: (" << std::fixed << std::setprecision(3) 
+              << prev_x << ", " << prev_y << ")" << std::endl;
+    std::cout << "  GPS: (" << std::fixed << std::setprecision(3) 
+              << gps_x << ", " << gps_y << ")" << std::endl;
+    
+    // 距離に応じた補正戦略を選択
+    double alpha;  // GPS側の重み（0.0〜1.0）
+    double suppress_duration;
+    
+    if(distance < 5.0) {
+        // 小さい補正: GPS寄りの重み付き平均
+        alpha = 0.8;  // GPS 80%
+        suppress_duration = 0.0;  // 抑制なし
+        std::cout << "Strategy: Small correction (alpha=" << std::fixed 
+                  << std::setprecision(1) << alpha << ")" << std::endl;
+    } 
+    else if(distance < 15.0) {
+        // 中程度の補正: バランス型
+        alpha = 0.9;  // GPS 90%
+        suppress_duration = measurement_suppress_duration_ * 0.3;
+        std::cout << "Strategy: Medium correction (alpha=" << std::fixed 
+                  << std::setprecision(1) << alpha << ")" << std::endl;
+    } 
+    else {
+        // 大きい補正: ほぼGPS絶対座標
+        alpha = 0.95;  // GPS 95%
+        suppress_duration = measurement_suppress_duration_ * 0.5;
+        std::cout << "Strategy: Large correction (alpha=" << std::fixed 
+                  << std::setprecision(1) << alpha << ")" << std::endl;
+    }
+    
+    // ✅ 1. 状態ベクトルを重み付き更新
+    double new_x = prev_x * (1.0 - alpha) + gps_x * alpha;
+    double new_y = prev_y * (1.0 - alpha) + gps_y * alpha;
+    
+    double actual_dx = new_x - prev_x;
+    double actual_dy = new_y - prev_y;
+    double actual_distance = std::sqrt(actual_dx * actual_dx + actual_dy * actual_dy);
+    
+    X_(0) = new_x;
+    X_(1) = new_y;
+    // yawは維持（GPSからは取得できないため）
+    
+    std::cout << "Actual correction: " << std::fixed << std::setprecision(3) 
+              << actual_distance << " m" << std::endl;
+    std::cout << "  New position: (" << std::fixed << std::setprecision(3) 
+              << new_x << ", " << new_y << ")" << std::endl;
+    
+    // ✅ 2. オドメトリ基準位置を同じだけシフト
+    update_odometry_reference(actual_dx, actual_dy);
+    
+    // ✅ 3. 共分散行列を適切に調整
+    // GPS共分散を取得
+    double gps_var_x = gps_pose_.pose.covariance[0];
+    double gps_var_y = gps_pose_.pose.covariance[7];
+    
+    // 位置の共分散をGPSの精度に基づいて設定
+    if(gps_var_x > 1e-9 && gps_var_y > 1e-9) {
+        // GPS共分散が有効な場合
+        double gps_weight = alpha;
+        double ekf_weight = 1.0 - alpha;
+        
+        // 重み付き共分散（簡易的な融合）
+        P_(0, 0) = ekf_weight * P_(0, 0) + gps_weight * gps_var_x * 4.0;
+        P_(1, 1) = ekf_weight * P_(1, 1) + gps_weight * gps_var_y * 4.0;
+    } else {
+        // GPS共分散が無効な場合は距離ベース
+        double position_uncertainty = actual_distance * 0.1;  // 移動量の10%
+        P_(0, 0) = std::max(P_(0, 0), position_uncertainty * position_uncertainty);
+        P_(1, 1) = std::max(P_(1, 1), position_uncertainty * position_uncertainty);
+    }
+    
+    // yaw共分散は小さく増加
+    P_(2, 2) = P_(2, 2) * 1.1;
+    
+    // 位置とyawの相関をリセット（大きく補正した場合）
+    if(distance > 10.0) {
+        P_(0, 2) = 0.0;
+        P_(2, 0) = 0.0;
+        P_(1, 2) = 0.0;
+        P_(2, 1) = 0.0;
+    }
+    
+    std::cout << "Covariance updated:" << std::endl;
+    std::cout << "  P(0,0)=" << std::fixed << std::setprecision(4) << P_(0,0) 
+              << ", P(1,1)=" << P_(1,1) << ", P(2,2)=" << P_(2,2) << std::endl;
+    
+    // ✅ 4. 大きく補正した場合はNDT情報をクリア
+    if(distance > 20.0) {
+        has_received_ndt_pose_ = false;
+        ndt_pose_ = geometry_msgs::msg::PoseStamped();
+        std::cout << "Large correction - NDT pose cleared (will re-acquire)" << std::endl;
+    }
+    
+    // ✅ 5. 測定更新の一時的抑制
+    if(suppress_duration > 0.0) {
+        suppress_measurements_after_reset_ = true;
+        measurement_suppress_until_ = this->now() + 
+            rclcpp::Duration::from_seconds(suppress_duration);
+        std::cout << "NDT/GPS measurements suppressed for " << std::fixed 
+                  << std::setprecision(1) << suppress_duration << " sec" << std::endl;
+    }
+    
+    // カウンタリセット
+    gps_high_quality_count_ = 0;
+    gps_respawn_in_progress_ = false;
+    
+    std::cout << "=== GPS GRADUAL RESPAWN COMPLETE ===" << std::endl;
+    std::cout << "========================================" << std::endl;
+}
+
 void EKF::gps_pose_callback(const geometry_msgs::msg::PoseWithCovarianceStamped::ConstSharedPtr msg)
 {
     gps_pose_ = *msg;
     has_received_gps_ = true;
-    
-    // ✅ リセット後の抑制期間中はGPS測定更新をスキップ
-    if(suppress_measurements_after_reset_) {
-        if(this->now() < measurement_suppress_until_) {
-            RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
-                "GPS measurement suppressed (reset protection active)");
+    static bool first_callback_ = true;
+
+    // 測定抑制中かチェック
+    rclcpp::Time current_time = this->now();
+    if(measurement_suppress_until_.nanoseconds() > 0) {
+        if(current_time < measurement_suppress_until_) {
+            std::cout << "[DEBUG] GPS measurement suppressed (respawn in progress)" << std::endl;
+            has_received_gps_ = false;
             return;
         } else {
-            suppress_measurements_after_reset_ = false;
-            RCLCPP_INFO(this->get_logger(), "✓ Measurement suppression ended - GPS updates resumed");
+            // 抑制期間が終了
+            measurement_suppress_until_ = rclcpp::Time(0, 0, RCL_ROS_TIME);
+            std::cout << "✓ Measurement suppression ended - resuming normal operation" << std::endl;
         }
     }
+
+    // 初回GPS受信時に自動初期化
+    if (first_callback_ && is_gps_fix_quality(*msg)) {
+        double x = msg->pose.pose.position.x;
+        double y = msg->pose.pose.position.y;
+        double z = msg->pose.pose.position.z;
+        
+        RCLCPP_INFO(this->get_logger(), 
+            "Auto-initializing EKF from GPS: x=%.3f, y=%.3f, z=%.3f", x, y, z);
+        
+        initialize(x, y, z, INIT_ROLL_, INIT_PITCH_, INIT_YAW_);
+        first_callback_ = false;
+    }
     
-    if(gps_measurement_enable_){
-        measurement_update_gps();
+    
+    // GPSリスポーン機能が無効の場合は通常のGPS測定更新のみ
+    if(!gps_respawn_enable_) {
+        static bool once = false;
+        if(!once) {
+            std::cout << "[DEBUG] GPS respawn disabled - using standard GPS measurement update only" 
+                      << std::endl;
+            once = true;
+        }
+        
+        // 通常のGPS測定更新
+        if(gps_measurement_enable_) {
+            measurement_update_gps();
+        }
+        return;
+    }
+    
+    // GPSリスポーン判定
+    if(should_gps_respawn(gps_pose_)) {
+        // 高精度GPS時のリスポーン実行
+        double gps_x = gps_pose_.pose.pose.position.x;
+        double gps_y = gps_pose_.pose.pose.position.y;
+        
+        gps_gradual_respawn(gps_x, gps_y);
+    } 
+    else {
+        // 通常のGPS測定更新
+        if(gps_measurement_enable_) {
+            measurement_update_gps();
+        }
     }
 }
 
@@ -667,7 +979,7 @@ void EKF::measurement_update_gps()
 {
     if(!has_received_gps_) return;
     
-    std::cout << "GPS measurement update" << std::endl;
+    std::cout << "[DEBUG] GPS standard measurement update" << std::endl;
     
     // Extract GPS position
     double gps_x = gps_pose_.pose.pose.position.x;
@@ -691,11 +1003,14 @@ void EKF::measurement_update_gps()
             Eigen::MatrixXd P_pos_inv = P_pos.inverse();
             double mahalanobis_dist = std::sqrt(diff.transpose() * P_pos_inv * diff);
             
-            std::cout << "GPS Mahalanobis distance: " << mahalanobis_dist << std::endl;
+            std::cout << "[DEBUG] GPS Mahalanobis distance: " << std::fixed 
+                      << std::setprecision(3) << mahalanobis_dist << std::endl;
             
             // Reject if distance is too large (threshold can be adjusted)
             if(mahalanobis_dist > 10.0) {
-                std::cout << "GPS measurement rejected (large Mahalanobis distance)" << std::endl;
+                std::cout << "GPS measurement rejected (large Mahalanobis distance: " 
+                          << std::fixed << std::setprecision(3) << mahalanobis_dist 
+                          << ")" << std::endl;
                 has_received_gps_ = false;
                 return;
             }
@@ -740,13 +1055,13 @@ void EKF::measurement_update_gps()
     // Covariance update
     P_ = (I - K * H) * P_;
     
-    std::cout << "GPS update applied: dx=" << (K * Y)(0) 
-              << ", dy=" << (K * Y)(1) << std::endl;
-    std::cout << "Updated position: x=" << X_(0) << ", y=" << X_(1) << std::endl;
+    std::cout << "[DEBUG] GPS update: dx=" << std::fixed << std::setprecision(3) 
+              << (K * Y)(0) << ", dy=" << (K * Y)(1) << std::endl;
+    std::cout << "[DEBUG] Position: x=" << std::fixed << std::setprecision(3) 
+              << X_(0) << ", y=" << X_(1) << std::endl;
     
     has_received_gps_ = false;
 }
-
 
 void EKF::process()
 {
