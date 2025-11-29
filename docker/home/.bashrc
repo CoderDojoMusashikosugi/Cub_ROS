@@ -136,3 +136,5 @@ cbsj1(){
   MAKEFLAGS="-j1" colcon build --symlink-install --packages-select $1
   cd - > /dev/null 2>&1
 }
+alias lab="ros2 launch cub_bringup launch_at_boot.launch.py"
+alias nav="ros2 launch cub_bringup navigation.launch.py"
