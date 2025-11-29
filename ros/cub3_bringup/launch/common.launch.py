@@ -30,7 +30,8 @@ def generate_launch_description():
                                                    output='both',
                                                    parameters=[_velodyne_driver_params_file])
     velodyne_convert_share_dir = ament_index_python.packages.get_package_share_directory('velodyne_pointcloud')
-    velodyne_convert_params_file = os.path.join(velodyne_convert_share_dir, 'config', 'VLP32C-velodyne_transform_node-params.yaml')
+    cub3_bringup_share_dir = ament_index_python.packages.get_package_share_directory('cub3_bringup')
+    velodyne_convert_params_file = os.path.join(cub3_bringup_share_dir, 'config', 'VLP32C-velodyne_transform_node-params.yaml')
     with open(velodyne_convert_params_file, 'r') as f:
         velodyne_convert_params = yaml.safe_load(f)['velodyne_transform_node']['ros__parameters']
     velodyne_convert_params['calibration'] = os.path.join(velodyne_convert_share_dir, 'params', 'VeloView-VLP-32C.yaml')

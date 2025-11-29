@@ -192,18 +192,20 @@ global_costmap:
       publish_frequency: 1.0
       global_frame: map
       robot_base_frame: base_link
-      rolling_window: false
+      rolling_window: true
+      width: 30
+      height: 30
       use_sim_time: False
       footprint: "[[0.3, 0.175], [0.3, -0.175], [-0.15, -0.175], [-0.15, 0.175]]" #実際サイズ
       # footprint: "[[0.3, 0.25], [0.3, -0.25], [-0.15, -0.25], [-0.15, 0.25]]" # ちょっと大きめサイズ
-      resolution: 0.05
+      resolution: 0.2
       track_unknown_space: true
       plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
       # filters: ["keepout_filter", "inflation_layer"]
       obstacle_layer:
         plugin: "nav2_costmap_2d::ObstacleLayer"
         enabled: True
-        observation_sources: scan SLC1L_scan SLC1R_scan
+        observation_sources: scan
         scan:
           topic: /scan
           min_obstacle_height: -8.0
@@ -295,7 +297,7 @@ local_costmap:
       obstacle_layer:
         plugin: "nav2_costmap_2d::ObstacleLayer"
         enabled: True
-        observation_sources: scan SLC1L_scan SLC1R_scan
+        observation_sources: scan
         scan:
           topic: /scan
           min_obstacle_height: -8.0
@@ -307,6 +309,8 @@ local_costmap:
           topic: /SLC1L_scan
           min_obstacle_height: -8.0
           max_obstacle_height: 2.0
+          obstacle_max_range: 1.5
+          obstable_min_range: 0.1
           clearing: True
           marking: True
           data_type: "LaserScan"
@@ -314,6 +318,8 @@ local_costmap:
           topic: /SLC1R_scan
           min_obstacle_height: -8.0
           max_obstacle_height: 2.0
+          obstacle_max_range: 1.5
+          obstable_min_range: 0.1
           clearing: True
           marking: True
           data_type: "LaserScan"
@@ -387,7 +393,7 @@ controller_server:
       debug_trajectory_details: True
       min_vel_x: 0.0
       min_vel_y: 0.0
-      max_vel_x: 0.2
+      max_vel_x: 1.0
       max_vel_y: 0.0
       max_vel_theta: 1.57
       min_speed_xy: 0.0
@@ -428,46 +434,46 @@ controller_server_rclcpp_node:
   ros__parameters:
     use_sim_time: False
 
-collision_monitor:
-  ros__parameters:
-    use_sim_time: False
-    base_frame_id: "base_link"
-    odom_frame_id: "map"
-    cmd_vel_in_topic: "cmd_vel_in"
-    cmd_vel_out_topic: "cmd_vel_out"
-    transform_tolerance: 0.5
-    source_timeout: 5.0
-    base_shift_correction: True
-    stop_pub_timeout: 2.0
-    # polygons: ["PolygonStop", "PolygonSlow"]
-    # PolygonStop:
-    #   type: "polygon"
-    #   points: [0.3, 0.25, 0.3, -0.25, -0.15, -0.25, -0.15, 0.25]
-    #   action_type: "stop"
-    #   min_points: 3  # max_points: 3 for Humble
-    #   visualize: True
-    #   polygon_pub_topic: "polygon_stop"
-    #   enabled: True
-    polygons: ["PolygonSlow"]
-    PolygonSlow:
-      type: "polygon"
-      points: [1.0, 0.3, 1.0, -0.3, -0.15, -0.3, -0.15, 0.3]
-      action_type: "slowdown"
-      min_points: 3  # max_points: 3 for Humble
-      slowdown_ratio: 0.3
-      visualize: True
-      polygon_pub_topic: "polygon_slowdown"
-      enabled: True
-    observation_sources: ["scan", "SLC1L_scan", "SLC1R_scan"]
-    scan:
-      type: "scan"
-      topic: "scan"
-    SLC1L_scan:
-      type: "scan"
-      topic: "SLC1L_scan"
-    SLC1R_scan:
-      type: "scan"
-      topic: "SLC1R_scan"
+# collision_monitor:
+#   ros__parameters:
+#     use_sim_time: False
+#     base_frame_id: "base_link"
+#     odom_frame_id: "map"
+#     cmd_vel_in_topic: "cmd_vel_in"
+#     cmd_vel_out_topic: "cmd_vel_out"
+#     transform_tolerance: 0.5
+#     source_timeout: 5.0
+#     base_shift_correction: True
+#     stop_pub_timeout: 2.0
+#     # polygons: ["PolygonStop", "PolygonSlow"]
+#     # PolygonStop:
+#     #   type: "polygon"
+#     #   points: [0.3, 0.25, 0.3, -0.25, -0.15, -0.25, -0.15, 0.25]
+#     #   action_type: "stop"
+#     #   min_points: 3  # max_points: 3 for Humble
+#     #   visualize: True
+#     #   polygon_pub_topic: "polygon_stop"
+#     #   enabled: True
+#     polygons: ["PolygonSlow"]
+#     PolygonSlow:
+#       type: "polygon"
+#       points: [1.0, 0.3, 1.0, -0.3, -0.15, -0.3, -0.15, 0.3]
+#       action_type: "slowdown"
+#       min_points: 3  # max_points: 3 for Humble
+#       slowdown_ratio: 0.3
+#       visualize: True
+#       polygon_pub_topic: "polygon_slowdown"
+#       enabled: True
+#     observation_sources: ["scan"]
+#     scan:
+#       type: "scan"
+#       topic: "scan"
+#     SLC1L_scan:
+#       type: "scan"
+#       topic: "SLC1L_scan"
+#     SLC1R_scan:
+#       type: "scan"
+#       topic: "SLC1R_scan"
 
 # costmap_filter_info_server:
 #   ros__parameters:

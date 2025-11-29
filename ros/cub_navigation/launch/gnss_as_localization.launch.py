@@ -52,6 +52,6 @@ def generate_launch_description():
             package='cub_bringup',
             executable='odom_to_tf',
             name='odom_to_tf',
-            output='screen'
+            output='log'
         ),
     ])
