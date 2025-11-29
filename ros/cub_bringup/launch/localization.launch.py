@@ -78,5 +78,10 @@ def generate_launch_description():
         #         [FindPackageShare("cub_navigation"), "launch", "odom_as_localization.launch.py"]
         #     ),
         # ),
+        # IncludeLaunchDescription(
+        #     PathJoinSubstitution(
+        #         [FindPackageShare("cub_navigation"), "launch", "gnss_as_localization.launch.py"]
+        #     ),
+        # ),
 
     ])
