@@ -13,7 +13,7 @@ public:
         marker_pub_ = this->create_publisher<visualization_msgs::msg::Marker>("/wp_vis", 10);
 
         // Load the JSON file
-        std::string json_file = "/home/cub/colcon_ws/src/cub/cub_behavior_tree/routes/3d_waypoints.yaml"; // Replace with your actual file path
+        std::string json_file = "/home/cub/colcon_ws/src/cub/cub_behavior_tree/routes/furo_waypoints.yaml"; // Replace with your actual file path
         if (!loadJsonFile(json_file)) {
             RCLCPP_ERROR(this->get_logger(), "Failed to load JSON file: %s", json_file.c_str());
             return;

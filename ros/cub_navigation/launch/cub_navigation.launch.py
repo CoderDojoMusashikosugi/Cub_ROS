@@ -93,7 +93,7 @@ def generate_launch_description():
         Node(
             package='cub_behavior_tree',
             executable='waypoint_navigator',
-            arguments=["/home/cub/colcon_ws/src/cub/cub_behavior_tree/routes/3d_waypoints.yaml"]
+            arguments=["/home/cub/colcon_ws/src/cub/cub_behavior_tree/routes/furo_waypoints.yaml"]
             # arguments=["/home/cub/colcon_ws/src/cub/cub_behavior_tree/routes/2d_waypoints.yaml"]
         ),
         Node(
