@@ -130,13 +130,13 @@ def generate_launch_description():
             output='both',
             parameters=[{'use_sim_time': use_sim_time}, diag_config],
         ),
-        Node(
-            package='cub_diagnostics',
-            executable='jetson_state_node',
-            name='jetson_state',
-            output='both',
-            parameters=[{'use_sim_time': use_sim_time}, diag_config],
-        ),
+        # Node(
+        #     package='cub_diagnostics',
+        #     executable='jetson_state_node',
+        #     name='jetson_state',
+        #     output='both',
+        #     parameters=[{'use_sim_time': use_sim_time}, diag_config],
+        # ),
         Node(
             package='diagnostic_aggregator',
             executable='aggregator_node',
