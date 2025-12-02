@@ -6,7 +6,7 @@
           <ReactiveFallback name="FollowInZoneOrNavigate">
             <Sequence name="FollowBranch">
               <IsInFollowZone goal="{goal}" radius="5" robot_frame="base_link"/>
-              <AcquireFrontTarget goal="{goal}" scan_topic="/detected_objects" max_offset_deg="25.0" max_range="3.0" target="{target}"/>
+              <AcquireFrontTarget goal="{goal}" scan_topic="/scan" max_offset_deg="25.0" max_range="3.0" target="{target}"/>
               <GoalUpdater input_goal="{target}" output_goal="{updated_goal}">
                 <ComputePathToPose goal="{updated_goal}" path="{path}" planner_id="GridBased"/>
               </GoalUpdater>
