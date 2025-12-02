@@ -152,9 +152,9 @@ def generate_launch_description():
             parameters=[{'use_sim_time': use_sim_time}],
         ),
 
-        # 3D LiDAR -> launch_at_boot.launch.pyから移動
-        velodyne_driver_node,
-        velodyne_transform_node,
+        # 3D LiDAR -> launch_at_boot.launch.pyから移動 ->から戻した
+        # velodyne_driver_node,
+        # velodyne_transform_node,
 
         # RGB-D Camera -> launch_at_boot.launch.pyから移動
         # realsense_launch,
