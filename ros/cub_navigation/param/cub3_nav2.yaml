@@ -193,11 +193,11 @@ global_costmap:
       global_frame: map
       robot_base_frame: base_link
       rolling_window: true
-      width: 30
-      height: 30
+      width: 100
+      height: 100
       use_sim_time: False
-      footprint: "[[0.3, 0.175], [0.3, -0.175], [-0.15, -0.175], [-0.15, 0.175]]" #実際サイズ
-      # footprint: "[[0.3, 0.25], [0.3, -0.25], [-0.15, -0.25], [-0.15, 0.25]]" # ちょっと大きめサイズ
+      # footprint: "[[0.3, 0.175], [0.3, -0.175], [-0.15, -0.175], [-0.15, 0.175]]" #実際サイズ
+      footprint: "[[0.3, 0.25], [0.3, -0.25], [-0.15, -0.25], [-0.15, 0.25]]" # ちょっと大きめサイズ
       resolution: 0.2
       track_unknown_space: true
       plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
@@ -286,8 +286,8 @@ local_costmap:
       width: 5
       height: 5
       resolution: 0.05
-      footprint: "[[0.3, 0.175], [0.3, -0.175], [-0.15, -0.175], [-0.15, 0.175]]" #実際サイズ
-      # footprint: "[[0.3, 0.25], [0.3, -0.25], [-0.15, -0.25], [-0.15, 0.25]]" # ちょっと大きめサイズ
+      # footprint: "[[0.3, 0.175], [0.3, -0.175], [-0.15, -0.175], [-0.15, 0.175]]" #実際サイズ
+      footprint: "[[0.3, 0.25], [0.3, -0.25], [-0.15, -0.25], [-0.15, 0.25]]" # ちょっと大きめサイズ
       plugins: ["obstacle_layer", "inflation_layer"]
       # filters: ["keepout_filter", "inflation_layer"]
       inflation_layer:
