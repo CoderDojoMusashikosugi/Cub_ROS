@@ -87,11 +87,18 @@ private:
   bool has_resend_waypoint_{false};
   bool resend_follow_mode_{false};
 
+  enum class ResendDecision
+  {
+    None,
+    ResendWithFollow,
+    ResendWithoutFollow
+  };
+
   void publish_follow_mode(bool enabled)
   {
-    if (follow_mode_enabled_ == enabled) {
-      return;
-    }
+    // if (follow_mode_enabled_ == enabled) {
+    //   return;
+    // }
 
     follow_mode_enabled_ = enabled;
     std_msgs::msg::Bool msg;
@@ -238,15 +245,19 @@ private:
   {
     publish_follow_mode(false);
 
-    if (should_resend_last_waypoint_if_far()) {
+    const ResendDecision decision = compute_resend_decision();
+    if (decision != ResendDecision::None) {
       WaypointGroup & current_group = waypoint_groups_[current_group_index_];
       Waypoint wp = current_group.waypoints[current_waypoint_index_];
-      const bool enable_follow_mode = current_group.require_input;
+      const bool enable_follow_mode =
+        decision == ResendDecision::ResendWithFollow && current_group.require_input;
       RCLCPP_WARN(
         this->get_logger(),
-        "Robot is still more than 1.0 m away from the last waypoint of group '%s'. "
-        "Retrying the same waypoint in 5 seconds.",
-        current_group.group_name.c_str());
+        "Robot is still away from the last waypoint of group '%s'. "
+        "Decision: %s. Retrying the same waypoint in 5 seconds.",
+        current_group.group_name.c_str(),
+        decision == ResendDecision::ResendWithFollow ? "resend with follow mode"
+                                                     : "resend without follow mode");
       // Cancel any existing timer and schedule a resend.
       resend_timer_.reset();
       resend_waypoint_ = wp;
@@ -302,21 +313,21 @@ private:
     }
   }
 
-  bool should_resend_last_waypoint_if_far()
+  ResendDecision compute_resend_decision()
   {
     if (waypoint_groups_.empty()) {
-      return false;
+      return ResendDecision::None;
     }
     WaypointGroup & current_group = waypoint_groups_[current_group_index_];
     if (!current_group.require_input) {
-      return false;
+      return ResendDecision::None;
     }
     if (current_waypoint_index_ >= current_group.waypoints.size()) {
-      return false;
+      return ResendDecision::None;
     }
     const bool is_last_in_group = current_waypoint_index_ == current_group.waypoints.size() - 1;
     if (!is_last_in_group) {
-      return false;
+      return ResendDecision::None;
     }
 
     try {
@@ -327,18 +338,25 @@ private:
       const double dy = tf.transform.translation.y - wp.y;
       const double dist = std::hypot(dx, dy);
 
-      if (dist > 1.0) {
+      if (dist > 2.0) {
         RCLCPP_WARN(
           this->get_logger(),
-          "Distance to last waypoint is %.2f m (> 1.0 m); will resend.",
+          "Distance to last waypoint is %.2f m (> 2.0 m); will resend with follow mode.",
           dist);
-        return true;
+        return ResendDecision::ResendWithFollow;
+      }
+      if (dist >= 1.0) {
+        RCLCPP_WARN(
+          this->get_logger(),
+          "Distance to last waypoint is %.2f m (>= 1.0 m and <= 2.0 m); will resend with follow mode disabled.",
+          dist);
+        return ResendDecision::ResendWithoutFollow;
       }
     } catch (const tf2::TransformException & ex) {
       RCLCPP_WARN(this->get_logger(), "TF lookup failed when checking waypoint distance: %s", ex.what());
     }
 
-    return false;
+    return ResendDecision::None;
   }
 };
 
