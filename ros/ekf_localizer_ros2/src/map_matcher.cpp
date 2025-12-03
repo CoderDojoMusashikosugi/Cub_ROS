@@ -74,8 +74,10 @@ MapMatcher::MapMatcher() : Node("MapMatcher")
 
 	// tfBuffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
     // tfListener_ = std::make_shared<tf2_ros::TransformListener>(*tfBuffer_);
+	// tfBuffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
+	// tfListener_ = std::make_shared<tf2_ros::TransformListener>(*tfBuffer_, this, false);  // 第3引数をfalseに
 	tfBuffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
-	tfListener_ = std::make_shared<tf2_ros::TransformListener>(*tfBuffer_, this, false);  // 第3引数をfalseに
+    tfListener_ = std::make_shared<tf2_ros::TransformListener>(*tfBuffer_);
 
 	// std::cout << "MATCHING_SCORE_TH_: " << MATCHING_SCORE_TH_ << std::endl;
 	map_pcl_ = std::make_shared<PointCloudType>();
@@ -87,32 +89,38 @@ MapMatcher::~MapMatcher(){}
 
 void MapMatcher::pc_callback(const sensor_msgs::msg::PointCloud2::ConstSharedPtr& msg)
 {
-	pc_time_ = msg->header.stamp;
-	pc_ = *msg;
-	PointCloudTypePtr raw_current_pcl(new PointCloudType);
-	pcl::fromROSMsg(*msg, *raw_current_pcl);
 
-	// downsampling
-	if(VOXEL_SIZE_ > 0) downsample_pcl(raw_current_pcl, current_pcl_, VOXEL_SIZE_);
-	else current_pcl_ = raw_current_pcl;
-	current_pcl_->is_dense = false;
-	current_pcl_->width = current_pcl_->size();
-	// offset
-	if(is_pcl_offset_){
-		geometry_msgs::msg::TransformStamped transform_stamped;
-		try{
-			// lookupTransform("変換のベースとなる座標系","変更したい対象の座標系",変更したい時間(過去データを扱う場合は注意が必要))
-			// transform_stamped = tfBuffer_->lookupTransform("base_link", msg->header.frame_id, tf2::TimePointZero); //座標系の変換 
-			transform_stamped = tfBuffer_->lookupTransform("base_link", msg->header.frame_id, msg->header.stamp); //座標系の変換 
+	if(has_read_map_ && has_received_ekf_pose_){
+		pc_time_ = msg->header.stamp;
+		pc_ = *msg;
+		PointCloudTypePtr raw_current_pcl(new PointCloudType);
+		pcl::fromROSMsg(*msg, *raw_current_pcl);
+
+		// downsampling
+		if(VOXEL_SIZE_ > 0) downsample_pcl(raw_current_pcl, current_pcl_, VOXEL_SIZE_);
+		else current_pcl_ = raw_current_pcl;
+		current_pcl_->is_dense = false;
+		current_pcl_->width = current_pcl_->size();
+		// offset
+		if(is_pcl_offset_){
+			geometry_msgs::msg::TransformStamped transform_stamped;
+			try{
+				// lookupTransform("変換のベースとなる座標系","変更したい対象の座標系",変更したい時間(過去データを扱う場合は注意が必要))
+				// transform_stamped = tfBuffer_->lookupTransform("base_link", msg->header.frame_id, msg->header.stamp); //座標系の変換 
+				transform_stamped = tfBuffer_->lookupTransform("base_link", msg->header.frame_id, tf2::TimePointZero);
+			}
+			catch(tf2::TransformException& ex){
+				// ROS_WARN("%s", ex.what());
+				return;
+			}	
+			Eigen::Matrix4f transform = tf2::transformToEigen(transform_stamped.transform).matrix().cast<float>();
+			pcl::transformPointCloud(*current_pcl_, *current_pcl_, transform);
 		}
-		catch(tf2::TransformException& ex){
-			// ROS_WARN("%s", ex.what());
-			return;
-		}	
-		Eigen::Matrix4f transform = tf2::transformToEigen(transform_stamped.transform).matrix().cast<float>();
-		pcl::transformPointCloud(*current_pcl_, *current_pcl_, transform);
+		// has_received_pc_ = true;
+
+		matching(map_pcl_, current_pcl_);
+		has_received_ekf_pose_ = false;
 	}
-	has_received_pc_ = true;
 }
 
 void MapMatcher::ekf_pose_callback(const geometry_msgs::msg::PoseStamped::ConstSharedPtr& msg)
@@ -159,12 +167,12 @@ void MapMatcher::matching(pcl::PointCloud<pcl::PointXYZI>::Ptr map_pcl,pcl::Poin
 	// passthrough
 	PointCloudTypePtr map_local_pcl(new PointCloudType);
 	PointCloudTypePtr current_local_pcl(new PointCloudType);
-	std::cout << "map_pcl_ size: " << map_pcl_->points.size() << std::endl;
+	// std::cout << "map_pcl_ size: " << map_pcl_->points.size() << std::endl;
 	set_pcl(map_pcl_, map_local_pcl, ekf_pose_.pose.position.x, ekf_pose_.pose.position.y, ekf_pose_.pose.position.z);
-	std::cout << "map_local_pcl_ size: " << map_local_pcl->points.size() << std::endl;
-	std::cout << "cur_pcl_ size: " << current_pcl_->points.size() << std::endl;
+	// std::cout << "map_local_pcl_ size: " << map_local_pcl->points.size() << std::endl;
+	// std::cout << "cur_pcl_ size: " << current_pcl_->points.size() << std::endl;
 	set_pcl(current_pcl_,current_local_pcl,0.0,0.0,0.0);
-	std::cout << "cur_local_pcl_ size: " << current_local_pcl->points.size() << std::endl;
+	// std::cout << "cur_local_pcl_ size: " << current_local_pcl->points.size() << std::endl;
 
 	if(map_local_pcl->points.empty() || current_local_pcl->points.empty()){
 		if(map_local_pcl->points.empty()) std::cout << "map_local_pcl is empty" << std::endl;
@@ -193,7 +201,7 @@ void MapMatcher::matching(pcl::PointCloud<pcl::PointXYZI>::Ptr map_pcl,pcl::Poin
 	ndt.setInputSource(current_local_pcl);
 	ndt.setNumThreads(std::thread::hardware_concurrency()/2);
   	ndt.setNeighborhoodSearchMethod(pclomp::DIRECT7);
-	// PointCloudTypePtr ndt_pcl(new PointCloudType);
+
 	// fast_gicp::NDTCuda<pcl::PointXYZI, pcl::PointXYZI> ndt;
 	// ndt.setTransformationEpsilon(TRANS_EPSILON_);
 	// ndt.setResolution(RESOLUTION_);
@@ -202,11 +210,20 @@ void MapMatcher::matching(pcl::PointCloud<pcl::PointXYZI>::Ptr map_pcl,pcl::Poin
 	// ndt.setInputSource(current_local_pcl);
 	// // NDTCuda uses CUDA for acceleration, no need for thread settings
 	// ndt.setNeighborSearchMethod(fast_gicp::NeighborSearchMethod::DIRECT7);
-	//ndt.align(*ndt_pcl,Eigen::Matrix4f::Identity());
 
 	ndt.align(*ndt_pcl, init_guess);
 	if(!ndt.hasConverged()){
 		std::cout << "Has not converged" << std::endl;
+		return;
+	}
+
+	// 追加: 反復回数のチェック
+	int final_iterations = ndt.getFinalNumIteration();
+	RCLCPP_INFO(this->get_logger(), "NDT converged in %d/%d iterations", final_iterations, (int)MAX_ITERATION_);
+
+	if(final_iterations > MAX_ITERATION_ ) {
+		RCLCPP_WARN(this->get_logger(), 
+			"NG NDT reached max iterations - may not be accurate");
 		return;
 	}
 
@@ -215,6 +232,7 @@ void MapMatcher::matching(pcl::PointCloud<pcl::PointXYZI>::Ptr map_pcl,pcl::Poin
 		Eigen::Matrix4f translation = ndt.getFinalTransformation();	
 		if(translation.isZero(1e-6))
 		{
+			std::cout << "Translation is Zero " << std::endl;
 			return;
 		}
 		Eigen::Quaternionf quaternion(Eigen::Matrix3f(translation.block(0,0,3,3)));
@@ -238,6 +256,7 @@ void MapMatcher::matching(pcl::PointCloud<pcl::PointXYZI>::Ptr map_pcl,pcl::Poin
 		ndt_msg.header.stamp = pc_time_;
 		ndt_msg.header.frame_id = map_frame_id_;
 		ndt_pc_pub_->publish(ndt_msg);
+		std::cout << "Publish NDT POSE " << std::endl;
 	}
 	else{
 		std::cout << "Fitness score is large " << std::endl;
@@ -294,12 +313,12 @@ void MapMatcher::process()
 	// std::cout << "is_read_map: " << has_read_map_ << std::endl;
 	// std::cout << "is_ekf_pose: " << has_received_ekf_pose_ << std::endl;
 	// std::cout << "is_rec_pc: " << has_received_pc_ << std::endl;
-	if(has_read_map_ && has_received_ekf_pose_ && has_received_pc_){
-		matching(map_pcl_,current_pcl_);
-		has_received_pc_ = false;
-		has_received_ekf_pose_ = false;
-	}
-	else if(has_read_map_) std::cout << "Waiting msg" << std::endl;
+	// if(has_read_map_ && has_received_ekf_pose_ && has_received_pc_){
+	// 	matching(map_pcl_,current_pcl_);
+	// 	has_received_pc_ = false;
+	// 	has_received_ekf_pose_ = false;
+	// }
+	// else if(has_read_map_) std::cout << "Waiting msg" << std::endl;
 }
 
 void MapMatcher::init_map() 

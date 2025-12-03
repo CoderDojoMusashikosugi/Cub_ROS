@@ -31,16 +31,16 @@ ekf_localizer_node:
     INIT_SIGMA: 0.001
     
     # Sensor noise parameters
-    SIGMA_IMU: 0.001
-    SIGMA_ODOM: 0.001
-    SIGMA_NDT: 0.001
-    SIGMA_GPS: 3.0                    # GPS標準測定更新時のノイズ [m]
+    SIGMA_IMU: 0.01
+    SIGMA_ODOM: 0.05
+    SIGMA_NDT: 0.1
+    SIGMA_GPS: 2.0                    # GPS標準測定更新時のノイズ [m]
     
     # Motion noise parameters
-    MOTION_NOISE_NN: 0.001
-    MOTION_NOISE_NO: 0.001
-    MOTION_NOISE_ON: 0.001
-    MOTION_NOISE_OO: 0.001
+    MOTION_NOISE_NN: 0.01
+    MOTION_NOISE_NO: 0.01
+    MOTION_NOISE_ON: 0.01
+    MOTION_NOISE_OO: 0.01
     
     # Mahalanobis distance and covariance thresholds
     TH_MAHALANOBIS: 1.5
