@@ -46,6 +46,9 @@ ament_target_dependencies(waypoint_navigator
   rclcpp
   nav2_msgs
   geometry_msgs
+  tf2
+  tf2_ros
+  tf2_geometry_msgs
   yaml-cpp
   rclcpp_action
   std_msgs

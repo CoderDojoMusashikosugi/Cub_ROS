@@ -2,6 +2,8 @@
 #include <rclcpp_action/rclcpp_action.hpp>
 #include <nav2_msgs/action/navigate_to_pose.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
+#include <tf2_ros/buffer.h>
+#include <tf2_ros/transform_listener.h>
 #include <yaml-cpp/yaml.h>
 #include <std_msgs/msg/empty.hpp>
 #include <std_msgs/msg/bool.hpp>
@@ -50,6 +52,9 @@ public:
       "/follow_mode_enabled", rclcpp::QoS(rclcpp::KeepLast(1)).transient_local());
     publish_follow_mode(false);
 
+    tf_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
+    tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
+
     if (!load_yaml(yaml_file_)) {
       RCLCPP_ERROR(this->get_logger(), "Failed to load YAML file.");
       rclcpp::shutdown();
@@ -70,11 +75,17 @@ private:
   rclcpp_action::Client<NavigateToPose>::SharedPtr navigate_to_pose_client_;
   rclcpp::Subscription<std_msgs::msg::Empty>::SharedPtr proceed_subscription_;
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr follow_mode_pub_;
+  rclcpp::TimerBase::SharedPtr resend_timer_;
 
   std::mutex mutex_;
   std::condition_variable cv_;
 
   bool follow_mode_enabled_;
+  std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
+  std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
+  Waypoint resend_waypoint_;
+  bool has_resend_waypoint_{false};
+  bool resend_follow_mode_{false};
 
   void publish_follow_mode(bool enabled)
   {
@@ -227,6 +238,31 @@ private:
   {
     publish_follow_mode(false);
 
+    if (should_resend_last_waypoint_if_far()) {
+      WaypointGroup & current_group = waypoint_groups_[current_group_index_];
+      Waypoint wp = current_group.waypoints[current_waypoint_index_];
+      const bool enable_follow_mode = current_group.require_input;
+      RCLCPP_WARN(
+        this->get_logger(),
+        "Robot is still more than 1.0 m away from the last waypoint of group '%s'. "
+        "Retrying the same waypoint in 5 seconds.",
+        current_group.group_name.c_str());
+      // Cancel any existing timer and schedule a resend.
+      resend_timer_.reset();
+      resend_waypoint_ = wp;
+      resend_follow_mode_ = enable_follow_mode;
+      has_resend_waypoint_ = true;
+      resend_timer_ = this->create_wall_timer(
+        5s, [this]() {
+          resend_timer_.reset();
+          if (has_resend_waypoint_) {
+            send_navigate_to_pose(resend_waypoint_, resend_follow_mode_);
+            has_resend_waypoint_ = false;
+          }
+        });
+      return;
+    }
+
     if (result.code == rclcpp_action::ResultCode::SUCCEEDED) {
       RCLCPP_INFO(this->get_logger(), "Navigation to waypoint %zu succeeded.", current_waypoint_index_ + 1);
     } else if (result.code == rclcpp_action::ResultCode::ABORTED) {
@@ -264,6 +300,45 @@ private:
       current_waypoint_index_ = 0;
       send_next_goal();
     }
+  }
+
+  bool should_resend_last_waypoint_if_far()
+  {
+    if (waypoint_groups_.empty()) {
+      return false;
+    }
+    WaypointGroup & current_group = waypoint_groups_[current_group_index_];
+    if (!current_group.require_input) {
+      return false;
+    }
+    if (current_waypoint_index_ >= current_group.waypoints.size()) {
+      return false;
+    }
+    const bool is_last_in_group = current_waypoint_index_ == current_group.waypoints.size() - 1;
+    if (!is_last_in_group) {
+      return false;
+    }
+
+    try {
+      geometry_msgs::msg::TransformStamped tf =
+        tf_buffer_->lookupTransform("map", "base_link", tf2::TimePointZero);
+      const Waypoint & wp = current_group.waypoints[current_waypoint_index_];
+      const double dx = tf.transform.translation.x - wp.x;
+      const double dy = tf.transform.translation.y - wp.y;
+      const double dist = std::hypot(dx, dy);
+
+      if (dist > 1.0) {
+        RCLCPP_WARN(
+          this->get_logger(),
+          "Distance to last waypoint is %.2f m (> 1.0 m); will resend.",
+          dist);
+        return true;
+      }
+    } catch (const tf2::TransformException & ex) {
+      RCLCPP_WARN(this->get_logger(), "TF lookup failed when checking waypoint distance: %s", ex.what());
+    }
+
+    return false;
   }
 };
 
