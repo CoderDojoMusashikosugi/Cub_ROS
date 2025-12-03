@@ -1,0 +1,15 @@
+# Goal: request a target in front of the robot, aligned with goal heading
+geometry_msgs/PoseStamped goal
+float64 max_offset_deg
+float64 front_fov_deg
+float64 max_range
+float64 standoff_distance
+string robot_frame
+string scan_topic
+---
+# Result: target pose and whether we fell back to the goal
+geometry_msgs/PoseStamped target
+bool fallback_to_goal
+---
+# Feedback: not used
+std_msgs/Empty feedback

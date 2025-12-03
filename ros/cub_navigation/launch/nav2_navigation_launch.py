@@ -165,6 +165,16 @@ def generate_launch_description():
                 arguments=['--ros-args', '--log-level', log_level],
                 remappings=remappings),
             Node(
+                package='cub_behavior_tree',
+                executable='front_target_server',
+                name='front_target_server',
+                output='screen',
+                respawn=use_respawn,
+                respawn_delay=2.0,
+                parameters=[configured_params],
+                arguments=['--ros-args', '--log-level', log_level],
+                condition=IfCondition(PythonExpression(['not ', use_composition]))),
+            Node(
                 package='nav2_waypoint_follower',
                 executable='waypoint_follower',
                 name='waypoint_follower',
@@ -253,6 +263,12 @@ def generate_launch_description():
                 parameters=[{'use_sim_time': use_sim_time,
                              'autostart': autostart,
                              'node_names': lifecycle_nodes}]),
+            ComposableNode(
+                package='cub_behavior_tree',
+                plugin='cub_behavior_tree::FrontTargetServer',
+                name='front_target_server',
+                parameters=[configured_params],
+                remappings=remappings),
         ],
     )
 

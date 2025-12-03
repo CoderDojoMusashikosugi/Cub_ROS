@@ -332,6 +332,7 @@ private:
 
   void proceed_callback(const std_msgs::msg::Empty::SharedPtr msg)
   {
+    (void)msg;
     std::lock_guard<std::mutex> lock(mutex_);
     if (!is_waiting_for_input_) {
       RCLCPP_WARN(this->get_logger(), "Received 'proceed_to_next_group' message but not waiting for input.");
