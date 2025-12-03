@@ -4,9 +4,19 @@
          base_class_type="BT::ConditionNode">
     <description>Checks if the robot is within a follow zone around the goal or an explicitly provided center.</description>
   </class>
+  <class name="cub_behavior_tree::FollowModeEnabled"
+         type="cub_behavior_tree::FollowModeEnabled"
+         base_class_type="BT::ConditionNode">
+    <description>Checks a latched Bool topic to see if follow mode should be enabled.</description>
+  </class>
   <class name="cub_behavior_tree::AcquireFrontTarget"
          type="cub_behavior_tree::AcquireFrontTarget"
          base_class_type="BT::SyncActionNode">
     <description>Selects a front object aligned with the goal heading and writes it to the blackboard.</description>
+  </class>
+  <class name="cub_behavior_tree::SetFrontFollowServerState"
+         type="cub_behavior_tree::SetFrontFollowServerState"
+         base_class_type="BT::SyncActionNode">
+    <description>Logs activation or deactivation of the front-follow server.</description>
   </class>
 </library>

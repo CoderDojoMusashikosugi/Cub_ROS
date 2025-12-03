@@ -19,6 +19,7 @@ find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(pluginlib REQUIRED)
+find_package(std_msgs REQUIRED)
 
 include_directories(
   include
@@ -49,6 +50,7 @@ ament_target_dependencies(bt_follow_zone_plugins
   sensor_msgs
   pluginlib
   nav2_behavior_tree
+  std_msgs
 )
 target_compile_definitions(bt_follow_zone_plugins
   PRIVATE BT_PLUGIN_EXPORT)

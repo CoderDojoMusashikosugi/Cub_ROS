@@ -6,6 +6,7 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <algorithm>
 
 #include <rclcpp/rclcpp.hpp>
 #include <geometry_msgs/msg/pose_array.hpp>
@@ -17,6 +18,7 @@
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <tf2_ros/buffer.h>
 #include <sensor_msgs/msg/laser_scan.hpp>
+#include <std_msgs/msg/bool.hpp>
 
 #include <behaviortree_cpp_v3/action_node.h>
 #include <behaviortree_cpp_v3/bt_factory.h>
@@ -41,6 +43,74 @@ inline double yaw_from_quat(const geometry_msgs::msg::Quaternion & q)
   tf2::fromMsg(q, tf_q);
   return tf2::getYaw(tf_q);
 }
+
+inline geometry_msgs::msg::Quaternion quat_from_yaw(double yaw)
+{
+  tf2::Quaternion q;
+  q.setRPY(0.0, 0.0, yaw);
+  return tf2::toMsg(q);
+}
+
+class FollowModeEnabled : public BT::ConditionNode
+{
+public:
+  FollowModeEnabled(const std::string & name, const BT::NodeConfiguration & conf)
+  : BT::ConditionNode(name, conf)
+  {
+    node_ = config().blackboard->get<rclcpp::Node::SharedPtr>("node");
+  }
+
+  static BT::PortsList providedPorts()
+  {
+    return {
+      BT::InputPort<std::string>("topic", std::string("/follow_mode_enabled"), "Topic that enables front-follow mode")
+    };
+  }
+
+  BT::NodeStatus tick() override
+  {
+    ensure_subscription();
+
+    if (!got_message_.load()) {
+      RCLCPP_WARN_THROTTLE(
+        node_->get_logger(), *node_->get_clock(), 2000,
+        "FollowModeEnabled: waiting for follow mode flag on topic %s", topic_.c_str());
+      return BT::NodeStatus::FAILURE;
+    }
+
+    return enabled_.load() ? BT::NodeStatus::SUCCESS : BT::NodeStatus::FAILURE;
+  }
+
+private:
+  void ensure_subscription()
+  {
+    std::lock_guard<std::mutex> lock(sub_mutex_);
+    if (sub_) {
+      return;
+    }
+
+    topic_ = "/follow_mode_enabled";
+    (void)getInput("topic", topic_);
+
+    auto qos = rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local();
+    sub_ = node_->create_subscription<std_msgs::msg::Bool>(
+      topic_, qos,
+      [this](std_msgs::msg::Bool::SharedPtr msg)
+      {
+        enabled_.store(msg->data);
+        got_message_.store(true);
+      });
+
+    RCLCPP_INFO(node_->get_logger(), "FollowModeEnabled: subscribed to %s", topic_.c_str());
+  }
+
+  rclcpp::Node::SharedPtr node_;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr sub_;
+  std::atomic_bool enabled_{false};
+  std::atomic_bool got_message_{false};
+  std::string topic_;
+  std::mutex sub_mutex_;
+};
 
 class IsInFollowZone : public BT::ConditionNode
 {
@@ -109,6 +179,49 @@ private:
   std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
 };
 
+class SetFrontFollowServerState : public BT::SyncActionNode
+{
+public:
+  SetFrontFollowServerState(const std::string & name, const BT::NodeConfiguration & conf)
+  : BT::SyncActionNode(name, conf)
+  {
+    node_ = config().blackboard->get<rclcpp::Node::SharedPtr>("node");
+  }
+
+  static BT::PortsList providedPorts()
+  {
+    return {
+      BT::InputPort<bool>("activate", true, "True to activate, false to deactivate")
+    };
+  }
+
+  BT::NodeStatus tick() override
+  {
+    bool activate = true;
+    (void)getInput("activate", activate);
+
+    const bool previous = active_.exchange(activate);
+    if (activate && !previous) {
+      RCLCPP_INFO(node_->get_logger(), "Front-follow server activated");
+    } else if (!activate && previous) {
+      RCLCPP_INFO(node_->get_logger(), "Front-follow server deactivated");
+    }
+
+    return BT::NodeStatus::SUCCESS;
+  }
+
+  static bool is_active()
+  {
+    return active_.load();
+  }
+
+private:
+  static std::atomic_bool active_;
+  rclcpp::Node::SharedPtr node_;
+};
+
+std::atomic_bool SetFrontFollowServerState::active_{false};
+
 class AcquireFrontTarget : public BT::SyncActionNode
 {
 public:
@@ -153,6 +266,7 @@ public:
       BT::InputPort<double>("front_fov_deg", 30.0, "Field of view to consider around robot front (deg)"),
       BT::InputPort<double>("max_range", 3.0, "Max range to consider (m)"),
       BT::InputPort<std::string>("robot_frame", std::string("base_link"), "Robot base TF frame"),
+      BT::InputPort<double>("standoff_distance", 0.5, "Distance to stay in front of the detected object (m)"),
       BT::OutputPort<geometry_msgs::msg::PoseStamped>("target", "Selected target pose in map frame")
     };
   }
@@ -188,6 +302,9 @@ public:
 
     std::string robot_frame = "base_link";
     (void)getInput("robot_frame", robot_frame);
+    double standoff_distance = 0.5;
+    (void)getInput("standoff_distance", standoff_distance);
+    standoff_distance = std::max(0.0, standoff_distance);
 
     geometry_msgs::msg::TransformStamped tf;
     try {
@@ -289,6 +406,23 @@ public:
       return BT::NodeStatus::SUCCESS;
     }
 
+    const double robot_x = tf.transform.translation.x;
+    const double robot_y = tf.transform.translation.y;
+    const double dx = best_target.pose.position.x - robot_x;
+    const double dy = best_target.pose.position.y - robot_y;
+    const double dist_to_target = std::hypot(dx, dy);
+
+    if (dist_to_target > 1e-3 && standoff_distance > 0.0) {
+      const double stop_dist = std::max(0.05, dist_to_target - standoff_distance);
+      const double scale = stop_dist / dist_to_target;
+      best_target.pose.position.x = robot_x + dx * scale;
+      best_target.pose.position.y = robot_y + dy * scale;
+    }
+
+    const double yaw_to_target = std::atan2(
+      best_target.pose.position.y - robot_y, best_target.pose.position.x - robot_x);
+    best_target.pose.orientation = quat_from_yaw(yaw_to_target);
+
     setOutput("target", best_target);
     return BT::NodeStatus::SUCCESS;
   }
@@ -337,6 +471,8 @@ private:
 
 BT_REGISTER_NODES(factory)
 {
+  factory.registerNodeType<cub_behavior_tree::FollowModeEnabled>("FollowModeEnabled");
   factory.registerNodeType<cub_behavior_tree::IsInFollowZone>("IsInFollowZone");
   factory.registerNodeType<cub_behavior_tree::AcquireFrontTarget>("AcquireFrontTarget");
+  factory.registerNodeType<cub_behavior_tree::SetFrontFollowServerState>("SetFrontFollowServerState");
 }
