@@ -1,7 +1,6 @@
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
 #include <nav2_msgs/action/navigate_to_pose.hpp>
-#include <nav2_msgs/action/navigate_through_poses.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <yaml-cpp/yaml.h>
 #include <std_msgs/msg/empty.hpp>
@@ -14,7 +13,6 @@
 #include <condition_variable>
 
 using NavigateToPose = nav2_msgs::action::NavigateToPose;
-using NavigateThroughPoses = nav2_msgs::action::NavigateThroughPoses;
 using namespace std::chrono_literals;
 
 struct Waypoint {
@@ -41,7 +39,6 @@ public:
     follow_mode_enabled_(false)
   {
     navigate_to_pose_client_ = rclcpp_action::create_client<NavigateToPose>(this, "navigate_to_pose");
-    navigate_through_poses_client_ = rclcpp_action::create_client<NavigateThroughPoses>(this, "navigate_through_poses");
 
     proceed_subscription_ = this->create_subscription<std_msgs::msg::Empty>(
       "/proceed_to_next_group",
@@ -71,7 +68,6 @@ private:
   bool is_waiting_for_input_;
 
   rclcpp_action::Client<NavigateToPose>::SharedPtr navigate_to_pose_client_;
-  rclcpp_action::Client<NavigateThroughPoses>::SharedPtr navigate_through_poses_client_;
   rclcpp::Subscription<std_msgs::msg::Empty>::SharedPtr proceed_subscription_;
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr follow_mode_pub_;
 
@@ -166,11 +162,7 @@ private:
     }
 
     publish_follow_mode(false);
-    if (current_group.waypoints.size() - current_waypoint_index_ > 1) {
-      send_navigate_through_poses(current_group);
-    } else {
-      send_navigate_to_pose(current_group.waypoints[current_waypoint_index_], false);
-    }
+    send_navigate_to_pose(current_group.waypoints[current_waypoint_index_], false);
   }
 
   void send_navigate_to_pose(const Waypoint & wp, bool enable_follow_mode)
@@ -198,38 +190,6 @@ private:
       std::bind(&WaypointNavigator::navigate_to_pose_result_callback, this, std::placeholders::_1);
 
     navigate_to_pose_client_->async_send_goal(goal_msg, options);
-  }
-
-  void send_navigate_through_poses(WaypointGroup & group)
-  {
-    size_t remaining_waypoints = group.waypoints.size() - current_waypoint_index_;
-    RCLCPP_INFO(this->get_logger(), "Navigating through %zu waypoints in group '%s'.", 
-                remaining_waypoints, group.group_name.c_str());
-
-    std::vector<geometry_msgs::msg::PoseStamped> poses;
-    for (size_t i = current_waypoint_index_; i < group.waypoints.size(); ++i) {
-      const Waypoint & wp = group.waypoints[i];
-      geometry_msgs::msg::PoseStamped pose = create_pose_stamped(wp);
-      poses.push_back(pose);
-    }
-
-    if (!navigate_through_poses_client_->wait_for_action_server(10s)) {
-      RCLCPP_ERROR(this->get_logger(), "NavigateThroughPoses action server not available.");
-      rclcpp::shutdown();
-      return;
-    }
-
-    publish_follow_mode(false);
-    auto goal_msg = NavigateThroughPoses::Goal();
-    goal_msg.poses = poses;
-
-    rclcpp_action::Client<NavigateThroughPoses>::SendGoalOptions options;
-    options.goal_response_callback = 
-      std::bind(&WaypointNavigator::navigate_through_poses_goal_response_callback, this, std::placeholders::_1);
-    options.result_callback = 
-      std::bind(&WaypointNavigator::navigate_through_poses_result_callback, this, std::placeholders::_1);
-
-    navigate_through_poses_client_->async_send_goal(goal_msg, options);
   }
 
   geometry_msgs::msg::PoseStamped create_pose_stamped(const Waypoint & wp)
@@ -279,55 +239,6 @@ private:
 
     current_waypoint_index_++;
     send_next_goal();
-  }
-
-  void navigate_through_poses_goal_response_callback(rclcpp_action::ClientGoalHandle<NavigateThroughPoses>::SharedPtr goal_handle)
-  {
-    if (!goal_handle) {
-      RCLCPP_ERROR(this->get_logger(), "NavigateThroughPoses goal was rejected by the server.");
-      current_group_index_++;
-      current_waypoint_index_ = 0;
-      publish_follow_mode(false);
-      send_next_goal();
-      return;
-    }
-
-    RCLCPP_INFO(this->get_logger(), "NavigateThroughPoses goal accepted by the server, waiting for result...");
-  }
-
-  void navigate_through_poses_result_callback(const rclcpp_action::ClientGoalHandle<NavigateThroughPoses>::WrappedResult & result)
-  {
-    publish_follow_mode(false);
-
-    if (result.code == rclcpp_action::ResultCode::SUCCEEDED) {
-      RCLCPP_INFO(this->get_logger(), "Navigation through group '%s' succeeded.", 
-                  waypoint_groups_[current_group_index_].group_name.c_str());
-    } else if (result.code == rclcpp_action::ResultCode::ABORTED) {
-      RCLCPP_ERROR(this->get_logger(), "Navigation through group '%s' aborted.", 
-                   waypoint_groups_[current_group_index_].group_name.c_str());
-      RCLCPP_INFO(this->get_logger(), "retry this groups");
-      send_next_goal();
-      return;
-    } else if (result.code == rclcpp_action::ResultCode::CANCELED) {
-      RCLCPP_WARN(this->get_logger(), "Navigation through group '%s' canceled.", 
-                  waypoint_groups_[current_group_index_].group_name.c_str());
-    } else {
-      RCLCPP_ERROR(this->get_logger(), "Unknown result code for navigation through group '%s'.", 
-                   waypoint_groups_[current_group_index_].group_name.c_str());
-    }
-
-    WaypointGroup & current_group = waypoint_groups_[current_group_index_];
-    if (current_group.require_input) {
-      RCLCPP_INFO(this->get_logger(), "Group '%s' requires input. Waiting for 'proceed_to_next_group' message.", 
-                  current_group.group_name.c_str());
-      is_waiting_for_input_ = true;
-    } else {
-      RCLCPP_INFO(this->get_logger(), "Group '%s' does not require input. Proceeding to the next group.", 
-                  current_group.group_name.c_str());
-      current_group_index_++;
-      current_waypoint_index_ = 0;
-      send_next_goal();
-    }
   }
 
   void proceed_callback(const std_msgs::msg::Empty::SharedPtr msg)
