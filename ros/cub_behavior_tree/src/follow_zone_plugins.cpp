@@ -45,6 +45,12 @@ public:
   {
     ensure_subscription();
 
+    // Pump callbacks in case the executor thread is starved; ensures the latched
+    // follow_mode flag is actually received before evaluating the condition.
+    if (!got_message_.load()) {
+      rclcpp::spin_some(node_);
+    }
+
     if (!got_message_.load()) {
       RCLCPP_WARN_THROTTLE(
         node_->get_logger(), *node_->get_clock(), 2000,
@@ -71,8 +77,13 @@ private:
       topic_, qos,
       [this](std_msgs::msg::Bool::SharedPtr msg)
       {
-        enabled_.store(msg->data);
-        got_message_.store(true);
+        const bool previous = enabled_.exchange(msg->data);
+        const bool first = !got_message_.exchange(true);
+        if (first || previous != msg->data) {
+          RCLCPP_INFO(
+            node_->get_logger(), "FollowModeEnabled: received %s on %s",
+            msg->data ? "true" : "false", topic_.c_str());
+        }
       });
 
     RCLCPP_INFO(node_->get_logger(), "FollowModeEnabled: subscribed to %s", topic_.c_str());
