@@ -94,17 +94,19 @@ private:
     ResendWithoutFollow
   };
 
-  void publish_follow_mode(bool enabled)
+  void publish_follow_mode(bool enabled, bool force = false)
   {
-    // if (follow_mode_enabled_ == enabled) {
-    //   return;
-    // }
-
+    const bool changed = follow_mode_enabled_ != enabled;
+    if (!force && !changed) {
+      return;
+    }
     follow_mode_enabled_ = enabled;
     std_msgs::msg::Bool msg;
     msg.data = enabled;
     follow_mode_pub_->publish(msg);
-    RCLCPP_INFO(this->get_logger(), "Front follow mode %s", enabled ? "ENABLED" : "DISABLED");
+    if (changed) {
+      RCLCPP_INFO(this->get_logger(), "Front follow mode %s", enabled ? "ENABLED" : "DISABLED");
+    }
   }
 
   bool load_yaml(const std::string & filepath)
@@ -196,7 +198,7 @@ private:
       return;
     }
 
-    publish_follow_mode(enable_follow_mode);
+    publish_follow_mode(enable_follow_mode, true);
 
     auto goal_msg = NavigateToPose::Goal();
     goal_msg.pose = pose;

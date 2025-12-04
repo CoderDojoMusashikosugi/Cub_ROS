@@ -8,11 +8,11 @@
               <FollowModeEnabled topic="/follow_mode_enabled"/>
               <IsInFollowZone goal="{goal}" radius="5" robot_frame="base_link"/>
               <SetFrontFollowServerState activate="true"/>
-              <AcquireFrontTarget goal="{goal}" scan_topic="/scan" max_offset_deg="25.0" max_range="3.0" standoff_distance="0.6" target="{target}"/>
+              <AcquireFrontTarget goal="{goal}" scan_topic="/scan" max_offset_deg="20.0" max_range="3.0" standoff_distance="0.6" target="{target}"/>
               <GoalUpdater input_goal="{target}" output_goal="{updated_goal}">
                 <ComputePathToPose goal="{updated_goal}" path="{path}" planner_id="GridBased"/>
               </GoalUpdater>
-              <TruncatePath distance="1.0" input_path="{path}" output_path="{path}"/>
+              <TruncatePath distance="0.75" input_path="{path}" output_path="{path}"/>
             </Sequence>
             <Sequence name="NavigateBranch">
               <SetFrontFollowServerState activate="false"/>
