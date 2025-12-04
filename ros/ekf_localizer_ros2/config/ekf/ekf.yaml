@@ -14,14 +14,14 @@ ekf_localizer_node:
     odom_frame_id: "odom"
     base_link_frame_id: "base_link"
     
-    # Feature enables
     GPS_MEASUREMENT_ENABLE: true      # GPS測定更新を有効化
     NDT_MEASUREMENT_ENABLE: true      # NDT測定更新を有効化
     is_odom_tf: false
+
     # GPSリスポーン機能の有効/無効（追加）
     gps_respawn_enable: true  # true: 有効, false: 無効
     
-    # Initial pose
+    # EKF Initial pose
     INIT_X: 0.0
     INIT_Y: 0.0
     INIT_Z: 0.0
@@ -76,7 +76,7 @@ ekf_localizer_node:
     # リスポーンを実行する最大許容距離
     # GPS-EKF間の距離がこの値を超える場合はGPS異常と判定して棄却
     # あまりに大きな差はGPSの異常値の可能性が高い
-    gps_respawn_max_distance: 50.0       # [m] 推奨値: 30-100m
+    gps_respawn_max_distance: 30.0       # [m] 推奨値: 30-100m
 
 
 # ========================================

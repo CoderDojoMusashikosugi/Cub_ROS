@@ -219,11 +219,12 @@ void MapMatcher::matching(pcl::PointCloud<pcl::PointXYZI>::Ptr map_pcl,pcl::Poin
 
 	// 追加: 反復回数のチェック
 	int final_iterations = ndt.getFinalNumIteration();
-	RCLCPP_INFO(this->get_logger(), "NDT converged in %d/%d iterations", final_iterations, (int)MAX_ITERATION_);
+	// RCLCPP_INFO(this->get_logger(), "NDT converged in %d/%d iterations", final_iterations, (int)MAX_ITERATION_);
+	std::cout << "NDT converged in " << final_iterations << "/" << (int)MAX_ITERATION_ << "iterations" << std::endl;
 
 	if(final_iterations > MAX_ITERATION_ ) {
-		RCLCPP_WARN(this->get_logger(), 
-			"NG NDT reached max iterations - may not be accurate");
+		// RCLCPP_WARN(this->get_logger(), "NG NDT reached max iterations - may not be accurate");
+		std::cout << "NG NDT reached max iterations - may not be accurate" << std::endl;
 		return;
 	}
 
