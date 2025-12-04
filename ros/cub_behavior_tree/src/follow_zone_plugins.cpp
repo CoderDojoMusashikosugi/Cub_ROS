@@ -47,9 +47,7 @@ public:
 
     // Pump callbacks in case the executor thread is starved; ensures the latched
     // follow_mode flag is actually received before evaluating the condition.
-    if (!got_message_.load()) {
-      rclcpp::spin_some(node_);
-    }
+    rclcpp::spin_some(node_);
 
     if (!got_message_.load()) {
       RCLCPP_WARN_THROTTLE(
