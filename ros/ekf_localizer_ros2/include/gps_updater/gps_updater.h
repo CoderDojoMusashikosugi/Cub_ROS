@@ -6,6 +6,7 @@
 #include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
 #include <GeographicLib/LocalCartesian.hpp>
 #include <memory>
+#include <string>
 
 class GpsUpdater : public rclcpp::Node
 {
@@ -21,6 +22,10 @@ private:
     void publish_gps_pose();
     void initialpose_callback(const geometry_msgs::msg::PoseWithCovarianceStamped::ConstSharedPtr msg);
     void reset_gps_origin();
+    
+    // GPS品質情報のヘルパー関数
+    std::string get_gps_status_name(int status);
+    std::string get_covariance_type_name(int cov_type);
 
     // Subscriber & Publisher
     rclcpp::Subscription<sensor_msgs::msg::NavSatFix>::SharedPtr gps_sub_;

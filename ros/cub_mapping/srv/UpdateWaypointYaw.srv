@@ -1,0 +1,7 @@
+# Update waypoint orientation
+int32 group_index       # Index of group containing the waypoint
+int32 waypoint_index    # Index of waypoint to update
+float64 new_yaw         # New orientation in radians
+---
+bool success            # True if waypoint yaw was updated successfully
+string message          # Status message

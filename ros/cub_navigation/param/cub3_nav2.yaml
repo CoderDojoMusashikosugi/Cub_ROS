@@ -1,3 +1,5 @@
+# 自己位置推定関係
+
 amcl:
   ros__parameters:
     use_sim_time: False
@@ -47,12 +49,27 @@ amcl_rclcpp_node:
   ros__parameters:
     use_sim_time: False
 
+map_localization_server:
+  ros__parameters:
+    use_sim_time: False
+    yaml_filename: "map.yaml"
+
+map_saver:
+  ros__parameters:
+    use_sim_time: False
+    save_map_timeout: 5.0
+    free_thresh_default: 0.25
+    occupied_thresh_default: 0.65
+    map_subscribe_transient_local: True
+
+# BT
 bt_navigator:
   ros__parameters:
     use_sim_time: False
-    global_frame: map
+    global_frame: odom
     robot_base_frame: base_link
     odom_topic: /odom
+    default_bt_xml_filename: "navigate_w_replanning_and_recovery.xml"
     bt_loop_duration: 10
     default_server_timeout: 20
     wait_for_service_timeout: 1000
@@ -63,6 +80,7 @@ bt_navigator:
     # default_bt_xml_filename: "navigate_w_replanning_and_recovery.xml"
     # default_nav_to_pose_bt_xml: /opt/ros/humble/share/nav2_bt_navigator/behavior_trees/follow_point.xml
     default_nav_to_pose_bt_xml: /home/cub/colcon_ws/src/cub/cub_behavior_tree/navigate_to_pose_w_replanning_and_recovery.xml
+    #default_nav_through_poses_bt_xml: /home/cub/colcon_ws/src/cub/cub_behavior_tree/navigate_through_pose.xml
     plugin_lib_names:
       - nav2_compute_path_to_pose_action_bt_node
       - nav2_compute_path_through_poses_action_bt_node
@@ -120,6 +138,202 @@ bt_navigator_navigate_to_pose_rclcpp_node:
   ros__parameters:
     use_sim_time: False
 
+# ユーティリティ系
+robot_state_publisher:
+  ros__parameters:
+    use_sim_time: False
+
+# 全体計画入力系
+
+waypoint_follower:
+  ros__parameters:
+    use_sim_time: False
+    loop_rate: 200
+    stop_on_failure: false
+    action_server_result_timeout: 900.0
+    waypoint_task_executor_plugin: "wait_at_waypoint"   
+    wait_at_waypoint:
+      plugin: "nav2_waypoint_follower::WaitAtWaypoint"
+      enabled: True
+      waypoint_pause_duration: 200
+
+
+recoveries_server:
+  ros__parameters:
+    costmap_topic: local_costmap/costmap_raw
+    footprint_topic: local_costmap/published_footprint
+    cycle_frequency: 10.0
+    recovery_plugins: ["spin", "backup", "wait"]
+    spin:
+      plugin: "nav2_recoveries/Spin"
+    backup:
+      plugin: "nav2_recoveries/BackUp"
+    wait:
+      plugin: "nav2_recoveries/Wait"
+    global_frame: map
+    robot_base_frame: base_link
+    transform_timeout: 0.1
+    use_sim_time: False
+    simulate_ahead_time: 2.0
+    max_rotational_vel: 1.0
+    min_rotational_vel: 0.4
+    rotational_acc_lim: 3.2
+
+# globalプランニング
+map_server:
+  ros__parameters:
+    use_sim_time: False
+    yaml_filename: "map.yaml"
+
+global_costmap:
+  global_costmap:
+    ros__parameters:
+      update_frequency: 1.0
+      publish_frequency: 1.0
+      global_frame: map
+      robot_base_frame: base_link
+      rolling_window: true
+      width: 100
+      height: 100
+      use_sim_time: False
+      # footprint: "[[0.3, 0.175], [0.3, -0.175], [-0.15, -0.175], [-0.15, 0.175]]" #実際サイズ
+      footprint: "[[0.3, 0.25], [0.3, -0.25], [-0.15, -0.25], [-0.15, 0.25]]" # ちょっと大きめサイズ
+      resolution: 0.2
+      track_unknown_space: true
+      plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
+      # filters: ["keepout_filter", "inflation_layer"]
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        enabled: True
+        observation_sources: scan
+        scan:
+          topic: /scan
+          min_obstacle_height: -8.0
+          max_obstacle_height: 2.0
+          clearing: True
+          marking: True
+          data_type: "LaserScan"
+          raytrace_max_range: 3.0
+          raytrace_min_range: 0.0
+          obstacle_max_range: 2.5
+          obstacle_min_range: 0.0
+        SLC1L_scan:
+          topic: /SLC1L_scan
+          min_obstacle_height: -8.0
+          max_obstacle_height: 2.0
+          clearing: True
+          marking: True
+          data_type: "LaserScan"
+          raytrace_max_range: 3.0
+          raytrace_min_range: 0.0
+          obstacle_max_range: 2.5
+          obstacle_min_range: 0.0
+        SLC1R_scan:
+          topic: /SLC1R_scan
+          min_obstacle_height: -8.0
+          max_obstacle_height: 2.0
+          clearing: True
+          marking: True
+          data_type: "LaserScan"
+          raytrace_max_range: 3.0
+          raytrace_min_range: 0.0
+          obstacle_max_range: 2.5
+          obstacle_min_range: 0.0
+      static_layer:
+        plugin: "nav2_costmap_2d::StaticLayer"
+        map_subscribe_transient_local: True
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        cost_scaling_factor: 5.0
+        inflation_radius: 2.0
+      always_send_full_costmap: True
+      # keepout_filter:
+      #   plugin: "nav2_costmap_2d::KeepoutFilter"
+      #   enabled: True
+      #   filter_info_topic: "/costmap_filter_info"
+  global_costmap_client:
+    ros__parameters:
+      use_sim_time: False
+  global_costmap_rclcpp_node:
+    ros__parameters:
+      use_sim_time: False
+
+planner_server:
+  ros__parameters:
+    expected_planner_frequency: 10.0
+    use_sim_time: False
+    planner_plugins: ["GridBased"]
+    GridBased:
+      plugin: "nav2_navfn_planner/NavfnPlanner"
+      tolerance: 0.5
+      use_astar: false
+      allow_unknown: true
+
+planner_server_rclcpp_node:
+  ros__parameters:
+    use_sim_time: False
+
+# Localプランニング
+local_costmap:
+  local_costmap:
+    ros__parameters:
+      update_frequency: 2.0
+      publish_frequency: 2.0
+      global_frame: map
+      robot_base_frame: base_link
+      use_sim_time: False
+      rolling_window: true
+      width: 5
+      height: 5
+      resolution: 0.05
+      # footprint: "[[0.3, 0.175], [0.3, -0.175], [-0.15, -0.175], [-0.15, 0.175]]" #実際サイズ
+      footprint: "[[0.3, 0.25], [0.3, -0.25], [-0.15, -0.25], [-0.15, 0.25]]" # ちょっと大きめサイズ
+      plugins: ["obstacle_layer", "inflation_layer"]
+      # filters: ["keepout_filter", "inflation_layer"]
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        inflation_radius: 2.0
+        cost_scaling_factor: 5.0
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        enabled: True
+        observation_sources: scan
+        scan:
+          topic: /scan
+          min_obstacle_height: -8.0
+          max_obstacle_height: 2.0
+          clearing: True
+          marking: True
+          data_type: "LaserScan"
+        SLC1L_scan:
+          topic: /SLC1L_scan
+          min_obstacle_height: -8.0
+          max_obstacle_height: 2.0
+          obstacle_max_range: 1.5
+          obstable_min_range: 0.1
+          clearing: True
+          marking: True
+          data_type: "LaserScan"
+        SLC1R_scan:
+          topic: /SLC1R_scan
+          min_obstacle_height: -8.0
+          max_obstacle_height: 2.0
+          obstacle_max_range: 1.5
+          obstable_min_range: 0.1
+          clearing: True
+          marking: True
+          data_type: "LaserScan"
+      # keepout_filter:
+      #   plugin: "nav2_costmap_2d::KeepoutFilter"
+      #   enabled: True
+      #   filter_info_topic: "/costmap_filter_info"
+  local_costmap_client:
+    ros__parameters:
+      use_sim_time: False
+  local_costmap_rclcpp_node:
+    ros__parameters:
+      use_sim_time: False
+
 controller_server:
   ros__parameters:
     use_sim_time: False
@@ -135,24 +349,24 @@ controller_server:
     # Progress checker parameters
     progress_checker:
       plugin: "nav2_controller::SimpleProgressChecker"
-      required_movement_radius: 0.5
+      required_movement_radius: 0.7
       movement_time_allowance: 10.0
     
     general_goal_checker:
       stateful: False
       plugin: "nav2_controller::SimpleGoalChecker"
-      xy_goal_tolerance: 1.0
+      xy_goal_tolerance: 0.4
       yaw_goal_tolerance: 6.28
 
     # DWB parameters
     # FollowPath:
     #   plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
-    #   desired_linear_vel: 0.5
+    #   desired_linear_vel: 0.2
     #   lookahead_dist: 0.6
     #   min_lookahead_dist: 0.3
     #   max_lookahead_dist: 0.9
     #   lookahead_time: 1.5
-    #   rotate_to_heading_angular_vel: 1.8
+    #   rotate_to_heading_angular_vel: 0.9
     #   transform_tolerance: 0.1
     #   use_velocity_scaled_lookahead_dist: false
     #   min_approach_linear_velocity: 0.05
@@ -179,15 +393,15 @@ controller_server:
       debug_trajectory_details: True
       min_vel_x: 0.0
       min_vel_y: 0.0
-      max_vel_x: 1.2
+      max_vel_x: 1.0
       max_vel_y: 0.0
-      max_vel_theta: 0.7
+      max_vel_theta: 1.57
       min_speed_xy: 0.0
-      max_speed_xy: 1.2
+      max_speed_xy: 1.0
       min_speed_theta: 0.0
       # Add high threshold velocity for turtlebot 3 issue.
       # https://github.com/ROBOTIS-GIT/turtlebot3_simulations/issues/75
-      acc_lim_x: 0.5
+      acc_lim_x: 2.5
       acc_lim_y: 0.0
       acc_lim_theta: 3.2
       decel_lim_x: -2.5
@@ -220,233 +434,59 @@ controller_server_rclcpp_node:
   ros__parameters:
     use_sim_time: False
 
-local_costmap:
-  local_costmap:
-    ros__parameters:
-      update_frequency: 5.0
-      publish_frequency: 4.0
-      global_frame: map
-      robot_base_frame: base_link
-      use_sim_time: False
-      rolling_window: true
-      width: 4
-      height: 4
-      resolution: 0.05
-      robot_radius: 0.4
-      plugins: ["static_layer","obstacle_layer", "inflation_layer"]
-      filters: ["keepout_filter", "inflation_layer"]
-      inflation_layer:
-        plugin: "nav2_costmap_2d::InflationLayer"
-        inflation_radius: 1.0
-        cost_scaling_factor: 3.0
-      obstacle_layer:
-        plugin: "nav2_costmap_2d::ObstacleLayer"
-        enabled: True
-        observation_sources: scan #velodyne
-        # velodyne:
-        #   topic: /velodyne_points
-        #   min_obstacle_height: -0.5
-        #   max_obstacle_height: 1.8
-        #   obstacle_min_range: 0.3
-        #   obstacle_max_range: 4.0
-        #   raytrace_min_range: 0.0
-        #   raytrace_max_range: 5.0
-        #   clearing: True
-        #   marking: True
-        #   inf_is_valid: True # default: False (inf_is_valid with PointCloud2 is not used)
-        scan:
-          topic: /scan
-          min_obstacle_height: -0.0
-          max_obstacle_height: 2.0
-          obstacle_min_range: 0.4
-          obstacle_max_range: 4.0
-          raytrace_min_range: 0.0
-          raytrace_max_range: 5.0
-          clearing: True
-          marking: False
-      static_layer:
-        plugin: "nav2_costmap_2d::StaticLayer"
-        map_subscribe_transient_local: True
-      always_send_full_costmap: True
-      keepout_filter:
-        plugin: "nav2_costmap_2d::KeepoutFilter"
-        enabled: True
-        filter_info_topic: "/costmap_filter_info"
-  local_costmap_client:
-    ros__parameters:
-      use_sim_time: False
-  local_costmap_rclcpp_node:
-    ros__parameters:
-      use_sim_time: False
+# collision_monitor:
+#   ros__parameters:
+#     use_sim_time: False
+#     base_frame_id: "base_link"
+#     odom_frame_id: "map"
+#     cmd_vel_in_topic: "cmd_vel_in"
+#     cmd_vel_out_topic: "cmd_vel_out"
+#     transform_tolerance: 0.5
+#     source_timeout: 5.0
+#     base_shift_correction: True
+#     stop_pub_timeout: 2.0
+#     # polygons: ["PolygonStop", "PolygonSlow"]
+#     # PolygonStop:
+#     #   type: "polygon"
+#     #   points: [0.3, 0.25, 0.3, -0.25, -0.15, -0.25, -0.15, 0.25]
+#     #   action_type: "stop"
+#     #   min_points: 3  # max_points: 3 for Humble
+#     #   visualize: True
+#     #   polygon_pub_topic: "polygon_stop"
+#     #   enabled: True
+#     polygons: ["PolygonSlow"]
+#     PolygonSlow:
+#       type: "polygon"
+#       points: [1.0, 0.3, 1.0, -0.3, -0.15, -0.3, -0.15, 0.3]
+#       action_type: "slowdown"
+#       min_points: 3  # max_points: 3 for Humble
+#       slowdown_ratio: 0.3
+#       visualize: True
+#       polygon_pub_topic: "polygon_slowdown"
+#       enabled: True
+#     observation_sources: ["scan"]
+#     scan:
+#       type: "scan"
+#       topic: "scan"
+#     SLC1L_scan:
+#       type: "scan"
+#       topic: "SLC1L_scan"
+#     SLC1R_scan:
+#       type: "scan"
+#       topic: "SLC1R_scan"
 
-global_costmap:
-  global_costmap:
-    ros__parameters:
-      update_frequency: 1.0
-      publish_frequency: 1.0
-      global_frame: map
-      robot_base_frame: base_link
-      use_sim_time: False
-      robot_radius: 0.4
-      resolution: 0.05
-      track_unknown_space: true
-      plugins: ["static_layer", "obstacle_layer","inflation_layer"]
-      filters: ["keepout_filter", "inflation_layer"]
-      obstacle_layer:
-        plugin: "nav2_costmap_2d::ObstacleLayer"
-        enabled: True
-        observation_sources: scan #velodyne
-        # velodyne:
-        #   topic: /velodyne_points
-        #   min_obstacle_height: -0.5
-        #   max_obstacle_height: 1.8
-        #   obstacle_min_range: 0.3
-        #   obstacle_max_range: 4.0
-        #   raytrace_min_range: 0.0
-        #   raytrace_max_range: 5.0
-        #   clearing: False
-        #   marking: True
-        #   inf_is_valid: True # default: False (inf_is_valid with PointCloud2 is not used)
-        scan:
-          topic: /scan
-          min_obstacle_height: -0.0
-          max_obstacle_height: 2.0
-          obstacle_min_range: 0.4
-          obstacle_max_range: 4.0
-          raytrace_min_range: 0.0
-          raytrace_max_range: 5.0
-          clearing: True
-          marking: False
-      static_layer:
-        plugin: "nav2_costmap_2d::StaticLayer"
-        map_subscribe_transient_local: True
-      inflation_layer:
-        plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 3.0
-        inflation_radius: 0.55
-      always_send_full_costmap: True
-      keepout_filter:
-        plugin: "nav2_costmap_2d::KeepoutFilter"
-        enabled: True
-        filter_info_topic: "/costmap_filter_info"
-  global_costmap_client:
-    ros__parameters:
-      use_sim_time: False
-  global_costmap_rclcpp_node:
-    ros__parameters:
-      use_sim_time: False
+# costmap_filter_info_server:
+#   ros__parameters:
+#     use_sim_time: False
+#     type: 0
+#     filter_info_topic: "/costmap_filter_info"
+#     mask_topic: "/keepout_filter_mask"
+#     base: 0.0
+#     multiplier: 1.0
 
-map_server:
-  ros__parameters:
-    use_sim_time: False
-    yaml_filename: "map.yaml"
-
-map_saver:
-  ros__parameters:
-    use_sim_time: False
-    save_map_timeout: 5.0
-    free_thresh_default: 0.25
-    occupied_thresh_default: 0.65
-    map_subscribe_transient_local: True
-
-planner_server:
-  ros__parameters:
-    expected_planner_frequency: 20.0
-    use_sim_time: False
-    planner_plugins: ["GridBased"]
-    GridBased:
-      plugin: "nav2_navfn_planner/NavfnPlanner"
-      tolerance: 0.5
-      use_astar: false
-      allow_unknown: true
-
-planner_server_rclcpp_node:
-  ros__parameters:
-    use_sim_time: False
-
-recoveries_server:
-  ros__parameters:
-    costmap_topic: local_costmap/costmap_raw
-    footprint_topic: local_costmap/published_footprint
-    cycle_frequency: 10.0
-    recovery_plugins: ["spin", "backup", "wait"]
-    spin:
-      plugin: "nav2_recoveries/Spin"
-    backup:
-      plugin: "nav2_recoveries/BackUp"
-    wait:
-      plugin: "nav2_recoveries/Wait"
-    global_frame: map
-    robot_base_frame: base_link
-    transform_timeout: 0.1
-    use_sim_time: False
-    simulate_ahead_time: 2.0
-    max_rotational_vel: 1.0
-    min_rotational_vel: 0.4
-    rotational_acc_lim: 3.2
-
-robot_state_publisher:
-  ros__parameters:
-    use_sim_time: False
-
-waypoint_follower:
-  ros__parameters:
-    use_sim_time: False
-    loop_rate: 2000
-    stop_on_failure: false
-    action_server_result_timeout: 900.0
-    waypoint_task_executor_plugin: "wait_at_waypoint"   
-    wait_at_waypoint:
-      plugin: "nav2_waypoint_follower::WaitAtWaypoint"
-      enabled: True
-      waypoint_pause_duration: 200
-
-costmap_filter_info_server:
-  ros__parameters:
-    use_sim_time: False
-    type: 0
-    filter_info_topic: "/costmap_filter_info"
-    # mask_topic: "/keepout_filter_mask"
-    base: 0.0
-    multiplier: 1.0
-
-filter_mask_server:
-  ros__parameters:
-    use_sim_time: False
-    frame_id: "map"
-    topic_name: "/keepout_filter_mask"
-    yaml_filename: "/home/cub/maps/near-tent/map.yaml"
-
-collision_monitor:
-  ros__parameters:
-    use_sim_time: False
-    base_frame_id: "base_footprint"
-    odom_frame_id: "odom"
-    cmd_vel_in_topic: "cmd_vel_smoothed"
-    cmd_vel_out_topic: "cmd_vel"
-    transform_tolerance: 0.5
-    source_timeout: 5.0
-    base_shift_correction: True
-    stop_pub_timeout: 2.0
-    polygons: ["PolygonStop", "PolygonSlow"]
-    PolygonStop:
-      type: "polygon"
-      points: [0.4, 0.3, 0.4, -0.3, 0.0, -0.3, 0.0, 0.3]
-      action_type: "stop"
-      min_points: 3  # max_points: 3 for Humble
-      visualize: True
-      polygon_pub_topic: "polygon_stop"
-      enabled: True
-    PolygonSlow:
-      type: "polygon"
-      points: [0.6, 0.4, 0.6, -0.4, 0.0, -0.4, 0.0, 0.4]
-      action_type: "slowdown"
-      min_points: 3  # max_points: 3 for Humble
-      slowdown_ratio: 0.3
-      visualize: True
-      polygon_pub_topic: "polygon_slowdown"
-      enabled: True
-    observation_sources: ["scan"]
-    scan:
-      type: "scan"
-      topic: "scan"
+# filter_mask_server:
+#   ros__parameters:
+#     use_sim_time: False
+#     frame_id: "odom"
+#     topic_name: "/keepout_filter_mask"
+#     yaml_filename: "/home/cub/maps/oudanhodoumade/mapoudanhodoumade_keepOut.yaml"

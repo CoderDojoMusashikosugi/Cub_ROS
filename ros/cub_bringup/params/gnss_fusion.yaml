@@ -1,0 +1,62 @@
+gnss_odom_fusion:
+  ros__parameters:
+    # GNSS timeout threshold (seconds)
+    # If GNSS data is not received for this duration, it will be considered invalid
+    gnss_timeout: 1.0
+
+    # Use GNSS altitude for z-coordinate
+    # false: Set z to 0.0 (2D navigation)
+    # true: Use GNSS altitude value
+    use_gnss_altitude: false
+
+    # TF publishing rate (Hz)
+    # Higher rate provides smoother TF updates
+    tf_publish_rate: 50.0
+
+    # Initial yaw angle (radians)
+    # Set the robot's initial orientation
+    # 0.0 = East, pi/2 = North, pi = West, -pi/2 = South
+    # This can be overridden by RViz 2D Pose Estimate
+    initial_yaw: 0.0
+
+    # GPS Origin Setting
+    # use_manual_origin: Manually set GPS origin or auto-initialize
+    #   false: Automatically set origin from first valid GPS signal
+    #   true:  Use the specified lat/lon/alt below as the origin
+    use_manual_origin: true
+
+    # Manual origin setting (effective only when use_manual_origin: true)
+    # IMPORTANT: Set these values to your map origin coordinates
+    gps_origin_lat: 36.082628231     # GPS origin latitude (degrees)
+    gps_origin_lon: 140.076144739    # GPS origin longitude (degrees)
+    gps_origin_alt: 67.078           # GPS origin altitude (m, ellipsoidal height)
+
+    # GNSS-based yaw correction
+    # Enable correction of yaw angle using GNSS movement direction
+    use_gnss_yaw_correction: true
+
+    # Minimum GNSS movement distance for yaw calculation (meters)
+    # Robot must move at least this distance (in GNSS coordinates) for yaw correction
+    # Larger values = more stable, less susceptible to GNSS noise
+    # Recommended: 2.0m or more to minimize angle error from GNSS positioning noise
+    # With RTK-GNSS (±2cm accuracy): 2m movement → ±0.6° angle error
+    min_gnss_movement_for_yaw: 2.0
+
+    # Minimum odometry movement distance for yaw calculation (meters)
+    # Robot must also move at least this distance (in odometry coordinates)
+    # This should match min_gnss_movement_for_yaw for consistency check
+    min_odom_movement_for_yaw: 2.0
+
+    # Maximum allowed distance mismatch ratio (0.0 to 1.0)
+    # Rejects yaw correction if |GNSS_dist - Odom_dist| / avg(GNSS_dist, Odom_dist) > threshold
+    # This prevents correction during wheel slip, GNSS glitches, or other anomalies
+    # 0.3 = 30% mismatch tolerance (e.g., 2.0m GNSS vs 2.6m Odom → 26% → accepted)
+    # Lower values = stricter, rejects more corrections
+    # Higher values = more permissive, may accept some bad corrections
+    max_distance_mismatch_ratio: 0.3
+
+    # GNSS yaw correction weight (0.0 to 1.0)
+    # Higher value = stronger GNSS correction, faster convergence
+    # Lower value = gentler correction, smoother but slower
+    # Recommended: 0.1-0.3 for stable operation
+    gnss_yaw_weight: 0.3

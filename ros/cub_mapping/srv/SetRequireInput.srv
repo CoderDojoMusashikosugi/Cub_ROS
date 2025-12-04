@@ -1,0 +1,6 @@
+# Set the require_input flag for a waypoint group
+int32 group_index       # Index of group to update
+bool require_input      # New require_input value
+---
+bool success            # True if flag was updated successfully
+string message          # Status message

@@ -97,6 +97,11 @@ def generate_launch_description():
         default_value='False',
         description='Whether run a SLAM')
 
+    declare_use_localization_cmd = DeclareLaunchArgument(
+        'use_localization',
+        default_value='True',
+        description='Whether run a Localization')
+
     declare_map_yaml_cmd = DeclareLaunchArgument(
         'map',
         description='Full path to map yaml file to load')
@@ -145,25 +150,28 @@ def generate_launch_description():
 
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(os.path.join(launch_dir, 'slam_launch.py')),
-            condition=IfCondition(PythonExpression([slam, ' and ', use_localization])),
+            condition=IfCondition(slam),
             launch_arguments={'namespace': namespace,
                               'use_sim_time': use_sim_time,
                               'autostart': autostart,
                               'use_respawn': use_respawn,
                               'params_file': params_file}.items()),
 
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(os.path.join(launch_dir,
-                                                       'localization_launch.py')),
-            condition=IfCondition(PythonExpression(['not ', slam, ' and ', use_localization])),
-            launch_arguments={'namespace': namespace,
-                              'map': map_yaml_file,
-                              'use_sim_time': use_sim_time,
-                              'autostart': autostart,
-                              'params_file': params_file,
-                              'use_composition': use_composition,
-                              'use_respawn': use_respawn,
-                              'container_name': 'nav2_container'}.items()),
+        # 2D自己位置推定はcub_navigation 2d_localization.launch.pyに移動
+        # IncludeLaunchDescription(
+        #     PythonLaunchDescriptionSource(os.path.join(cub_navigation_launch_dir,
+        #                                                'nav2_localization_launch.py')),
+        #     condition=IfCondition(use_localization),
+        #     launch_arguments={'namespace': namespace,
+        #                       'map': map_yaml_file,
+        #                       'use_sim_time': use_sim_time,
+        #                       'autostart': autostart,
+        #                       'params_file': params_file,
+        #                       'use_composition': use_composition,
+        #                       'use_respawn': use_respawn,
+        #                       'container_name': 'nav2_container'}.items()),
+        
+        # 経路計画用の地図読み込み。
         Node(
             package='nav2_map_server',
             executable='map_server',
@@ -173,7 +181,6 @@ def generate_launch_description():
             respawn_delay=2.0,
             parameters=[{'yaml_filename': map_yaml_file}],
             arguments=['--ros-args', '--log-level', log_level],
-            condition=IfCondition(PythonExpression(['not ', use_localization])),
             remappings=remappings),
         Node(
             package='nav2_lifecycle_manager',
@@ -183,11 +190,11 @@ def generate_launch_description():
             emulate_tty=True,
             parameters=[{'use_sim_time': False},
                         {'autostart': True},
-                        {'node_names': ['map_server']}]
+                        {'node_names': ['map_server']}],
         ),
         
         IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(os.path.join(cub_navigation_launch_dir, 'navigation_launch.py')),
+            PythonLaunchDescriptionSource(os.path.join(cub_navigation_launch_dir, 'nav2_navigation_launch.py')),
             launch_arguments={'namespace': namespace,
                               'use_sim_time': use_sim_time,
                               'autostart': autostart,
@@ -207,6 +214,7 @@ def generate_launch_description():
     ld.add_action(declare_namespace_cmd)
     ld.add_action(declare_use_namespace_cmd)
     ld.add_action(declare_slam_cmd)
+    ld.add_action(declare_use_localization_cmd)
     ld.add_action(declare_map_yaml_cmd)
     ld.add_action(declare_use_sim_time_cmd)
     ld.add_action(declare_params_file_cmd)

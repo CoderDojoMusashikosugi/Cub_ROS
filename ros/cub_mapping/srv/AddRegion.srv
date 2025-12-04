@@ -1,0 +1,11 @@
+# Request: Parameters for the region to extract from point cloud
+float64 center_x        # X coordinate of region center (m)
+float64 center_y        # Y coordinate of region center (m)
+float64 center_z        # Z coordinate (height) of region center (m)
+float64 width           # Width of region in XY plane (m)
+float64 height_range    # Height range in Z direction (±height_range/2) (m)
+---
+# Response: Result of processing the region
+bool success            # Whether the region was successfully processed
+string message          # Status or error message
+int32 points_processed  # Number of points processed in this region

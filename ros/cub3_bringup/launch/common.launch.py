@@ -30,7 +30,8 @@ def generate_launch_description():
                                                    output='both',
                                                    parameters=[_velodyne_driver_params_file])
     velodyne_convert_share_dir = ament_index_python.packages.get_package_share_directory('velodyne_pointcloud')
-    velodyne_convert_params_file = os.path.join(velodyne_convert_share_dir, 'config', 'VLP32C-velodyne_transform_node-params.yaml')
+    cub3_bringup_share_dir = ament_index_python.packages.get_package_share_directory('cub3_bringup')
+    velodyne_convert_params_file = os.path.join(cub3_bringup_share_dir, 'config', 'VLP32C-velodyne_transform_node-params.yaml')
     with open(velodyne_convert_params_file, 'r') as f:
         velodyne_convert_params = yaml.safe_load(f)['velodyne_transform_node']['ros__parameters']
     velodyne_convert_params['calibration'] = os.path.join(velodyne_convert_share_dir, 'params', 'VeloView-VLP-32C.yaml')
@@ -129,13 +130,13 @@ def generate_launch_description():
             output='both',
             parameters=[{'use_sim_time': use_sim_time}, diag_config],
         ),
-        Node(
-            package='cub_diagnostics',
-            executable='jetson_state_node',
-            name='jetson_state',
-            output='both',
-            parameters=[{'use_sim_time': use_sim_time}, diag_config],
-        ),
+        # Node(
+        #     package='cub_diagnostics',
+        #     executable='jetson_state_node',
+        #     name='jetson_state',
+        #     output='both',
+        #     parameters=[{'use_sim_time': use_sim_time}, diag_config],
+        # ),
         Node(
             package='diagnostic_aggregator',
             executable='aggregator_node',
@@ -143,10 +144,17 @@ def generate_launch_description():
             output='both',
             parameters=[{'use_sim_time': use_sim_time}, diag_config],
         ),
+        Node(
+            package='cub_diagnostics',
+            executable='diag_rviz_converter_node',
+            name='diag_rviz_converter',
+            output='both',
+            parameters=[{'use_sim_time': use_sim_time}],
+        ),
 
-        # 3D LiDAR -> launch_at_boot.launch.pyから移動
-        velodyne_driver_node,
-        velodyne_transform_node,
+        # 3D LiDAR -> launch_at_boot.launch.pyから移動 ->から戻した
+        # velodyne_driver_node,
+        # velodyne_transform_node,
 
         # RGB-D Camera -> launch_at_boot.launch.pyから移動
         # realsense_launch,

@@ -1,0 +1,8 @@
+# Update waypoint position
+int32 group_index       # Index of group containing the waypoint
+int32 waypoint_index    # Index of waypoint to move
+float64 new_x           # New X coordinate in map frame
+float64 new_y           # New Y coordinate in map frame
+---
+bool success            # True if waypoint was moved successfully
+string message          # Status message

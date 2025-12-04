@@ -228,22 +228,29 @@ void motor_exec(){
       motor_handler.Control_Motor(Speed[i], i+1, Acce, brake, &Receiv[i]);//スピード0：モーター停止
       // debug_message("i = %d send speed %d receiver id %d temp %d err %d", i, Speed[i], Receiv.ID, Receiv.Temp, Receiv.ErrCode);
       vTaskDelay(5 / portTICK_PERIOD_MS);//1回の通信ごとに5msのWaitが必要（RS485の半二重通信の問題と思われる） 
-      switch (i)
-      {
-      case 0:
-        rear_left_wheel_position = Receiv[i].Position;
-        break;
-      case 1:
-        front_right_wheel_position = Receiv[i].Position;
-        break;
-      case 2:
-        front_left_wheel_position = Receiv[i].Position;
-        break;
-      case 3:
-        rear_right_wheel_position = Receiv[i].Position;
-        break;
-      default:
-        break;
+
+      uint8_t motor_id = i + 1;
+      if (motor_id - Receiv[i].ID == 1 || motor_id - Receiv[i].ID == -3) {
+        // 例えばモーターのIDが2に対してControl_Motor掛けたら、Receiv[2-1].IDが帰ってくるはずが何故か一つ前のID:1のデータが帰ってくる。1のときは4。
+        // この状態で一年以上運用出来てた実績はあるのでこれはもう正常な状態とする。
+        // で、さらにエラーとして上記の条件から外れる場合もあって、それは異常として値を読み飛ばす。
+        switch (i)
+        {
+        case 0:
+          rear_left_wheel_position = Receiv[i].Position;
+          break;
+        case 1:
+          front_right_wheel_position = Receiv[i].Position;
+          break;
+        case 2:
+          front_left_wheel_position = Receiv[i].Position;
+          break;
+        case 3:
+          rear_right_wheel_position = Receiv[i].Position;
+          break;
+        default:
+          break;
+        }
       }
     }
     xSemaphoreGive(mutex);
@@ -268,6 +275,30 @@ unsigned int vehicle_stop_exe_count = 0;
 void vehicle_run(int right, int left){
   Speed[0]=Speed[2]=-right;
   Speed[1]=Speed[3]=left;
+  if(vehicle_stop_exe_count > 10) {
+    brake = Brake_Enable;
+  } else {
+    brake = Brake_Disable;
+  }
+  motor_exec();
+  // if((right == 0) && (left == 0)) {
+  //   ++vehicle_stop_exe_count;
+  // } else {
+  //   vehicle_stop_exe_count = 0;
+  // }
+} 
+
+void vehicle_run(int left_rear, int right_front, int left_front, int right_rear){
+  // Speed[0]=left_rear;
+  // Speed[1]=-right_front;
+  // Speed[2]=left_front;
+  // Speed[3]=-right_rear;
+
+  Speed[0]=-right_front;
+  Speed[1]=left_front;
+  Speed[2]=-right_rear;
+  Speed[3]=left_rear;
+
   if(vehicle_stop_exe_count > 10) {
     brake = Brake_Enable;
   } else {
@@ -386,6 +417,7 @@ void initialize_dynamixel() {
 // caluclate velocity for each dinamixel from twist value
 #ifdef CUB_TARGET_CUB3
 const float cub_d = 110;  // [mm] distance between center and wheel
+const float wheel_base = 180; // [mm] distance between front and rear wheel
 float motor_vel_unit = 1;  //[rpm]
 const float diameter = 150; // [mm] diameter of wheel
 uint16_t l_motor_pos = 0;
@@ -454,7 +486,15 @@ void control_motor(const geometry_msgs__msg__Twist* arg_twist) {
   int r_goal_vel = (int)(r_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit); // right goal velocity[rpm] # TODO: check whether need to add dvidid by motor_velocity_unit
   int l_goal_vel = (int)(l_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit); // left goal velocity[rpm]
 
-  vehicle_run(r_goal_vel, l_goal_vel);
+  double rf_goal_vel_m_s = arg_twist->linear.x + (cub_d+wheel_base)/1000.0 * arg_twist->angular.z; // [m/s]
+  double lf_goal_vel_m_s = arg_twist->linear.x - (cub_d+wheel_base)/1000.0 * arg_twist->angular.z; // [m/s]
+  double rf_goal_vel_r = rf_goal_vel_m_s / (diameter / 1000.0 / 2.0); // [rad/s]
+  double lf_goal_vel_r = lf_goal_vel_m_s / (diameter / 1000.0 / 2.0); // [rad/s]
+
+  int rf_goal_vel = (int)(rf_goal_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit);
+  int lf_goal_vel = (int)(lf_goal_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit);
+  
+  vehicle_run(l_goal_vel, rf_goal_vel, lf_goal_vel, r_goal_vel);
   #elif defined(CUB_TARGET_MCUB)
   int32_t r_goal_vel = (int32_t)(r_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit); // right goal velocity
   int32_t l_goal_vel = (int32_t)(l_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit); // left goal velocity
@@ -744,8 +784,8 @@ void setup() {
   delay(10);
 
 #ifdef CUB_TARGET_CUB3
-  for(int i=1;i<=4;i++){
-    motor_handler.Control_Motor(0, i, Acce, Brake_P, &Receiv[i]); //4つのモーター
+  for(int i=0;i<4;i++){
+    motor_handler.Control_Motor(0, i+1, Acce, Brake_P, &Receiv[i]); //4つのモーター
   }
 #elif defined(CUB_TARGET_MCUB)
   initialize_dynamixel();
@@ -795,9 +835,12 @@ void loop() {
     fill_solid(lane_led, NUM_LANE_LEDS, CRGB::Yellow);
 #endif
   } else if (robo_mode == AUTONOMOUS) {
-    leds[4] = CRGB::Green;
+    if(subscribe_twist_msg.angular.y == 0.0) leds[4] = CRGB::Green;
+    else leds[4] = CRGB::Yellow;
 #ifdef CUB_TARGET_CUB3
-    fill_solid(lane_led, NUM_LANE_LEDS, CRGB::Green);
+    // 使ってないangularのyについて、速度指令の出所が自律なら0、手動なら0以外にする。
+    if(subscribe_twist_msg.angular.y == 0.0) fill_solid(lane_led, NUM_LANE_LEDS, CRGB::Green);
+    else fill_solid(lane_led, NUM_LANE_LEDS, CRGB::Yellow);
 #endif
   } else if (robo_mode == IDLE) {
     leds[4] = CRGB::Blue;

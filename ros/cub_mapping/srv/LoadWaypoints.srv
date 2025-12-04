@@ -1,0 +1,7 @@
+# Load waypoints from a YAML file
+string filepath         # Path to YAML file to load
+---
+bool success            # True if waypoints were loaded successfully
+string message          # Status message
+int32 num_groups_loaded     # Number of groups loaded
+int32 num_waypoints_loaded  # Total number of waypoints loaded

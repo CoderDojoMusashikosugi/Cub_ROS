@@ -1,0 +1,5 @@
+# Request: Empty
+---
+# Response: List of group names
+string[] group_names
+bool[] require_input_flags

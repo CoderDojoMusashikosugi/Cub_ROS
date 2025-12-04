@@ -1,0 +1,7 @@
+# Create a new waypoint group
+string group_name       # Name for the new group
+bool require_input      # Whether this group requires user input before execution
+---
+bool success            # True if group was created successfully
+string message          # Status message
+int32 group_index       # Index of newly created group

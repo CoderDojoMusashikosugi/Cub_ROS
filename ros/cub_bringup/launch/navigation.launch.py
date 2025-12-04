@@ -16,21 +16,19 @@ def generate_launch_description():
     print("launch target:", cub_target)
     map_dir = LaunchConfiguration(
         'map',
-        default = "/home/cub/maps/oudanhodoumade/mapoudanhodoumade_manual_crean.yaml")
+        default = "/home/cub/maps/furo_kakunin/map.yaml")
+        # default = "/home/cub/colcon_ws/src/cub/cub_navigation/maps/empty/map.yaml")
 
     return LaunchDescription([
         IncludeLaunchDescription(
             PathJoinSubstitution(
                 [FindPackageShare("cub_bringup"), "launch", "localization.launch.py"] # ここでlocalizationを起動
-            )
+            ),
+            launch_arguments=[
+                ('map_localization', map_dir)
+            ],
         ),
 
-        IncludeLaunchDescription(
-            PathJoinSubstitution(
-                [FindPackageShare("cub_navigation"), "launch", "3d_cub_navigation.launch.py"]
-            ),
-            condition=IfCondition("true" if cub_target == 'cub3' else "false")
-        ),
         IncludeLaunchDescription(
             PathJoinSubstitution(
                 [FindPackageShare("cub_navigation"), "launch", "cub_navigation.launch.py"]
@@ -38,18 +36,5 @@ def generate_launch_description():
             launch_arguments=[
                 ('map', map_dir)
             ],
-            condition=IfCondition("true" if (cub_target == 'mcub' or cub_target == 'mcub_direct') else "false")
-        ),
-        IncludeLaunchDescription(
-            PathJoinSubstitution(
-                [FindPackageShare("cub_navigation"), "launch", "3d_cub_navigation.launch.py"]
-            ),
-            condition=IfCondition("true" if cub_target == 'spidar' else "false")
-        ),
-        IncludeLaunchDescription(
-            PathJoinSubstitution(
-                [FindPackageShare("cub_navigation"), "launch", "3d_cub_navigation.launch.py"]
-            ),
-            condition=IfCondition("true" if cub_target == 'handy1' else "false")
         ),
     ])

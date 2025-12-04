@@ -7,12 +7,18 @@ from launch.actions import IncludeLaunchDescription
 from launch.substitutions import PathJoinSubstitution
 from launch_ros.substitutions import FindPackageShare
 from launch.conditions import IfCondition
+from launch.substitutions import LaunchConfiguration
 import os
 
 
 def generate_launch_description():
     cub_target = os.getenv('CUB_TARGET', 'cub3')
     print("launch target:", cub_target)
+
+    map_dir = LaunchConfiguration(
+        'map',
+        default = "/home/cub/maps/oudanhodoumade/mapoudanhodoumade_manual_crean.yaml")
+
 
     return LaunchDescription([
         IncludeLaunchDescription(
@@ -25,14 +31,27 @@ def generate_launch_description():
             PathJoinSubstitution(
                 [FindPackageShare("ekf_localizer"), "launch", "ekf_locali.launch.py"]
             ),
+            launch_arguments=[
+                ('map_localization', map_dir)
+            ],
             condition=IfCondition("true" if cub_target == 'cub3' else "false")
         ),
-        # IncludeLaunchDescription(
-        #     PathJoinSubstitution(
-        #         [FindPackageShare("mcub_bringup"), "launch", "localization.launch.py"]
-        #     ),
-        #     condition=IfCondition("true" if (cub_target == 'mcub' or cub_target == 'mcub_direct') else "false")
-        # ),
+        Node(
+            package='tf2_ros',
+            executable='static_transform_publisher',
+            arguments=['0','0','0','0','0','0','1','map','odom'],
+            condition=IfCondition("true" if cub_target == 'cub3' else "false")
+        ),
+
+        IncludeLaunchDescription(
+            PathJoinSubstitution(
+                [FindPackageShare("cub_navigation"), "launch", "2d_localization.launch.py"]
+            ),
+            launch_arguments=[
+                ('map_localization', map_dir)
+            ],
+            condition=IfCondition("true" if (cub_target == 'mcub' or cub_target == 'mcub_direct') else "false")
+        ),
         IncludeLaunchDescription(
             PathJoinSubstitution(
                 [FindPackageShare("ekf_localizer"), "launch", "ekf_locali.launch.py"]
@@ -45,4 +64,24 @@ def generate_launch_description():
             ),
             condition=IfCondition("true" if cub_target == 'handy1' else "false")
         ),
+
+        # IncludeLaunchDescription(
+        #     PathJoinSubstitution(
+        #         [FindPackageShare("cub_navigation"), "launch", "2d_localization.launch.py"]
+        #     ),
+        #     launch_arguments=[
+        #         ('map_localization', map_dir)
+        #     ],
+        # ),
+        # IncludeLaunchDescription(
+        #     PathJoinSubstitution(
+        #         [FindPackageShare("cub_navigation"), "launch", "odom_as_localization.launch.py"]
+        #     ),
+        # ),
+        # IncludeLaunchDescription(
+        #     PathJoinSubstitution(
+        #         [FindPackageShare("cub_navigation"), "launch", "gnss_as_localization.launch.py"]
+        #     ),
+        # ),
+
     ])

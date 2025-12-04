@@ -1,0 +1,30 @@
+map_converter_node:
+  ros__parameters:
+    # Map resolution in meters per cell
+    resolution: 0.2
+
+    # Map dimensions in meters
+    map_width: 50.0
+    map_height: 50.0
+
+    # Map origin (bottom-left corner) in meters
+    origin_x: -25.0
+    origin_y: -25.0
+
+    # Frame ID for the map
+    map_frame: "map"
+
+    # Point cloud topic to subscribe to
+    pointcloud_topic: "/cloud_pcd_mapping"
+
+    # Directory to save generated maps
+    output_directory: "/home/cub/maps"
+
+    # Rate at which to publish the occupancy grid (Hz)
+    publish_rate: 1.0
+
+    # Initial height of map_slice frame (m)
+    slice_height: 0.0
+
+    # TF broadcast rate (Hz)
+    tf_publish_rate: 10.0

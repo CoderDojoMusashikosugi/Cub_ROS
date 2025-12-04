@@ -157,9 +157,9 @@ def generate_launch_description():
         rtklib,
         ublox_gps_delayed,
 
-        # 3D LiDAR -> commmon.launch.pyでの起動に移動
-        # velodyne_driver_node,
-        # velodyne_transform_node,
+        # 3D LiDAR -> commmon.launch.pyでの起動に移動 -> から戻した
+        velodyne_driver_node,
+        velodyne_transform_node,
 
         # RGB-D Camera -> commmon.launch.pyでの起動に移動
         # realsense_launch,

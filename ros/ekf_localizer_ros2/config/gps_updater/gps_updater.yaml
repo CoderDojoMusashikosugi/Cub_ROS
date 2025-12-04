@@ -1,39 +1,112 @@
+# GPS Updater Parameters
 gps_updater:
   ros__parameters:
-
-    # Topic Names
-    gps_topic_name: /fix                    # GPS入力トピック名
-    gps_pose_topic_name: /gps_pose          # GPS出力トピック名（ローカル座標系）
-    map_frame_id: map                       # 出力フレームID
-
-    # GPS Origin Setting
-    # use_manual_origin: GPS原点を手動設定するか
-    #   false: 最初の有効なGPS信号の位置を自動的に原点に設定（推奨）
-    #   true:  以下の3つのパラメータで指定した位置を原点として使用
-    use_manual_origin: false
+    # Topic names
+    gps_topic_name: "/fix"                    # GPS受信機からのNavSatFixトピック
+    gps_pose_topic_name: "/gps_pose"          # 出力するPoseWithCovarianceトピック
+    initialpose_topic_name: "/initialpose"    # RVizからの初期位置設定
     
-    # 手動原点設定（use_manual_origin: trueの場合のみ有効）
-    # 例: 東京駅付近
-    # gps_origin_lat: 35.6812
-    # gps_origin_lon: 139.7671
-    # gps_origin_alt: 40.0
-    gps_origin_lat: 0.0                     # GPS原点の緯度（度）
-    gps_origin_lon: 0.0                     # GPS原点の経度（度）
-    gps_origin_alt: 0.0                     # GPS原点の高度（m、楕円体高）
+    # Frame ID
+    map_frame_id: "map"
 
-    # GPS Quality Filter Parameters
-    # min_satellites: 最小衛星数の閾値（現在未実装）
-    # max_hdop: 最大HDOP値の閾値（現在未実装）
-    min_satellites: 6.0
-    max_hdop: 3.0
+    # 通常設定
+    # gps_high_quality_count_threshold: 3
+    # 一般的な設定
+    # gps_high_confidence_threshold: 1.0  # 1.0m以下で高精度
+
     
-    # max_covariance_threshold: 許容する最大測位誤差（m）
-    #   GPSの水平方向標準偏差がこの値を超えると棄却される
-    #   厳しい設定: 5.0  → 高精度データのみ使用（都市部では使えないことも）
-    #   標準設定: 10.0 → バランスの取れた設定
-    #   緩い設定: 15.0 → 低精度データも許容（位置推定が不安定になる可能性）
-    max_covariance_threshold: 10.0
+    # GPS原点設定
+    use_manual_origin: true                  # 手動で原点を設定する場合はtrue
+    gps_origin_lat: 36.082628231                       # 手動設定時の原点緯度 [deg]
+    gps_origin_lon: 140.076144739                       # 手動設定時の原点経度 [deg]
+    gps_origin_alt: 67.078                       # 手動設定時の原点高度 [m]
 
-    # Note: 
-    # - SBAS_FIX（STATUS_SBAS_FIX = 1）以上のGPS測位のみ採用されます
-    # - 共分散タイプがKNOWN(3)またはAPPROXIMATED(1)のデータのみ採用されます
+    
+    # GPS品質フィルタリング（基本的なチェック用）
+    min_satellites: 6.0                       # 最小衛星数（使用していない場合は無視）
+    max_hdop: 3.0                             # 最大HDOP（使用していない場合は無視）
+    max_covariance_threshold: 10.0            # 最大水平標準偏差 [m]
+                                              # この閾値より大きい場合はGPSデータを棄却
+
+# ========================================
+# パラメータ設定ガイド
+# ========================================
+#
+# 【基本設定】
+# max_covariance_threshold: 10.0
+# - GPSデータの最大許容標準偏差
+# - これより大きい共分散を持つGPSデータは棄却される
+# - 通常は10m程度に設定
+# - RTK-GPS環境では5m程度でもOK
+#
+# 【use_manual_origin: true の場合】
+# - GPS原点を手動で設定
+# - ロボットが常に同じ場所から起動する場合に便利
+# - 緯度・経度・高度を正確に設定する必要がある
+#
+# 例: 東京タワー付近を原点に設定
+# use_manual_origin: true
+# gps_origin_lat: 35.6585805
+# gps_origin_lon: 139.7454329
+# gps_origin_alt: 10.0
+#
+# 【use_manual_origin: false の場合】
+# - 最初の有効なGPS信号を原点(0, 0, 0)として自動設定
+# - ロボットの起動位置が変わる場合に便利
+# - /initialposeを受信すると原点がリセットされる
+#
+# ========================================
+# GPS受信機の設定確認
+# ========================================
+#
+# GPS Updaterが正しく動作するには、GPS受信機が以下の情報を提供する必要があります:
+#
+# 1. position_covariance_type が KNOWN(3) または APPROXIMATED(1)
+#    - UNKNOWN(0) の場合、共分散情報が無効
+#    - デフォルト値(σ=3m)が使用される
+#
+# 2. position_covariance に実際の共分散値が設定されている
+#    - RTK-FIX: 0.01-0.05 m^2 (標準偏差 0.1-0.22m)
+#    - SBAS-FIX: 1-4 m^2 (標準偏差 1-2m)
+#    - 単独測位: 9-100 m^2 (標準偏差 3-10m)
+#
+# 3. status.status が適切に設定されている
+#    - STATUS_NO_FIX (-1): 測位不可
+#    - STATUS_FIX (0): 単独測位
+#    - STATUS_SBAS_FIX (1): SBAS補正
+#    - STATUS_GBAS_FIX (2): GBAS補正
+#    - カスタム値 (4以上): RTK-FIXなど高精度モード
+#
+# ========================================
+# トラブルシューティング
+# ========================================
+#
+# 【GPS品質が常に "GOOD" にならない】
+# → max_covariance_threshold を大きくする
+# → GPS受信機の設定を確認
+# → 障害物のない開けた場所でテスト
+#
+# 【EKF側でGPS高精度リスポーンが動作しない】
+# → ログで "GPS covariance transferred" を確認
+# → 共分散値が実際に小さいか確認（σ < 1.0m）
+# → position_covariance_type が KNOWN または APPROXIMATED か確認
+#
+# 【GPS原点が毎回変わってしまう】
+# → use_manual_origin: true にして固定原点を設定
+# → または最初のGPS受信位置を記録して使用
+#
+# ========================================
+# デバッグ用設定
+# ========================================
+#
+# GPS品質情報を詳細に確認したい場合:
+# 1. ログレベルをDEBUGに設定
+#    ros2 run gps_updater gps_updater --ros-args --log-level debug
+#
+# 2. 定期的なステータス出力を確認
+#    "GPS Quality: ✓ GOOD"
+#    "  Status       : 1 [SBAS_FIX]"
+#    "  Cov Type     : 3 [KNOWN]"
+#    "  σ_x          : 0.523 m"
+#    "  σ_y          : 0.487 m"
+#    "  σ_horizontal : 0.715 m"

@@ -5,21 +5,24 @@ map_matcher_node:
     # pcd_file_path: /home/cub/colcon_ws/src/cub/ekf_localizer/pcd/map.pcd
     # pcd_file_path: /home/cub/colcon_ws/src/cub/ekf_localizer/pcd/mapoudanhodoumade.pcd
     # pcd_file_path: /home/cub/colcon_ws/src/cub/ekf_localizer/pcd/mapkakunin.pcd
-    pcd_file_path: /home/cub/colcon_ws/src/cub/ekf_localizer_ros2/pcd/11-2025tsukuba-map-1004.pcd
+    # pcd_file_path: /home/cub/colcon_ws/src/cub/ekf_localizer_ros2/pcd/11-2025tsukuba-map-1004.pcd
+    pcd_file_path: /home/cub/maps/map_tc25_gnss_0_2.pcd
 
+    is_publish_map: true
     # Downsampling Parameter
     # この値が大きいほど処理する点群が減る（計算が軽くなる）
     # VOXEL_SIZE: 0.05
     is_pcl_offset: false
     # NDTのボクセルサイズ(マシンスペックに合わせて調整)
-    VOXEL_SIZE: 0.6
+    VOXEL_SIZE: 0.1
     # map点群のボクセルサイズ(マシンスペックに合わせて調整)
-    VOXEL_SIZE_MAP: 0.6
+    VOXEL_SIZE_MAP: 0.1
 
     # Paththrough Parameter
     # 処理する点群の範囲 (m)
     # 値の距離以内の点群を処理する
     LIMIT_RANGE: 30.0
+    LIMIT_RANGE_HEIGHT: 10.0
 
     # Matching Parameters # 基本ノータッチで大丈夫です
     TRANS_EPSILON: 0.001

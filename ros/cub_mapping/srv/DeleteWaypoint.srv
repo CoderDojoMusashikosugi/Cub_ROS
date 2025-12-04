@@ -1,0 +1,6 @@
+# Delete a waypoint from a group
+int32 group_index       # Index of group containing the waypoint
+int32 waypoint_index    # Index of waypoint to delete
+---
+bool success            # True if waypoint was deleted successfully
+string message          # Status message
