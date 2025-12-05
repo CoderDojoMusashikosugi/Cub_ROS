@@ -16,7 +16,7 @@ gps_updater:
 
     
     # GPS原点設定
-    use_manual_origin: true                  # 手動で原点を設定する場合はtrue
+    use_manual_origin: true                  # 手動で原点を設定する場合はtrue  falseにするとnode起動地点が原点になる
     gps_origin_lat: 36.082628231                       # 手動設定時の原点緯度 [deg]
     gps_origin_lon: 140.076144739                       # 手動設定時の原点経度 [deg]
     gps_origin_alt: 67.078                       # 手動設定時の原点高度 [m]
