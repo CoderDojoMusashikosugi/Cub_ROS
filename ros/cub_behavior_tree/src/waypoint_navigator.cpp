@@ -1,4 +1,5 @@
 #include <rclcpp/rclcpp.hpp>
+#include <rclcpp/async_parameters_client.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
 #include <nav2_msgs/action/navigate_to_pose.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
@@ -8,6 +9,8 @@
 #include <std_msgs/msg/empty.hpp>
 #include <std_msgs/msg/bool.hpp>
 #include <fstream>
+#include <cmath>
+#include <limits>
 #include <string>
 #include <vector>
 #include <memory>
@@ -38,6 +41,7 @@ public:
     current_group_index_(0),
     current_waypoint_index_(0),
     is_waiting_for_input_(true), // 起動時にユーザー入力待ちにする
+    current_xy_goal_tolerance_(std::numeric_limits<double>::quiet_NaN()),
     follow_mode_enabled_(false)
   {
     navigate_to_pose_client_ = rclcpp_action::create_client<NavigateToPose>(this, "navigate_to_pose");
@@ -55,6 +59,13 @@ public:
     tf_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
     tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 
+    parameters_client_ = std::make_shared<rclcpp::AsyncParametersClient>(this, "controller_server");
+    if (!parameters_client_->wait_for_service(2s)) {
+      RCLCPP_WARN(this->get_logger(), "controller_server parameter service not available at startup.");
+    } else {
+      set_goal_checker_tolerance(kDefaultGoalTolerance);
+    }
+
     if (!load_yaml(yaml_file_)) {
       RCLCPP_ERROR(this->get_logger(), "Failed to load YAML file.");
       rclcpp::shutdown();
@@ -66,6 +77,9 @@ public:
   }
 
 private:
+  static constexpr double kPreciseGoalTolerance = 0.4;
+  static constexpr double kDefaultGoalTolerance = 3.0;
+
   std::string yaml_file_;
   std::vector<WaypointGroup> waypoint_groups_;
   size_t current_group_index_;
@@ -73,6 +87,7 @@ private:
   bool is_waiting_for_input_;
 
   rclcpp_action::Client<NavigateToPose>::SharedPtr navigate_to_pose_client_;
+  rclcpp::AsyncParametersClient::SharedPtr parameters_client_;
   rclcpp::Subscription<std_msgs::msg::Empty>::SharedPtr proceed_subscription_;
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr follow_mode_pub_;
   rclcpp::TimerBase::SharedPtr resend_timer_;
@@ -80,6 +95,7 @@ private:
   std::mutex mutex_;
   std::condition_variable cv_;
 
+  double current_xy_goal_tolerance_;
   bool follow_mode_enabled_;
   std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
@@ -107,6 +123,39 @@ private:
     if (changed) {
       RCLCPP_INFO(this->get_logger(), "Front follow mode %s", enabled ? "ENABLED" : "DISABLED");
     }
+  }
+
+  void set_goal_checker_tolerance(double tolerance)
+  {
+    if (!parameters_client_) {
+      return;
+    }
+
+    if (!std::isnan(current_xy_goal_tolerance_) &&
+        std::fabs(current_xy_goal_tolerance_ - tolerance) < 1e-6) {
+      return;
+    }
+
+    if (!parameters_client_->service_is_ready() && !parameters_client_->wait_for_service(1s)) {
+      RCLCPP_WARN(this->get_logger(), "controller_server parameter service not ready, cannot set goal tolerance yet.");
+      return;
+    }
+
+    parameters_client_->set_parameters(
+      {rclcpp::Parameter("general_goal_checker.xy_goal_tolerance", tolerance)},
+      [this, tolerance](auto future) {
+        try {
+          const auto & results = future.get();
+          if (results.empty() || !results[0].successful) {
+            RCLCPP_WARN(this->get_logger(), "Failed to set goal checker xy tolerance to %.2f", tolerance);
+            return;
+          }
+          current_xy_goal_tolerance_ = tolerance;
+          RCLCPP_INFO(this->get_logger(), "Goal checker xy tolerance set to %.2f", tolerance);
+        } catch (const std::exception & e) {
+          RCLCPP_WARN(this->get_logger(), "Error while setting goal checker tolerance: %s", e.what());
+        }
+      });
   }
 
   bool load_yaml(const std::string & filepath)
@@ -156,6 +205,10 @@ private:
     }
 
     WaypointGroup & current_group = waypoint_groups_[current_group_index_];
+
+    const double goal_tolerance =
+      current_group.require_input ? kPreciseGoalTolerance : kDefaultGoalTolerance;
+    set_goal_checker_tolerance(goal_tolerance);
 
     if (current_waypoint_index_ >= current_group.waypoints.size()) {
       if (current_group.require_input) {
