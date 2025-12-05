@@ -4,7 +4,7 @@ DynamicTfCub::DynamicTfCub() : Node("DynamicTFCub")
     declare_parameter<std::string>("base_frame_id", "base_link");
     declare_parameter<std::string>("odom_frame_id", "odom");
     declare_parameter<std::string>("map_frame_id", "map");
-    declare_parameter<bool>("odom_tf_enable", true);  // true: map->odom->base_link, false: map->base_link
+    declare_parameter<bool>("odom_tf_enable", false);  // true: map->odom->base_link, false: map->base_link
 
     odom_tf_enable_ = this->get_parameter("odom_tf_enable").as_bool();
 
