@@ -1,0 +1,22 @@
+<library path="bt_follow_zone_plugins">
+  <class name="cub_behavior_tree::IsInFollowZone"
+         type="cub_behavior_tree::IsInFollowZone"
+         base_class_type="BT::ConditionNode">
+    <description>Checks if the robot is within a follow zone around the goal or an explicitly provided center.</description>
+  </class>
+  <class name="cub_behavior_tree::FollowModeEnabled"
+         type="cub_behavior_tree::FollowModeEnabled"
+         base_class_type="BT::ConditionNode">
+    <description>Checks a latched Bool topic to see if follow mode should be enabled.</description>
+  </class>
+  <class name="cub_behavior_tree::AcquireFrontTargetAction"
+         type="cub_behavior_tree::AcquireFrontTargetAction"
+         base_class_type="BT::ActionNodeBase">
+    <description>Calls the acquire_front_target action server to produce a follow target.</description>
+  </class>
+  <class name="cub_behavior_tree::SetFrontFollowServerState"
+         type="cub_behavior_tree::SetFrontFollowServerState"
+         base_class_type="BT::SyncActionNode">
+    <description>Logs activation or deactivation of the front-follow server.</description>
+  </class>
+</library>

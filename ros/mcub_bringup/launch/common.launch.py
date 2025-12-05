@@ -67,10 +67,10 @@ def generate_launch_description():
             parameters=[{'use_sim_time': use_sim_time}, diag_config],
         ),
 
-        Node(
-            package='rviz2',
-            executable='rviz2',
-            arguments=['-d', PathJoinSubstitution([FindPackageShare('cub_visualization'), 'config', 'mcub.rviz'])],
-            output='screen',
-        ),
+        # Node(
+        #     package='rviz2',
+        #     executable='rviz2',
+        #     arguments=['-d', PathJoinSubstitution([FindPackageShare('cub_visualization'), 'config', 'mcub.rviz'])],
+        #     output='screen',
+        # ),
     ])
