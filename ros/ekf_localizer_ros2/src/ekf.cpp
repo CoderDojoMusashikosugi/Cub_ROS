@@ -324,36 +324,28 @@ void EKF::odom_callback(const nav_msgs::msg::Odometry::ConstSharedPtr msg)
 
 void EKF::motion_update_by_odom(double dt)
 {
+    Eigen::VectorXd X_prev = X_;
+    Eigen::MatrixXd P_prev = P_;
+    
     // Odomからの並進速度計算
     auto current_position = odom_.pose.pose.position;
     double current_v = 0.0;
-	double  dyaw = 0.0;
-	// double omega = 0.0;
+    double dyaw = 0.0;
     
     Eigen::Vector3d current_odom_pose_(odom_.pose.pose.position.x, odom_.pose.pose.position.y, 0);
-	// 現在の姿勢角を取得
-    // double current_yaw = calc_yaw_from_quat(odom_.pose.pose.orientation);
     
     if (!first_callback_) {
-        // 位置の変化量から速度を計算
         current_v = (current_odom_pose_ - last_odom_pose_).norm() / dt;
-		// 姿勢角の変化量から角速度を計算
-        // dyaw = normalize_angle(current_yaw - last_odom_yaw_);
-        // omega = dyaw / dt;
     }
     
-    // 現在の位置を保存
     last_position_ = current_position;
     first_callback_ = false;
     last_odom_pose_ = current_odom_pose_;
-	// last_odom_yaw_ = current_yaw;
     
     // 制御入力
-    // double nu = current_v;
-	double nu = odom_.twist.twist.linear.x; // 使えるならこれを使うべき
-    double omega = odom_.twist.twist.angular.z; // Odomから角速度を取得
+    double nu = odom_.twist.twist.linear.x;
+    double omega = odom_.twist.twist.angular.z;
     
-    // 微小角速度の場合は数値安定性のため小さな値に設定
     if(std::fabs(omega) < 1e-3) omega = 1e-10;
     
     // Motion noise covariance matrix M (2x2)
@@ -380,20 +372,55 @@ void EKF::motion_update_by_odom(double dt)
     
     // State transition
     if(std::fabs(omega) < 1e-2){
-        // 角速度が小さい場合は線形近似を使用
         X_(0) += nu*std::cos(X_(2))*dt;
         X_(1) += nu*std::sin(X_(2))*dt;
         X_(2) += omega*dt;
     }
     else{
-        // 通常の非線形モデル
         X_(0) += nu/omega*(std::sin(X_(2) + omega*dt) - std::sin(X_(2)));
         X_(1) += nu/omega*(-std::cos(X_(2) + omega*dt) + std::cos(X_(2)));
         X_(2) += omega*dt;
     }
     
+    // 角度を正規化
+    X_(2) = normalize_angle(X_(2));
+    
     // Covariance update
     P_ = G * P_ * G.transpose() + A * M * A.transpose();
+    
+    // NaN/Infチェック
+    if(std::isnan(X_(0)) || std::isnan(X_(1)) || std::isnan(X_(2)) ||
+       std::isinf(X_(0)) || std::isinf(X_(1)) || std::isinf(X_(2))) {
+        X_ = X_prev;
+        P_ = P_prev;
+        return;
+    }
+    
+    // 変化量チェック
+    double dx = X_(0) - X_prev(0);
+    double dy = X_(1) - X_prev(1);
+    double position_change = std::sqrt(dx * dx + dy * dy);
+    double yaw_change = normalize_angle(X_(2) - X_prev(2));
+    
+    // 速度計算
+    double velocity = position_change / dt;
+    double angular_velocity = std::abs(yaw_change) / dt;
+    
+    // 閾値チェック
+    double max_velocity = 3.0;  // [m/s]
+    double max_angular_velocity = 2.0;  // [rad/s]
+    
+    if(velocity > max_velocity) {
+        X_ = X_prev;
+        P_ = P_prev;
+        return;
+    }
+    
+    if(angular_velocity > max_angular_velocity) {
+        X_ = X_prev;
+        P_ = P_prev;
+        return;
+    }
 }
 
 void EKF::imu_callback(const sensor_msgs::msg::Imu::ConstSharedPtr msg)
@@ -422,13 +449,13 @@ void EKF::imu_callback(const sensor_msgs::msg::Imu::ConstSharedPtr msg)
 
 void EKF::motion_update_by_imu(double dt)
 {
-    // IMUからの角速度を取得
+    Eigen::VectorXd X_prev = X_;
+    Eigen::MatrixXd P_prev = P_;
+    
     double omega = imu_.angular_velocity.z;
     
-    // 微小角速度の場合は数値安定性のため小さな値に設定
     if(std::fabs(omega) < 1e-3) omega = 1e-10;
     
-    // 並進速度は0と仮定（IMUからは取得できないため）
     double nu = 0.0;
     
     // Motion noise covariance matrix M (2x2)
@@ -440,60 +467,123 @@ void EKF::motion_update_by_imu(double dt)
     // Jacobian of motion model w.r.t. control inputs A (3x2)
     Eigen::Matrix<double,3,2> A;
     A.setZero();
-    // IMUは角速度のみなので、角速度に関する項のみ設定
-    A(2,1) = dt; // dyaw/domega = dt
+    A(2,1) = dt;
     
     // Jacobian of motion model w.r.t. state G (3x3)
     Eigen::MatrixXd G(3, 3);
     G.setIdentity();
-    // IMUは並進速度がないため、yawに関するJacobianは0
     
     // State transition (IMUは角度のみ更新)
     X_(2) += omega * dt;
     
+    // 角度を正規化
+    X_(2) = normalize_angle(X_(2));
+    
     // Covariance update
     P_ = G * P_ * G.transpose() + A * M * A.transpose();
+    
+    // NaN/Infチェック
+    if(std::isnan(X_(2)) || std::isinf(X_(2))) {
+        X_ = X_prev;
+        P_ = P_prev;
+        return;
+    }
+    
+    // 角速度チェック
+    double yaw_change = normalize_angle(X_(2) - X_prev(2));
+    double angular_velocity = std::abs(yaw_change) / dt;
+    double max_angular_velocity = 2.0;  // [rad/s]
+    
+    if(angular_velocity > max_angular_velocity) {
+        X_ = X_prev;
+        P_ = P_prev;
+        return;
+    }
 }
 
 void EKF::measurement_update_3DoF()
 {
-	if(check_ekf_covariance(ekf_pose_) || check_mahalanobis_distance(ekf_pose_, ndt_pose_)){
-		// Z
-		Eigen::VectorXd Z(X_.size());
-		Z.setZero();
-		Z(0) = ndt_pose_.pose.position.x;
-		Z(1) = ndt_pose_.pose.position.y;
-		Z(2) = calc_yaw_from_quat(ndt_pose_.pose.orientation);
+    Eigen::VectorXd X_prev = X_;
+    Eigen::MatrixXd P_prev = P_;
+    
+    if(check_ekf_covariance(ekf_pose_) || check_mahalanobis_distance(ekf_pose_, ndt_pose_)){
+        // Z
+        Eigen::VectorXd Z(X_.size());
+        Z.setZero();
+        Z(0) = ndt_pose_.pose.position.x;
+        Z(1) = ndt_pose_.pose.position.y;
+        Z(2) = calc_yaw_from_quat(ndt_pose_.pose.orientation);
 
-		// H
-		Eigen::MatrixXd H = Eigen::MatrixXd::Identity(X_.size(),X_.size());
+        // H
+        Eigen::MatrixXd H = Eigen::MatrixXd::Identity(X_.size(),X_.size());
 
-		// I
-		Eigen::MatrixXd I = Eigen::MatrixXd::Identity(X_.size(),X_.size());
+        // I
+        Eigen::MatrixXd I = Eigen::MatrixXd::Identity(X_.size(),X_.size());
 
-		// Y
-		Eigen::VectorXd Y(X_.size());
-		Y.setZero();
-		Y = Z - H*X_;
-		Y(2) = normalize_angle(Y(2));
+        // Y
+        Eigen::VectorXd Y(X_.size());
+        Y.setZero();
+        Y = Z - H*X_;
+        Y(2) = normalize_angle(Y(2));
 
-		// R
-		Eigen::MatrixXd R(X_.size(),X_.size());
-		R = SIGMA_NDT_*Eigen::MatrixXd::Identity(X_.size(),X_.size());
+        // R
+        Eigen::MatrixXd R(X_.size(),X_.size());
+        R = SIGMA_NDT_*Eigen::MatrixXd::Identity(X_.size(),X_.size());
 
-		// S
-		Eigen::MatrixXd S(X_.size(),X_.size());
-		S.setZero();
-		S = H*P_*H.transpose() + R;
+        // S
+        Eigen::MatrixXd S(X_.size(),X_.size());
+        S.setZero();
+        S = H*P_*H.transpose() + R;
 
-		// K
-		Eigen::MatrixXd K(X_.size(),X_.size());
-		K = P_*H.transpose()*S.inverse();
+        // K
+        Eigen::MatrixXd K(X_.size(),X_.size());
+        K = P_*H.transpose()*S.inverse();
 
-		X_ += 1.0*K*Y;
-		X_(2) = normalize_angle(X_(2));
-		P_ = (I - K*H)*P_;
-	}
+        X_ += 1.0*K*Y;
+        X_(2) = normalize_angle(X_(2));
+        P_ = (I - K*H)*P_;
+        
+        // NaN/Infチェック
+        if(std::isnan(X_(0)) || std::isnan(X_(1)) || std::isnan(X_(2)) ||
+           std::isinf(X_(0)) || std::isinf(X_(1)) || std::isinf(X_(2))) {
+            X_ = X_prev;
+            P_ = P_prev;
+            return;
+        }
+        
+        // 変化量チェック
+        double dx = X_(0) - X_prev(0);
+        double dy = X_(1) - X_prev(1);
+        double position_change = std::sqrt(dx * dx + dy * dy);
+        double yaw_change = normalize_angle(X_(2) - X_prev(2));
+        double yaw_change_deg = std::abs(yaw_change) * 180.0 / M_PI;
+        
+        std::cout << "[NDT UPDATE CHECK]" << std::endl;
+        std::cout << "  Position change: " << std::fixed << std::setprecision(3) 
+                  << position_change << " m" << std::endl;
+        std::cout << "  Yaw change: " << yaw_change << " rad (" 
+                  << yaw_change_deg << " deg)" << std::endl;
+        
+        // 閾値チェック（観測更新では大きな変化も許容するが、異常値は棄却）
+        double max_position_jump = 5.0;  // [m]
+        double max_yaw_jump_deg = 90.0;   // [deg] 観測更新では大きめに
+        
+        if(position_change > max_position_jump) {
+            X_ = X_prev;
+            P_ = P_prev;
+            return;
+        }
+        
+        if(yaw_change_deg > max_yaw_jump_deg) {
+            std::cout << "  Yaw: " << std::fixed << std::setprecision(3) 
+                      << X_prev(2) << " rad → " << X_(2) << " rad" << std::endl;
+            X_ = X_prev;
+            P_ = P_prev;
+            return;
+        }
+        
+        std::cout << "✓ NDT update accepted" << std::endl;
+    }
 }
 
 // 距離が大ならmeasurement_updateしない
