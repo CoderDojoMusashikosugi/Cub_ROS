@@ -153,15 +153,21 @@ void debug_message(const char* format, ...);
 #define RCCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){error_loop(temp_rc);}}
 #define RCSOFTCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){}}
 
+int error_count_ = 0;
+
 // Error handle loop
 void error_loop(rcl_ret_t temp_rc) {
   leds[24] = CRGB::Red;
   FastLED.show();
   vTaskDelay(1000 / portTICK_PERIOD_MS);
-
+  error_count_ = error_count_ + 1;
   rcl_reset_error();
   leds[24] = CRGB::Black;
   FastLED.show();
+
+  if (20 < error_count_) {
+    ESP.restart();
+  }
 }
 
 void IRAM_ATTR set_emergency(){
