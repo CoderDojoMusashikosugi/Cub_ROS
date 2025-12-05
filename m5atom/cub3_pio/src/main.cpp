@@ -160,7 +160,9 @@ void error_loop(rcl_ret_t temp_rc) {
   leds[24] = CRGB::Red;
   FastLED.show();
   vTaskDelay(1000 / portTICK_PERIOD_MS);
-  error_count_ = error_count_ + 1;
+  if (robo_mode != EMERGENCY){
+    error_count_ = error_count_ + 1;
+  }
   rcl_reset_error();
   leds[24] = CRGB::Black;
   FastLED.show();
