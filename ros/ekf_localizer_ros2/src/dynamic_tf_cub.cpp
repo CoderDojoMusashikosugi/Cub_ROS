@@ -33,14 +33,14 @@ DynamicTfCub::DynamicTfCub() : Node("DynamicTFCub")
 DynamicTfCub::~DynamicTfCub(){}
 void DynamicTfCub::current_pose_callback(const geometry_msgs::msg::PoseStamped::ConstSharedPtr& msg)
 {
-    RCLCPP_INFO(this->get_logger(), "Received EKF Pose");
+    // RCLCPP_INFO(this->get_logger(), "Received EKF Pose");
     current_pose = *msg;
     
     // pub_static_tf();
 }
 void DynamicTfCub::wheel_odometry_callback(const nav_msgs::msg::Odometry::ConstSharedPtr& msg)
 {
-    RCLCPP_DEBUG(this->get_logger(), "Received Wheel Odometry");
+    // RCLCPP_DEBUG(this->get_logger(), "Received Wheel Odometry");
     wheel_odometry_pose = *msg;
     if (odom_tf_enable_) {
         pub_wheel_odometry_tf();  // odom -> base_link
