@@ -78,6 +78,13 @@ ekf_localizer_node:
     # あまりに大きな差はGPSの異常値の可能性が高い
     gps_respawn_max_distance: 30.0       # [m] 推奨値: 30-100m
 
+    # 運動更新・観測更新の妥当性チェック
+    MAX_ODOM_VELOCITY: 3.0              # [m/s] オドメトリ更新での最大速度
+    MAX_ODOM_ANGULAR_VELOCITY: 2.0      # [rad/s] オドメトリ更新での最大角速度
+    MAX_IMU_ANGULAR_VELOCITY: 2.0       # [rad/s] IMU更新での最大角速度
+    MAX_NDT_POSITION_JUMP: 5.0          # [m] NDT観測更新での最大位置変化
+    MAX_NDT_YAW_JUMP_DEG: 90.0              # [deg] NDT観測更新での最大方位変化
+
 
 # ========================================
 # パラメータチューニングガイド

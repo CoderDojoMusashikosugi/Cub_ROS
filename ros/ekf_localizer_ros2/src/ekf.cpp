@@ -43,6 +43,11 @@ EKF::EKF() : Node("EKF")
 	this->declare_parameter<int>("gps_high_quality_count_threshold", 3);
 	this->declare_parameter<double>("gps_respawn_distance_threshold", 3.0);
 	this->declare_parameter<double>("gps_respawn_max_distance", 50.0);
+    this->declare_parameter<double>("MAX_ODOM_VELOCITY", 3.0);
+    this->declare_parameter<double>("MAX_ODOM_ANGULAR_VELOCITY", 2.0);
+    this->declare_parameter<double>("MAX_IMU_ANGULAR_VELOCITY", 2.0);
+    this->declare_parameter<double>("MAX_NDT_POSITION_JUMP", 5.0);
+    this->declare_parameter<double>("MAX_NDT_YAW_JUMP_DEG", 90.0);
 
     // Retrieve the parameters
     this->get_parameter("ndt_pose_topic_name", ndt_pose_topic_name_);
@@ -85,6 +90,12 @@ EKF::EKF() : Node("EKF")
 	this->get_parameter("gps_high_quality_count_threshold", gps_high_quality_count_threshold_);
 	this->get_parameter("gps_respawn_distance_threshold", gps_respawn_distance_threshold_);
 	this->get_parameter("gps_respawn_max_distance", gps_respawn_max_distance_);
+
+    this->get_parameter("MAX_ODOM_VELOCITY", max_odom_velocity_);
+    this->get_parameter("MAX_ODOM_ANGULAR_VELOCITY", max_odom_angular_velocity_);
+    this->get_parameter("MAX_IMU_ANGULAR_VELOCITY", max_imu_angular_velocity_);
+    this->get_parameter("MAX_NDT_POSITION_JUMP", max_ndt_position_jump_);
+    this->get_parameter("MAX_NDT_YAW_JUMP_DEG", max_ndt_yaw_jump_deg_);
 
     ndt_pose_sub_  = this->create_subscription<geometry_msgs::msg::PoseStamped>(
         ndt_pose_topic_name_, rclcpp::QoS(1).reliable(),
@@ -132,6 +143,16 @@ EKF::EKF() : Node("EKF")
 	std::cout << "  GPS_RESPAWN_DIST_TH     : " << gps_respawn_distance_threshold_ << " m" << std::endl;
 	std::cout << "  GPS_RESPAWN_MAX_DIST    : " << gps_respawn_max_distance_ << " m" << std::endl;
     std::cout <<"  GPS_RESPAWN_ENABLE      : " << gps_respawn_enable_ << std::endl;
+
+    std::cout << "\n[MOTION UPDATE VALIDATION]" << std::endl;
+    std::cout << "  MAX_ODOM_VELOCITY       : " << max_odom_velocity_ << " m/s" << std::endl;
+    std::cout << "  MAX_ODOM_ANGULAR_VEL    : " << max_odom_angular_velocity_ << " rad/s" << std::endl;
+    std::cout << "  MAX_IMU_ANGULAR_VEL     : " << max_imu_angular_velocity_ << " rad/s" << std::endl;
+    
+    std::cout << "\n[OBSERVATION UPDATE VALIDATION]" << std::endl;
+    std::cout << "  MAX_NDT_POSITION_JUMP   : " << max_ndt_position_jump_ << " m" << std::endl;
+    std::cout << "  MAX_NDT_YAW_JUMP        : " << max_ndt_yaw_jump_deg_ << " deg" << std::endl;
+
 }
 
 EKF::~EKF() {}
@@ -407,16 +428,16 @@ void EKF::motion_update_by_odom(double dt)
     double angular_velocity = std::abs(yaw_change) / dt;
     
     // 閾値チェック
-    double max_velocity = 3.0;  // [m/s]
-    double max_angular_velocity = 2.0;  // [rad/s]
+    // double max_velocity = 3.0;  // [m/s]
+    // double max_angular_velocity = 2.0;  // [rad/s]
     
-    if(velocity > max_velocity) {
+    if(velocity > max_odom_velocity_) {
         X_ = X_prev;
         P_ = P_prev;
         return;
     }
     
-    if(angular_velocity > max_angular_velocity) {
+    if(angular_velocity > max_odom_angular_velocity_) {
         X_ = X_prev;
         P_ = P_prev;
         return;
@@ -492,9 +513,9 @@ void EKF::motion_update_by_imu(double dt)
     // 角速度チェック
     double yaw_change = normalize_angle(X_(2) - X_prev(2));
     double angular_velocity = std::abs(yaw_change) / dt;
-    double max_angular_velocity = 2.0;  // [rad/s]
+    // double max_imu_angular_velocity = 2.0;  // [rad/s]
     
-    if(angular_velocity > max_angular_velocity) {
+    if(angular_velocity > max_imu_angular_velocity_) {
         X_ = X_prev;
         P_ = P_prev;
         return;
@@ -565,16 +586,16 @@ void EKF::measurement_update_3DoF()
                   << yaw_change_deg << " deg)" << std::endl;
         
         // 閾値チェック（観測更新では大きな変化も許容するが、異常値は棄却）
-        double max_position_jump = 5.0;  // [m]
-        double max_yaw_jump_deg = 90.0;   // [deg] 観測更新では大きめに
+        // double max_ndt_position_jump = 5.0;  // [m]
+        // double max_ndt_yaw_jump_deg = 90.0;   // [deg] 観測更新では大きめに
         
-        if(position_change > max_position_jump) {
+        if(position_change > max_ndt_position_jump_) {
             X_ = X_prev;
             P_ = P_prev;
             return;
         }
         
-        if(yaw_change_deg > max_yaw_jump_deg) {
+        if(yaw_change_deg > max_ndt_yaw_jump_deg_) {
             std::cout << "  Yaw: " << std::fixed << std::setprecision(3) 
                       << X_prev(2) << " rad → " << X_(2) << " rad" << std::endl;
             X_ = X_prev;
