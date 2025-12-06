@@ -32,6 +32,13 @@ def generate_launch_description():
         ),
         # Node(
         #     package='cub_diagnostics',
+        #     executable='fix_status_node',
+        #     name='fix_status',
+        #     output='both',
+        #     parameters=[{'use_sim_time': use_sim_time}, diag_config],
+        # ),
+        # Node(
+        #     package='cub_diagnostics',
         #     executable='jetson_state_node',
         #     name='jetson_state',
         #     output='both',
