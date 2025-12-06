@@ -43,26 +43,26 @@ topic_hz_checker:
       #     reliability: best_effort
       #     durability: volatile
       #     depth: 100
-      sllidar_l:
-        topic: "/SLC1L_scan"
-        type: "sensor_msgs/msg/LaserScan"
-        expected_hz: 10.0
-        tolerance: 0.2
-        window_size: 10
-        qos:
-          reliability: best_effort
-          durability: volatile
-          depth: 100
-      sllidar_r:
-        topic: "/SLC1R_scan"
-        type: "sensor_msgs/msg/LaserScan"
-        expected_hz: 10.0
-        tolerance: 0.2
-        window_size: 10
-        qos:
-          reliability: best_effort
-          durability: volatile
-          depth: 100
+      # sllidar_l:
+      #   topic: "/SLC1L_scan"
+      #   type: "sensor_msgs/msg/LaserScan"
+      #   expected_hz: 10.0
+      #   tolerance: 0.2
+      #   window_size: 10
+      #   qos:
+      #     reliability: best_effort
+      #     durability: volatile
+      #     depth: 100
+      # sllidar_r:
+      #   topic: "/SLC1R_scan"
+      #   type: "sensor_msgs/msg/LaserScan"
+      #   expected_hz: 10.0
+      #   tolerance: 0.2
+      #   window_size: 10
+      #   qos:
+      #     reliability: best_effort
+      #     durability: volatile
+      #     depth: 100
       velodyne:
         topic: "/velodyne_points"
         type: "sensor_msgs/msg/PointCloud2"
