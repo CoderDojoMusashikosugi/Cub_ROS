@@ -138,3 +138,4 @@ cbsj1(){
 }
 alias lab="ros2 launch cub_bringup launch_at_boot.launch.py"
 alias nav="ros2 launch cub_bringup navigation.launch.py"
+alias minipclab="ros2 launch cub3_bringup minipc_launch_at_boot.launch.py"
