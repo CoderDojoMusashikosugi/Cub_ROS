@@ -1,0 +1,44 @@
+map_matcher_node:
+  ros__parameters:
+
+    # 点密度up & ndt resolution down & ndt iteration up
+    # pcd path
+    # pcd_file_path: /home/cub/colcon_ws/src/cub/ekf_localizer/pcd/map.pcd
+    # pcd_file_path: /home/cub/colcon_ws/src/cub/ekf_localizer/pcd/mapoudanhodoumade.pcd
+    # pcd_file_path: /home/cub/colcon_ws/src/cub/ekf_localizer/pcd/mapkakunin.pcd
+    # pcd_file_path: /home/cub/colcon_ws/src/cub/ekf_localizer_ros2/pcd/11-2025tsukuba-map-1004.pcd
+    pcd_file_path: /home/cub/maps/map_tc25_gnss_0_2.pcd
+
+    # pcdファイルを読み込んだらpublishするかどうか
+    is_publish_map: true
+    is_pcl_offset: true
+
+    # LiDAR点群をダウンサンプルする時のボクセルサイズ(マシンスペックに合わせて調整)
+    VOXEL_SIZE: 0.2
+    # map点群をダウンサンプルするときのボクセルサイズ(マシンスペックに合わせて調整)
+    VOXEL_SIZE_MAP: 0.2
+
+    # 値の距離以内の点群を処理する(m)
+    LIMIT_RANGE: 25.0
+    LIMIT_RANGE_HEIGHT: 30.0
+
+    # Matching Score
+    # FitnessScore : 点群地図とLiDAR点群とのマッチング具合を数値化したもの。小さいほどマッチングしている
+    # FitnessScoreがMATCHING_SCORE_THを下回っていたら観測更新を行う
+    MATCHING_SCORE_TH: 0.5
+
+    # Matching Parameters # 基本ノータッチで大丈夫です
+    TRANS_EPSILON: 0.001
+    STEP_SIZE: 0.1
+    # RESOLUTION: 0.1
+    RESOLUTION: 1.0
+    MAX_ITERATION: 50.0 # 最適化計算を最大何回繰り返すか
+
+
+    # Map Offset
+    MAP_OFFSET_X: 0.0
+    MAP_OFFSET_Y: 0.0
+    MAP_OFFSET_Z: 0.0
+    MAP_OFFSET_ROLL: 0.0
+    MAP_OFFSET_PITCH: 0.0
+    MAP_OFFSET_YAW: 0.0
