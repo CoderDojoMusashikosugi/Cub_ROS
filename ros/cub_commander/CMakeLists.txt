@@ -26,7 +26,11 @@ add_executable(nav2_action_client src/nav2_action_client.cpp)
 ament_target_dependencies(nav2_action_client rclcpp rclcpp_action sensor_msgs geometry_msgs geometry_msgs nav2_msgs yaml-cpp ament_index_cpp)
 target_link_libraries(nav2_action_client ${YAML_CPP_LIBRARIES})
 
-install(TARGETS cub_commander_node nav2_action_client
+add_executable(start_button_serial src/start_button_serial.cpp)
+ament_target_dependencies(start_button_serial rclcpp std_msgs)
+target_link_libraries(start_button_serial serial)
+
+install(TARGETS cub_commander_node nav2_action_client start_button_serial
   DESTINATION lib/${PROJECT_NAME})
 
 install(

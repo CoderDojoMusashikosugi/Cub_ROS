@@ -151,6 +151,12 @@ def generate_launch_description():
             output='both',
             parameters=[{'use_sim_time': use_sim_time}],
         ),
+        Node(
+            package='cub_commander',
+            executable='start_button_serial',
+            name='start_button_minipc',
+            output='both',
+        ),
 
         # 3D LiDAR -> launch_at_boot.launch.pyから移動
         velodyne_driver_node,
