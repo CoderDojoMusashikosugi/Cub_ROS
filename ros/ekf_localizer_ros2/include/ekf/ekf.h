@@ -153,5 +153,11 @@ private:
 	geometry_msgs::msg::Point last_position_;
 	Eigen::Vector3d last_odom_pose_ = Eigen::Vector3d::Zero();
 	double last_odom_yaw_;
+
+	double max_odom_velocity_;           // [m/s]
+    double max_odom_angular_velocity_;   // [rad/s]
+    double max_imu_angular_velocity_;    // [rad/s]
+    double max_ndt_position_jump_;       // [m]
+    double max_ndt_yaw_jump_deg_;            // [deg]
 };
 #endif	// EKF_H_
