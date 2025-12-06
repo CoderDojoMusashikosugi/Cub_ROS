@@ -130,13 +130,13 @@ def generate_launch_description():
             output='both',
             parameters=[{'use_sim_time': use_sim_time}, diag_config],
         ),
-        Node(
-            package='cub_diagnostics',
-            executable='jetson_state_node',
-            name='jetson_state',
-            output='both',
-            parameters=[{'use_sim_time': use_sim_time}, diag_config],
-        ),
+        # Node(
+        #     package='cub_diagnostics',
+        #     executable='jetson_state_node',
+        #     name='jetson_state',
+        #     output='both',
+        #     parameters=[{'use_sim_time': use_sim_time}, diag_config],
+        # ),
         Node(
             package='diagnostic_aggregator',
             executable='aggregator_node',
@@ -150,6 +150,12 @@ def generate_launch_description():
             name='diag_rviz_converter',
             output='both',
             parameters=[{'use_sim_time': use_sim_time}],
+        ),
+        Node(
+            package='cub_commander',
+            executable='start_button_serial',
+            name='start_button_minipc',
+            output='both',
         ),
 
         # 3D LiDAR -> launch_at_boot.launch.pyから移動

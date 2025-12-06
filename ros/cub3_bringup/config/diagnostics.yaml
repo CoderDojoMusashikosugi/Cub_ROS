@@ -101,19 +101,19 @@ linux_state:
       paths: ["/"]
       warn: 0.8
       error: 0.9
-jetson_state:
-  ros__parameters:
-    hardware_id: cub3
-    update_period: 1.0
-    thermal_zones:
-      - "cpu-thermal"
-      - "gpu-thermal"
-      - "soc0-thermal"
-      - "soc1-thermal"
-      - "soc2-thermal"
-      - "tj-thermal"
-    warn_temperature: 65.0
-    error_temperature: 80.0
+# jetson_state:
+#   ros__parameters:
+#     hardware_id: cub3
+#     update_period: 1.0
+#     thermal_zones:
+#       - "cpu-thermal"
+#       - "gpu-thermal"
+#       - "soc0-thermal"
+#       - "soc1-thermal"
+#       - "soc2-thermal"
+#       - "tj-thermal"
+#     warn_temperature: 65.0
+#     error_temperature: 80.0
 diagnostic_aggregator:
   ros__parameters:
     pub_rate: 1.0
