@@ -15,7 +15,7 @@ map_matcher_node:
     # LiDAR点群をダウンサンプルする時のボクセルサイズ(マシンスペックに合わせて調整)
     VOXEL_SIZE: 0.2
     # map点群をダウンサンプルするときのボクセルサイズ(マシンスペックに合わせて調整)
-    VOXEL_SIZE_MAP: 0.2
+    VOXEL_SIZE_MAP: 0.4
 
     # 値の距離以内の点群を処理する(m)
     LIMIT_RANGE: 25.0

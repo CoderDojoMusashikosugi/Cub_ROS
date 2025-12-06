@@ -114,6 +114,12 @@ linux_state:
 #       - "tj-thermal"
 #     warn_temperature: 65.0
 #     error_temperature: 80.0
+fix_status:
+  ros__parameters:
+    hardware_id: example
+    update_period: 1.0
+    topic: "/fix"
+    timeout: 2.0
 diagnostic_aggregator:
   ros__parameters:
     pub_rate: 1.0
@@ -130,6 +136,7 @@ diagnostic_aggregator:
               "velodyne_points",
               "velodyne_packets",
               # "fix", # これだとfix topic statusも含まれてしまう
+              "GPS Fix Status",
             ]
             regex: [
               "^ublox_gps_node: fix$" # これならfixだけ取れる

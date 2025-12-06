@@ -31,19 +31,19 @@ def generate_launch_description():
         output='screen'
     )
 
-    joy_dev = "/dev/input/js0"
-    cub_commander = Node(
-        package='cub_commander',
-        executable='cub_commander_node',
-        output='screen',
-        parameters=[{'dev': joy_dev}],
-    )
+    # joy_dev = "/dev/input/js0"
+    # cub_commander = Node(
+    #     package='cub_commander',
+    #     executable='cub_commander_node',
+    #     output='screen',
+    #     parameters=[{'dev': joy_dev}],
+    # )
 
-    joy_linux = Node(
-        package='joy_linux',
-        executable='joy_linux_node',
-        parameters=[{'dev': joy_dev}],
-    )
+    # joy_linux = Node(
+    #     package='joy_linux',
+    #     executable='joy_linux_node',
+    #     parameters=[{'dev': joy_dev}],
+    # )
 
     # sllidar_ros2パッケージの共有ディレクトリを取得
     sllidar_ros2_share_dir = FindPackageShare('sllidar_ros2').find('sllidar_ros2')

@@ -140,24 +140,21 @@ waypoint_groups:
       - x: 86.630348205566406
         y: 57.483100891113281
         yaw: -0.16433354465207445
-      - x: 120.60518646240234
-        y: 63.610786437988281
-        yaw: -0.050386103182877777
   - group_name: "Go to first closswalk"
+    require_input: true
+    waypoints:
+      - x: 102.83393859863281
+        y: 55.419910430908203
+        yaw: 0.21030983309553508
+  - group_name: "Go to second closswalk"
     require_input: true
     waypoints:
       - x: 120.51958465576172
         y: 59.663860321044922
         yaw: 0.65738927479043729
-      - x: 138.57553100585938
-        y: 61.734722137451172
+      - x: 140.27553100585938
+        y: 61.74522137451172
         yaw: 0.01519867839781683
-  - group_name: "Go to second closswalk"
-    require_input: true
-    waypoints:
-      - x: 159.40524291992188
-        y: 59.844646453857422
-        yaw: -0.039672235898190349
   - group_name: "Go to 3rd closswalk"
     require_input: true
     waypoints:

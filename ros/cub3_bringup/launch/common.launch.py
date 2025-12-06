@@ -50,6 +50,8 @@ def generate_launch_description():
         }.items()
     )
 
+    joy_dev = "/dev/input/js0"
+
     # Launchファイルの返り値
     return LaunchDescription([
         # wheel_odometryノード
@@ -138,6 +140,13 @@ def generate_launch_description():
         #     parameters=[{'use_sim_time': use_sim_time}, diag_config],
         # ),
         Node(
+            package='cub_diagnostics',
+            executable='fix_status_node',
+            name='fix_status',
+            output='both',
+            parameters=[{'use_sim_time': use_sim_time}, diag_config],
+        ),
+        Node(
             package='diagnostic_aggregator',
             executable='aggregator_node',
             name='diagnostic_aggregator',
@@ -164,4 +173,17 @@ def generate_launch_description():
 
         # RGB-D Camera -> launch_at_boot.launch.pyから移動
         # realsense_launch,
+
+        Node(
+            package='cub_commander',
+            executable='cub_commander_node',
+            output='screen',
+            parameters=[{'dev': joy_dev}],
+        ),
+
+        Node(
+            package='joy_linux',
+            executable='joy_linux_node',
+            parameters=[{'dev': joy_dev}],
+        ),
     ])
