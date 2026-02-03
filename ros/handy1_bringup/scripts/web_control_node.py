@@ -45,6 +45,7 @@ from std_msgs.msg import Int32
 
 # Global variables
 rosbag_process = None
+log_tail_process = None
 websocket_clients = set()
 asyncio_loop = None
 ws_port_actual = None
@@ -74,7 +75,7 @@ def get_ws_port():
 
 @app.route('/start_rosbag')
 def start_rosbag():
-    global rosbag_process
+    global rosbag_process, log_tail_process
     if rosbag_process and rosbag_process.poll() is None:
         return "Rosbag is already running.", 400
     
@@ -82,21 +83,16 @@ def start_rosbag():
         asyncio.run_coroutine_threadsafe(broadcast_message("> Starting rosbag recording...\n"), asyncio_loop)
     
     try:
-        # Using ros2 launch command
+        # Start Rosbag process
         command = ['ros2', 'launch', 'handy1_bringup', 'rosbag.launch.py']
         rosbag_process = subprocess.Popen(
             command,
-            stdout=subprocess.PIPE,
+            stdout=subprocess.PIPE, # We don't stream this anymore, but capturing avoids noise
             stderr=subprocess.STDOUT,
             text=True,
             bufsize=1,
             universal_newlines=True
         )
-        
-        # Thread to read output and broadcast
-        output_thread = threading.Thread(target=read_process_output, args=(rosbag_process, asyncio_loop))
-        output_thread.daemon = True
-        output_thread.start()
         
         return "Rosbag recording started.", 200
     except Exception as e:
@@ -108,31 +104,27 @@ def start_rosbag():
 
 @app.route('/stop_rosbag')
 def stop_rosbag():
-    global rosbag_process
+    global rosbag_process, log_tail_process
+    
+    # Stop rosbag process
     if rosbag_process and rosbag_process.poll() is None:
         if asyncio_loop:
             asyncio.run_coroutine_threadsafe(broadcast_message("> Stopping rosbag recording...\n"), asyncio_loop)
         
-        # Send SIGINT to the process group to gracefully stop rosbag
         os.kill(rosbag_process.pid, signal.SIGINT)
-        
         try:
             rosbag_process.wait(timeout=10)
         except subprocess.TimeoutExpired:
-            if asyncio_loop:
-                asyncio.run_coroutine_threadsafe(broadcast_message("> Rosbag did not terminate gracefully. Forcing kill...\n"), asyncio_loop)
-            os.kill(rosbag_process.pid, signal.SIGINT) # Try again with SIGINT
-            try:
-                rosbag_process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                os.kill(rosbag_process.pid, signal.SIGKILL) # Force kill
+            os.kill(rosbag_process.pid, signal.SIGKILL)
         
         rosbag_process = None
         if asyncio_loop:
             asyncio.run_coroutine_threadsafe(broadcast_message("> Rosbag recording stopped.\n"), asyncio_loop)
-        return "Rosbag recording stopped.", 200
     else:
-        return "Rosbag is not running.", 400
+        # If not running, just ensure cleanup
+        rosbag_process = None
+    
+    return "Rosbag recording stopped.", 200
 
 @app.route('/shutdown')
 def shutdown_host():
@@ -165,12 +157,40 @@ def shutdown_host():
         return error_msg, 500
 
 
-def read_process_output(process, loop):
+def read_process_output(process):
+    global asyncio_loop
     if process.stdout:
         for line in iter(process.stdout.readline, ''):
-            if loop:
-                asyncio.run_coroutine_threadsafe(broadcast_message(line), loop)
+            if asyncio_loop:
+                asyncio.run_coroutine_threadsafe(broadcast_message(line), asyncio_loop)
         process.stdout.close()
+
+def start_log_tailing():
+    global log_tail_process
+    if log_tail_process and log_tail_process.poll() is None:
+        return
+    
+    try:
+        # Ensure log file exists
+        subprocess.run(['touch', '/home/cub/launch.log'])
+
+        # Start tail process for logs
+        tail_cmd = ['tail', '-f', '/home/cub/launch.log']
+        log_tail_process = subprocess.Popen(
+            tail_cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+            universal_newlines=True
+        )
+
+        # Thread to read TAIL output and broadcast
+        output_thread = threading.Thread(target=read_process_output, args=(log_tail_process,))
+        output_thread.daemon = True
+        output_thread.start()
+    except Exception as e:
+        print(f"Failed to start log tailing: {e}")
 
 # WebSocket Server
 async def websocket_handler(websocket, path=None):
@@ -250,6 +270,8 @@ class WebControlNode(Node):
         ws_thread.start()
         self.get_logger().info('WebSocket server thread started (dynamic port). Open /ws_port for actual port.')
 
+        # Start log tailing
+        start_log_tailing()
         
         # Subscribe to livox/time_type to monitor sync state
         self._last_time_type = None
@@ -290,6 +312,14 @@ def main(args=None):
             node.get_logger().info('Shutting down rosbag process...')
             os.kill(rosbag_process.pid, signal.SIGINT)
             rosbag_process.wait()
+        
+        # Clean up log tail process
+        global log_tail_process
+        if log_tail_process and log_tail_process.poll() is None:
+            node.get_logger().info('Shutting down log tail process...')
+            os.kill(log_tail_process.pid, signal.SIGTERM)
+            log_tail_process.wait()
+
         node.destroy_node()
         rclpy.shutdown()
 

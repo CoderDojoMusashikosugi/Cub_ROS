@@ -10,7 +10,8 @@ fi
 USER_NAME=$SUDO_USER
 CUB_ROS_WS=$(cd $(dirname $0);cd ..;pwd)
 
-echo "[Unit]
+cat <<EOF > /etc/systemd/system/cub_ros.service
+[Unit]
 Description=Cub_ROS_docker
 After=docker.service docker.socket 
 
@@ -19,10 +20,11 @@ User=$USER_NAME
 Type=simple
 WorkingDirectory=$CUB_ROS_WS
 ExecStartPre=$CUB_ROS_WS/run.sh
-ExecStart=$CUB_ROS_WS/docker/internal/docker_exec.sh /bin/bash -c 'source /home/cub/colcon_ws/install/setup.bash && source ~/.user_config.bash && ros2 launch cub_bringup launch_at_boot.launch.py'
+ExecStart=/bin/bash -c "$CUB_ROS_WS/docker/internal/docker_exec.sh /bin/bash -c 'source /home/cub/colcon_ws/install/setup.bash && source ~/.user_config.bash && ros2 launch cub_bringup launch_at_boot.launch.py' >> $CUB_ROS_WS/docker/home/launch.log 2>&1"
 
 [Install]
-WantedBy=graphical.target" > /etc/systemd/system/cub_ros.service
+WantedBy=graphical.target
+EOF
 systemctl daemon-reload
 systemctl enable cub_ros.service
 
