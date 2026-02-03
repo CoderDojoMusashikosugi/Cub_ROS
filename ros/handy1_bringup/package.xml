@@ -20,7 +20,7 @@
   <exec_depend>livox_ros_driver2</exec_depend>
   <exec_depend>ublox_gps</exec_depend>
   <exec_depend>rosbag2_composable_recorder</exec_depend>
-  <exec_depend>imave_view</exec_depend>
+  <exec_depend>image_view</exec_depend>
 
   <exec_depend>launch_ros</exec_depend>
   <exec_depend>python3-flask</exec_depend>
