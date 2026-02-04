@@ -86,6 +86,9 @@
 <body>
     <div class="container">
         <h1>Rosbag Control</h1>
+        <div style="text-align: center; margin-bottom: 20px;">
+            <img src="/video_feed" style="width: 100%; max-width: 640px; border: 1px solid #ccc; background-color: #000;" alt="Camera Stream" />
+        </div>
         <div class="buttons">
             <button id="startBtn">Start Recording</button>
             <button id="stopBtn">Stop Recording</button>
@@ -140,7 +143,7 @@
         });
 
         async function connectWebSocket() {
-            let port = 8765;
+            let port = 8766;
             try {
                 const resp = await fetch('/ws_port', {cache: 'no-store'});
                 if (resp.ok) {
@@ -150,7 +153,7 @@
                     }
                 }
             } catch (e) {
-                console.warn('Failed to fetch ws_port; fallback to default 8765');
+                console.warn('Failed to fetch ws_port; fallback to default 8766');
             }
             const ws = new WebSocket(`ws://${window.location.hostname}:${port}`);
 

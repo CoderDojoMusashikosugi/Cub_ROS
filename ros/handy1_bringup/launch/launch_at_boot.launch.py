@@ -58,7 +58,7 @@ def generate_launch_description():
                 name='handy1_driver_container',
                 namespace='',
                 package='rclcpp_components',
-                executable='component_container',
+                executable='component_container_mt',
                 composable_node_descriptions=[
                     ComposableNode(
                         package='livox_ros_driver2',
@@ -82,14 +82,14 @@ def generate_launch_description():
                         remappings=[('image_raw', '/camera_node/image_raw')],
                         extra_arguments=[{'use_intra_process_comms': True}],
                     ),
-                    ComposableNode(
-                        package='image_view',
-                        plugin='image_view::ImageViewNode',
-                        name='image_view_node',
-                        remappings=[('image', '/camera_node/image_raw')],
-                        parameters=[{'autosize': True}],
-                        extra_arguments=[{'use_intra_process_comms': True}],
-                    ),
+                    # ComposableNode(
+                    #     package='image_view',
+                    #     plugin='image_view::ImageViewNode',
+                    #     name='image_view_node',
+                    #     remappings=[('image', '/camera_node/image_raw')],
+                    #     parameters=[{'autosize': True}],
+                    #     extra_arguments=[{'use_intra_process_comms': True}],
+                    # ),
                     # ComposableNode(
                     #     package='handy1_bringup',
                     #     plugin='handy1_bringup::FrequencyChecker',
@@ -97,6 +97,18 @@ def generate_launch_description():
                     #     remappings=[('input_image', '/camera_node/image_raw')],
                     #     extra_arguments=[{'use_intra_process_comms': True}],
                     # ),
+                    ComposableNode(
+                        package='handy1_bringup',
+                        plugin='handy1_bringup::LivoxFrequencyChecker',
+                        name='livox_frequency_checker',
+                        extra_arguments=[{'use_intra_process_comms': True}],
+                    ),
+                    ComposableNode(
+                        package='handy1_bringup',
+                        plugin='handy1_bringup::ImuFrequencyChecker',
+                        name='imu_frequency_checker',
+                        extra_arguments=[{'use_intra_process_comms': True}],
+                    ),
 
                 ],
                 # prefix=f"sudo -E env LD_LIBRARY_PATH={ld_library_path_escaped} nice -n -10", # sudo利用を無効化しておく

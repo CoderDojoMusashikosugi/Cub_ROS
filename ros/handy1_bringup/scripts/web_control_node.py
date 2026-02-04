@@ -39,9 +39,10 @@ import websockets
 import json
 import os
 import signal
-from flask import Flask, send_from_directory
+from flask import Flask, send_from_directory, Response
 from ament_index_python.packages import get_package_share_directory
 from std_msgs.msg import Int32
+from sensor_msgs.msg import CompressedImage
 
 # Global variables
 rosbag_process = None
@@ -49,7 +50,7 @@ log_tail_process = None
 websocket_clients = set()
 asyncio_loop = None
 ws_port_actual = None
-WS_PORT_DEFAULT = int(os.environ.get('HANDY1_WS_PORT', '8765'))
+WS_PORT_DEFAULT = int(os.environ.get('HANDY1_WS_PORT', '8766'))
 # Latest sync status label (e.g., "NO", "PTP", "GPS") for initial push to clients
 latest_sync_label = None
 
@@ -64,6 +65,32 @@ def index():
 @app.route('/<path:path>')
 def send_web_files(path):
     return send_from_directory(web_dir, path)
+
+# Video streaming
+latest_jpeg_data = None
+jpeg_lock = threading.Lock()
+
+def gen_frames():
+    global latest_jpeg_data
+    while True:
+        with jpeg_lock:
+            if latest_jpeg_data is not None:
+                frame = latest_jpeg_data
+            else:
+                frame = None
+        
+        if frame:
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+        else:
+            pass
+            
+        import time
+        time.sleep(0.04) # Limit to approx 25 fps
+
+@app.route('/video_feed')
+def video_feed():
+    return Response(gen_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 @app.route('/ws_port')
 def get_ws_port():
@@ -236,10 +263,11 @@ def run_asyncio_loop():
         last_exc = None
         for _ in range(20):  # try a range of ports
             try:
-                async with websockets.serve(websocket_handler, "0.0.0.0", port):
+                # host=None binds to all interfaces (IPv4 and IPv6)
+                async with websockets.serve(websocket_handler, None, port):
                     ws_port_actual = port
                     # Informatively print to stdout for ros2 logs
-                    print(f"[web_control_node] WebSocket server bound on ws://0.0.0.0:{port}")
+                    print(f"[web_control_node] WebSocket server bound on ws://*:{port}")
                     await asyncio.Future()  # run forever
             except OSError as e:
                 last_exc = e
@@ -276,6 +304,19 @@ class WebControlNode(Node):
         # Subscribe to livox/time_type to monitor sync state
         self._last_time_type = None
         self._time_type_sub = self.create_subscription(Int32, 'livox/time_type', self._on_time_type, 10)
+
+        # Subscribe to compressed image for video streaming
+        self._image_sub = self.create_subscription(
+            CompressedImage,
+            '/camera_node/image_raw/compressed',
+            self._on_image_compressed,
+            10
+        )
+
+    def _on_image_compressed(self, msg):
+        global latest_jpeg_data
+        with jpeg_lock:
+            latest_jpeg_data = msg.data
 
     def _on_time_type(self, msg: Int32):
         global latest_sync_label
