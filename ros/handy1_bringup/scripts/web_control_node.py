@@ -69,10 +69,21 @@ def send_web_files(path):
 # Video streaming
 latest_jpeg_data = None
 jpeg_lock = threading.Lock()
+streaming_enabled = False  # Default: OFF
+streaming_lock = threading.Lock()
 
 def gen_frames():
-    global latest_jpeg_data
+    global latest_jpeg_data, streaming_enabled
     while True:
+        with streaming_lock:
+            enabled = streaming_enabled
+        
+        if not enabled:
+            # Send a blank frame when streaming is disabled
+            import time
+            time.sleep(0.1)
+            continue
+            
         with jpeg_lock:
             if latest_jpeg_data is not None:
                 frame = latest_jpeg_data
@@ -99,6 +110,32 @@ def get_ws_port():
     global ws_port_actual
     port = ws_port_actual if ws_port_actual is not None else WS_PORT_DEFAULT
     return json.dumps({"port": port}), 200, {"Content-Type": "application/json"}
+
+@app.route('/streaming/status')
+def streaming_status():
+    global streaming_enabled
+    with streaming_lock:
+        return json.dumps({"enabled": streaming_enabled}), 200, {"Content-Type": "application/json"}
+
+@app.route('/streaming/enable', methods=['POST'])
+def enable_streaming():
+    global streaming_enabled
+    with streaming_lock:
+        streaming_enabled = True
+    # Notify the ROS node to start subscription
+    if hasattr(app, 'ros_node'):
+        app.ros_node.enable_streaming()
+    return json.dumps({"enabled": True}), 200, {"Content-Type": "application/json"}
+
+@app.route('/streaming/disable', methods=['POST'])
+def disable_streaming():
+    global streaming_enabled
+    with streaming_lock:
+        streaming_enabled = False
+    # Notify the ROS node to stop subscription
+    if hasattr(app, 'ros_node'):
+        app.ros_node.disable_streaming()
+    return json.dumps({"enabled": False}), 200, {"Content-Type": "application/json"}
 
 @app.route('/start_rosbag')
 def start_rosbag():
@@ -305,14 +342,33 @@ class WebControlNode(Node):
         self._last_time_type = None
         self._time_type_sub = self.create_subscription(Int32, 'livox/time_type', self._on_time_type, 10)
 
-        # Subscribe to compressed image for video streaming
-        self._image_sub = self.create_subscription(
-            CompressedImage,
-            '/camera_node/image_raw/compressed',
-            self._on_image_compressed,
-            10
-        )
+        # Image subscription (initially None, created on demand)
+        self._image_sub = None
+        
+        # Register this node with the Flask app for streaming control
+        app.ros_node = self
 
+    def enable_streaming(self):
+        """Enable image streaming by creating subscription."""
+        if self._image_sub is None:
+            self._image_sub = self.create_subscription(
+                CompressedImage,
+                '/camera_node/image_raw/compressed',
+                self._on_image_compressed,
+                10
+            )
+            self.get_logger().info('Image streaming enabled.')
+    
+    def disable_streaming(self):
+        """Disable image streaming by destroying subscription."""
+        if self._image_sub is not None:
+            self.destroy_subscription(self._image_sub)
+            self._image_sub = None
+            global latest_jpeg_data
+            with jpeg_lock:
+                latest_jpeg_data = None
+            self.get_logger().info('Image streaming disabled.')
+    
     def _on_image_compressed(self, msg):
         global latest_jpeg_data
         with jpeg_lock:
