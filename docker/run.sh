@@ -2,6 +2,16 @@
 
 set -e
 
+./stop.sh
+
+USERNAME="cub"
+ROSBAG_STORAGE_PATH=/media/$USERNAME/SSD-PSTU3A
+
+until mountpoint -q "$ROSBAG_STORAGE_PATH"; do
+    echo "waiting for USB Storage mout at $ROSBAG_STORAGE_PATH ..."
+    sleep 5
+done
+
 # handy1向けに、外部トリガを有効化
 if [ -e /sys/module/imx296/parameters/trigger_mode ]; then
     echo 1 | sudo tee /sys/module/imx296/parameters/trigger_mode > /dev/null 2>&1 || true
