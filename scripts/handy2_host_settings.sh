@@ -21,6 +21,14 @@ echo "metric 4000" >> /etc/dhcpcd.conf
 echo "interface eth0" >> /etc/dhcpcd.conf
 echo "static ip_address=192.168.1.2/24" >> /etc/dhcpcd.conf
 
+if ! grep -q "dtoverlay=pps-gpio,gpiopin=23" /boot/firmware/config.txt; then
+    echo "dtoverlay=pps-gpio,gpiopin=23" >> /boot/firmware/config.txt
+fi
+echo 'KERNEL=="pps0", OWNER="root", GROUP="root", MODE="0666"' > /etc/udev/rules.d/99-pps.rules
+
+systemctl disable systemd-timesyncd
+systemctl stop systemd-timesyncd
+
 mkdir -p ~/.config/autostart
 cat > ~/.config/autostart/cub-ros-journal.desktop <<'EOF'
 [Desktop Entry]
@@ -31,7 +39,6 @@ Exec=/usr/bin/x-terminal-emulator -T "ROS Logs (cub_ros)" -e bash -lc 'journalct
 Terminal=false
 X-GNOME-Autostart-enabled=true
 EOF
-
 
 echo "setting completed. reboot to apply."
 

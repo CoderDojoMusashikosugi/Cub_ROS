@@ -8,7 +8,14 @@ find_package(sensor_msgs REQUIRED)
 
 add_executable(pico_node src/pico.cpp src/pico_comm.cpp)
 ament_target_dependencies(pico_node rclcpp sensor_msgs)
-install(TARGETS pico_node DESTINATION lib/${PROJECT_NAME})
+
+add_executable(gnss_time_node src/gnss_time_node.cpp)
+ament_target_dependencies(gnss_time_node rclcpp)
+
+install(TARGETS 
+  pico_node 
+  gnss_time_node
+  DESTINATION lib/${PROJECT_NAME})
 
 # Include directories
 include_directories(
