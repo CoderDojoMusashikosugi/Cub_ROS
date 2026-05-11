@@ -16,8 +16,8 @@
 #include <tf2_ros/buffer.h>
 #include <std_msgs/msg/bool.hpp>
 
-#include <behaviortree_cpp_v3/action_node.h>
-#include <behaviortree_cpp_v3/bt_factory.h>
+#include <behaviortree_cpp/action_node.h>
+#include <behaviortree_cpp/bt_factory.h>
 #include <nav2_behavior_tree/bt_action_node.hpp>
 
 #include "cub_behavior_tree/action/acquire_front_target.hpp"
