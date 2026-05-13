@@ -33,6 +33,11 @@ else
 # このファイルは.gitignoreに設定してあるので、コミットされない。
 
 CUB_TARGET=DEFAULT
+
+# ここに外部SSD等のパスを設定すると、コンテナ内のホームディレクトリ以下にext_storageというシンボリックリンクが出来てアクセス可能になる。
+# 設定してSSD差してない場合は壊れたリンクとして出てくる。設定しないとリンクは消える。
+# 例: EXT_STORAGE_PATH=/media/cub/SSD-PSTU3A
+# EXT_STORAGE_PATH=
 " > $BASE_DIR/target.env
 
   echo "最初の起動のようですね。起動前に、初期設定の入力をお願いします。"

@@ -2,15 +2,7 @@
 
 set -e
 
-./stop.sh
-
-USERNAME="cub"
-ROSBAG_STORAGE_PATH=/media/$USERNAME/SSD-PSTU3A
-
-until mountpoint -q "$ROSBAG_STORAGE_PATH"; do
-    echo "waiting for USB Storage mout at $ROSBAG_STORAGE_PATH ..."
-    sleep 5
-done
+# ./stop.sh
 
 # handy1向けに、外部トリガを有効化
 if [ -e /sys/module/imx296/parameters/trigger_mode ]; then
@@ -25,6 +17,12 @@ fi
 docker/internal/set_target_env.sh
 source docker/internal/docker_util.sh
 
+# EXT_STORAGE_PATHの設定に応じて、外部SSD等をDockerコンテナ内のext_storageにマウントする
+if [ -n "$EXT_STORAGE_PATH" ]; then
+    ln -sfn "$EXT_STORAGE_PATH" docker/home/ext_storage
+else
+    rm -f docker/home/ext_storage
+fi
 export HOST_UID=`id -u`
 export HOST_GID=`id -g`
 container_list=`$docker_compose ps -q`
