@@ -6,6 +6,15 @@ find_package(rclcpp REQUIRED)
 find_package(rclcpp_components REQUIRED)
 find_package(sensor_msgs REQUIRED)
 
+add_executable(pico_node src/pico.cpp src/pico_comm.cpp)
+ament_target_dependencies(pico_node rclcpp sensor_msgs)
+install(TARGETS pico_node DESTINATION lib/${PROJECT_NAME})
+
+# Include directories
+include_directories(
+  include
+)
+
 install(DIRECTORY launch
   DESTINATION share/${PROJECT_NAME}
 )
