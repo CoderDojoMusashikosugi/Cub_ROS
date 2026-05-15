@@ -34,3 +34,6 @@
 [submodule "ros/fast_gicp"]
 	path = ros/fast_gicp
 	url = https://github.com/koide3/fast_gicp.git
+[submodule "ros/hesai_ros_driver"]
+	path = ros/hesai_ros_driver
+	url = https://github.com/HesaiTechnology/HesaiLidar_ROS_2.0
