@@ -46,7 +46,7 @@ else # macOS以外の場合
     if [ -z "$DISPLAY" ]; then
         export DISPLAY=:0 # DISPLAY環境変数が無い場合は:0で決め打ちしてしまう。もっと良い方法あったら取り替えたい。
     fi
-    docker_compose=$docker_compose" -f docker/docker-compose-media.yml" # Linuxの場合は/mediaをマウントする。macOSでは出来ないから消してる。
+    docker_compose=$docker_compose" -f docker/internal/docker-compose-media.yml" # Linuxの場合は/mediaをマウントする。macOSでは出来ないから消してる。
 fi
 
 # export USE_VNC_ENV=1 # これを有効化すると、VNC環境を強制オン
