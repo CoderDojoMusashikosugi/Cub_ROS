@@ -26,6 +26,17 @@ def generate_launch_description():
             executable='web_control_node.py',
             output='screen',
         ),
+        Node(
+            package='handy2_bringup',
+            executable='gnss_time_node',
+            name='gnss_time_node',
+            output='screen',
+            parameters=[{
+                'port': '/dev/serial0',
+                'baudrate': 921600,
+                'shm_unit': 0,
+            }],
+        ),
         # TimerAction(  # TimerActionを無効化しておく
         #     period=5.0,
         #     actions=[
