@@ -2,10 +2,12 @@
 
 # username: cub
 # password: same as username   (openssl passwd $USER_NAME)
-groupadd -g $HOST_GID $USER_NAME
-useradd -u $HOST_UID -g $HOST_GID -m $USER_NAME --password '$1$1MParYB8$R8c8vAbst5CsASYDC8Bmw1' -s /bin/bash
-echo "$USER_NAME ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
-gpasswd -a $USER_NAME sudo
+if ! id -u $USER_NAME > /dev/null 2>&1; then
+    groupadd -g $HOST_GID $USER_NAME
+    useradd -u $HOST_UID -g $HOST_GID -m $USER_NAME --password '$1$1MParYB8$R8c8vAbst5CsASYDC8Bmw1' -s /bin/bash
+    echo "$USER_NAME ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+    gpasswd -a $USER_NAME sudo
+fi
 
 # Configure chrony for GNSS Time Sync
 CHRONY_CONF="/etc/chrony/chrony.conf"
@@ -26,6 +28,8 @@ fi
 python3 -c "import ctypes; libc = ctypes.CDLL('libc.so.6'); libc.shmget(0x4e545030, 96, 0o1000 | 0o666)"
 
 # Start chrony
+# Remove stale pid file if exists (e.g. after host reboot)
+rm -f /var/run/chrony/chronyd.pid
 service chrony start
 
 su - $USER_NAME -c "/bin/bash -c 'source /opt/ros/${ROS_DISTRO}/setup.bash &&
