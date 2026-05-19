@@ -33,45 +33,55 @@ def generate_launch_description():
             output='screen',
             parameters=[{
                 'port': '/dev/serial0',
-                'baudrate': 921600,
+                'baudrate': 9600,
                 'shm_unit': 0,
             }],
         ),
-        # TimerAction(  # TimerActionを無効化しておく
-        #     period=5.0,
-        #     actions=[
-            ComposableNodeContainer(
-                name='handy2_driver_container',
-                namespace='',
-                package='rclcpp_components',
-                executable='component_container_mt',
-                composable_node_descriptions=[
-                    ComposableNode(
-                        package='camera_ros',
-                        plugin='camera::CameraNode',
-                        name='camera_node',
-                        parameters=[{
-                            'format': "BGR888", 
-                            'width' : 1456,
-                            'height': 1088,
-                            'camera_info_url': "file://" + os.path.join(get_package_share_directory('handy2_bringup'), 'config', 'rpgsc.yaml'),
-                            'role': 'video',
-                            'frame_id': 'gs_camera',
-                        }],
-                        remappings=[('image_raw', '/camera_node/image_raw')],
-                        extra_arguments=[{'use_intra_process_comms': True}],
-                    ),
-                    # ComposableNode(
-                    #     package='image_view',
-                    #     plugin='image_view::ImageViewNode',
-                    #     name='image_view_node',
-                    #     remappings=[('image', '/camera_node/image_raw')],
-                    #     parameters=[{'autosize': True}],
-                    #     extra_arguments=[{'use_intra_process_comms': True}],
-                    # ),
-                ],
-                output='both',
-            ),
-        #     ]
-        # ),
+        Node(
+            package='handy2_bringup',
+            executable='pico_node',
+            name='pico_node',
+            output='screen',
+            parameters=[{
+                'shutter_on_us': 2000,
+                'shutter_offset_us': 0,
+            }],
+        ),
+        TimerAction(
+            period=2.0,
+            actions=[
+                ComposableNodeContainer(
+                    name='handy2_driver_container',
+                    namespace='',
+                    package='rclcpp_components',
+                    executable='component_container_mt',
+                    composable_node_descriptions=[
+                        ComposableNode(
+                            package='camera_ros',
+                            plugin='camera::CameraNode',
+                            name='camera_node',
+                            parameters=[{
+                                'format': "BGR888", 
+                                'width' : 1456,
+                                'height': 1088,
+                                'camera_info_url': "file://" + os.path.join(get_package_share_directory('handy2_bringup'), 'config', 'rpgsc.yaml'),
+                                'role': 'video',
+                                'frame_id': 'gs_camera',
+                            }],
+                            remappings=[('image_raw', '/camera_node/image_raw')],
+                            extra_arguments=[{'use_intra_process_comms': True}],
+                        ),
+                        ComposableNode(
+                            package='image_view',
+                            plugin='image_view::ImageViewNode',
+                            name='image_view_node',
+                            remappings=[('image', '/camera_node/image_raw')],
+                            parameters=[{'autosize': True}],
+                            extra_arguments=[{'use_intra_process_comms': True}],
+                        ),
+                    ],
+                    output='both',
+                ),
+            ]
+        ),
     ])

@@ -39,7 +39,7 @@ class GNSSTimeNode : public rclcpp::Node {
 public:
     GNSSTimeNode() : Node("gnss_time_node") {
         this->declare_parameter("port", "/dev/serial0");
-        this->declare_parameter("baudrate", 921600);
+        this->declare_parameter("baudrate", 9600);
         this->declare_parameter("shm_unit", 0);
 
         std::string port = this->get_parameter("port").as_string();
@@ -55,7 +55,7 @@ public:
 
         struct termios options;
         tcgetattr(fd_, &options);
-        cfsetispeed(&options, B921600); // Assuming 921600 for UM982
+        cfsetispeed(&options, B9600); // Assuming 9600 for UM982
         options.c_cflag |= (CLOCAL | CREAD);
         options.c_cflag &= ~PARENB;
         options.c_cflag &= ~CSTOPB;

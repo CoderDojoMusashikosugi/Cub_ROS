@@ -24,6 +24,11 @@ echo "static ip_address=192.168.1.2/24" >> /etc/dhcpcd.conf
 if ! grep -q "dtoverlay=pps-gpio,gpiopin=23" /boot/firmware/config.txt; then
     echo "dtoverlay=pps-gpio,gpiopin=23" >> /boot/firmware/config.txt
 fi
+if ! grep -q "gpio=17=op,dh" /boot/firmware/config.txt; then
+    echo "gpio=17=op,dh" >> /boot/firmware/config.txt
+    echo "dtoverlay=gpio-poweroff,gpiopin=17,active_low=1" >> /boot/firmware/config.txt
+fi
+
 echo 'KERNEL=="pps0", OWNER="root", GROUP="root", MODE="0666"' > /etc/udev/rules.d/99-pps.rules
 
 systemctl disable systemd-timesyncd
