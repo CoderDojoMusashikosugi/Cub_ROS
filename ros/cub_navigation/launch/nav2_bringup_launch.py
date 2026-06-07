@@ -1,4 +1,3 @@
-# slamは切れるがlocalizationを切れない問題を解決するためnav2_bringupから持ってきた
 # Copyright (c) 2018 Intel Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,22 +17,25 @@ import os
 from ament_index_python.packages import get_package_share_directory
 
 from launch import LaunchDescription
-from launch.actions import (DeclareLaunchArgument, GroupAction,
-                            IncludeLaunchDescription, SetEnvironmentVariable)
+from launch.actions import (
+    DeclareLaunchArgument,
+    GroupAction,
+    IncludeLaunchDescription,
+    SetEnvironmentVariable,
+)
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
-from launch_ros.actions import PushRosNamespace
+from launch_ros.actions import PushROSNamespace
 from launch_ros.descriptions import ParameterFile
-from nav2_common.launch import RewrittenYaml, ReplaceString
+from nav2_common.launch import ReplaceString, RewrittenYaml
 
 
 def generate_launch_description():
     # Get the launch directory
     bringup_dir = get_package_share_directory('nav2_bringup')
     launch_dir = os.path.join(bringup_dir, 'launch')
-    cub_navigation_launch_dir = os.path.join(get_package_share_directory('cub_navigation'), 'launch')
 
     # Create the launch configuration variables
     namespace = LaunchConfiguration('namespace')
@@ -54,13 +56,7 @@ def generate_launch_description():
     # https://github.com/ros/robot_state_publisher/pull/30
     # TODO(orduno) Substitute with `PushNodeRemapping`
     #              https://github.com/ros2/launch_ros/issues/56
-    remappings = [('/tf', 'tf'),
-                  ('/tf_static', 'tf_static')]
-
-    # Create our own temporary YAML files that include substitutions
-    param_substitutions = {
-        'use_sim_time': use_sim_time,
-        'yaml_filename': map_yaml_file}
+    remappings = [('/tf', 'tf'), ('/tf_static', 'tf_static')]
 
     # Only it applys when `use_namespace` is True.
     # '<robot_namespace>' keyword shall be replaced by 'namespace' launch argument
@@ -69,140 +65,139 @@ def generate_launch_description():
     params_file = ReplaceString(
         source_file=params_file,
         replacements={'<robot_namespace>': ('/', namespace)},
-        condition=IfCondition(use_namespace))
+        condition=IfCondition(use_namespace),
+    )
 
     configured_params = ParameterFile(
         RewrittenYaml(
             source_file=params_file,
             root_key=namespace,
-            param_rewrites=param_substitutions,
-            convert_types=True),
-        allow_substs=True)
+            param_rewrites={},
+            convert_types=True,
+        ),
+        allow_substs=True,
+    )
 
     stdout_linebuf_envvar = SetEnvironmentVariable(
-        'RCUTILS_LOGGING_BUFFERED_STREAM', '1')
+        'RCUTILS_LOGGING_BUFFERED_STREAM', '1'
+    )
 
     declare_namespace_cmd = DeclareLaunchArgument(
-        'namespace',
-        default_value='',
-        description='Top-level namespace')
+        'namespace', default_value='', description='Top-level namespace'
+    )
 
     declare_use_namespace_cmd = DeclareLaunchArgument(
         'use_namespace',
         default_value='false',
-        description='Whether to apply a namespace to the navigation stack')
+        description='Whether to apply a namespace to the navigation stack',
+    )
 
     declare_slam_cmd = DeclareLaunchArgument(
-        'slam',
-        default_value='False',
-        description='Whether run a SLAM')
-
-    declare_use_localization_cmd = DeclareLaunchArgument(
-        'use_localization',
-        default_value='True',
-        description='Whether run a Localization')
+        'slam', default_value='False', description='Whether run a SLAM'
+    )
 
     declare_map_yaml_cmd = DeclareLaunchArgument(
-        'map',
-        description='Full path to map yaml file to load')
+        'map', default_value='', description='Full path to map yaml file to load'
+    )
+
+    declare_use_localization_cmd = DeclareLaunchArgument(
+        'use_localization', default_value='True',
+        description='Whether to enable localization or not'
+    )
 
     declare_use_sim_time_cmd = DeclareLaunchArgument(
         'use_sim_time',
         default_value='false',
-        description='Use simulation (Gazebo) clock if true')
+        description='Use simulation (Gazebo) clock if true',
+    )
 
     declare_params_file_cmd = DeclareLaunchArgument(
         'params_file',
         default_value=os.path.join(bringup_dir, 'params', 'nav2_params.yaml'),
-        description='Full path to the ROS2 parameters file to use for all launched nodes')
+        description='Full path to the ROS2 parameters file to use for all launched nodes',
+    )
 
     declare_autostart_cmd = DeclareLaunchArgument(
-        'autostart', default_value='true',
-        description='Automatically startup the nav2 stack')
+        'autostart',
+        default_value='true',
+        description='Automatically startup the nav2 stack',
+    )
 
     declare_use_composition_cmd = DeclareLaunchArgument(
-        'use_composition', default_value='True',
-        description='Whether to use composed bringup')
+        'use_composition',
+        default_value='True',
+        description='Whether to use composed bringup',
+    )
 
     declare_use_respawn_cmd = DeclareLaunchArgument(
-        'use_respawn', default_value='False',
-        description='Whether to respawn if a node crashes. Applied when composition is disabled.')
+        'use_respawn',
+        default_value='False',
+        description='Whether to respawn if a node crashes. Applied when composition is disabled.',
+    )
 
     declare_log_level_cmd = DeclareLaunchArgument(
-        'log_level', default_value='info',
-        description='log level')
+        'log_level', default_value='info', description='log level'
+    )
 
     # Specify the actions
-    bringup_cmd_group = GroupAction([
-        PushRosNamespace(
-            condition=IfCondition(use_namespace),
-            namespace=namespace),
-
-        Node(
-            condition=IfCondition(use_composition),
-            name='nav2_container',
-            package='rclcpp_components',
-            executable='component_container_isolated',
-            parameters=[configured_params, {'autostart': autostart}],
-            arguments=['--ros-args', '--log-level', log_level],
-            remappings=remappings,
-            output='screen'),
-
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(os.path.join(launch_dir, 'slam_launch.py')),
-            condition=IfCondition(slam),
-            launch_arguments={'namespace': namespace,
-                              'use_sim_time': use_sim_time,
-                              'autostart': autostart,
-                              'use_respawn': use_respawn,
-                              'params_file': params_file}.items()),
-
-        # 2D自己位置推定はcub_navigation 2d_localization.launch.pyに移動
-        # IncludeLaunchDescription(
-        #     PythonLaunchDescriptionSource(os.path.join(cub_navigation_launch_dir,
-        #                                                'nav2_localization_launch.py')),
-        #     condition=IfCondition(use_localization),
-        #     launch_arguments={'namespace': namespace,
-        #                       'map': map_yaml_file,
-        #                       'use_sim_time': use_sim_time,
-        #                       'autostart': autostart,
-        #                       'params_file': params_file,
-        #                       'use_composition': use_composition,
-        #                       'use_respawn': use_respawn,
-        #                       'container_name': 'nav2_container'}.items()),
-        
-        # 経路計画用の地図読み込み。
-        Node(
-            package='nav2_map_server',
-            executable='map_server',
-            name='map_server',
-            output='screen',
-            respawn=use_respawn,
-            respawn_delay=2.0,
-            parameters=[{'yaml_filename': map_yaml_file}],
-            arguments=['--ros-args', '--log-level', log_level],
-            remappings=remappings),
-        Node(
-            package='nav2_lifecycle_manager',
-            executable='lifecycle_manager',
-            name='lifecycle_manager',
-            output='screen',
-            emulate_tty=True,
-            parameters=[{'use_sim_time': False},
-                        {'autostart': True},
-                        {'node_names': ['map_server']}],
-        ),
-        
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(os.path.join(cub_navigation_launch_dir, 'nav2_navigation_launch.py')),
-            launch_arguments={'namespace': namespace,
-                              'use_sim_time': use_sim_time,
-                              'autostart': autostart,
-                              'params_file': params_file,
-                              'use_composition': use_composition,
-                              'use_respawn': use_respawn,
-                              'container_name': 'nav2_container'}.items()),
-    ])
+    bringup_cmd_group = GroupAction(
+        [
+            PushROSNamespace(condition=IfCondition(use_namespace), namespace=namespace),
+            Node(
+                condition=IfCondition(use_composition),
+                name='nav2_container',
+                package='rclcpp_components',
+                executable='component_container_isolated',
+                parameters=[configured_params, {'autostart': autostart}],
+                arguments=['--ros-args', '--log-level', log_level],
+                remappings=remappings,
+                output='screen',
+            ),
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    os.path.join(launch_dir, 'slam_launch.py')
+                ),
+                condition=IfCondition(PythonExpression([slam, ' and ', use_localization])),
+                launch_arguments={
+                    'namespace': namespace,
+                    'use_sim_time': use_sim_time,
+                    'autostart': autostart,
+                    'use_respawn': use_respawn,
+                    'params_file': params_file,
+                }.items(),
+            ),
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    os.path.join(launch_dir, 'localization_launch.py')
+                ),
+                condition=IfCondition(PythonExpression(['not ', slam, ' and ', use_localization])),
+                launch_arguments={
+                    'namespace': namespace,
+                    'map': map_yaml_file,
+                    'use_sim_time': use_sim_time,
+                    'autostart': autostart,
+                    'params_file': params_file,
+                    'use_composition': use_composition,
+                    'use_respawn': use_respawn,
+                    'container_name': 'nav2_container',
+                }.items(),
+            ),
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    os.path.join(launch_dir, 'navigation_launch.py')
+                ),
+                launch_arguments={
+                    'namespace': namespace,
+                    'use_sim_time': use_sim_time,
+                    'autostart': autostart,
+                    'params_file': params_file,
+                    'use_composition': use_composition,
+                    'use_respawn': use_respawn,
+                    'container_name': 'nav2_container',
+                }.items(),
+            ),
+        ]
+    )
 
     # Create the launch description and populate
     ld = LaunchDescription()
@@ -214,7 +209,6 @@ def generate_launch_description():
     ld.add_action(declare_namespace_cmd)
     ld.add_action(declare_use_namespace_cmd)
     ld.add_action(declare_slam_cmd)
-    ld.add_action(declare_use_localization_cmd)
     ld.add_action(declare_map_yaml_cmd)
     ld.add_action(declare_use_sim_time_cmd)
     ld.add_action(declare_params_file_cmd)
@@ -222,6 +216,7 @@ def generate_launch_description():
     ld.add_action(declare_use_composition_cmd)
     ld.add_action(declare_use_respawn_cmd)
     ld.add_action(declare_log_level_cmd)
+    ld.add_action(declare_use_localization_cmd)
 
     # Add the actions to launch all of the navigation nodes
     ld.add_action(bringup_cmd_group)
