@@ -44,7 +44,7 @@ def generate_launch_description():
     use_respawn = LaunchConfiguration('use_respawn')
     log_level = LaunchConfiguration('log_level')
 
-    lifecycle_nodes = ['map_server', 'amcl']
+    lifecycle_nodes = ['map_localization_server', 'amcl']
 
     # Map fully qualified names to relative ones so the node's namespace can be prepended.
     # In case of the transforms (tf), currently, there doesn't seem to be a better alternative
@@ -52,7 +52,7 @@ def generate_launch_description():
     # https://github.com/ros/robot_state_publisher/pull/30
     # TODO(orduno) Substitute with `PushNodeRemapping`
     #              https://github.com/ros2/launch_ros/issues/56
-    remappings = [('/tf', 'tf'), ('/tf_static', 'tf_static')]
+    remappings = [('/tf', 'tf'), ('/tf_static', 'tf_static'), ('/map', '/map_localization')] # 自己位置推定用の地図を経路計画用と分離してる
 
     configured_params = ParameterFile(
         RewrittenYaml(
@@ -73,7 +73,7 @@ def generate_launch_description():
     )
 
     declare_map_yaml_cmd = DeclareLaunchArgument(
-        'map', default_value='', description='Full path to map yaml file to load'
+        'map', default_value='', description='Full path to map for localization yaml file to load'
     )
 
     declare_use_sim_time_cmd = DeclareLaunchArgument(
@@ -126,7 +126,7 @@ def generate_launch_description():
                 ),
                 package='nav2_map_server',
                 executable='map_server',
-                name='map_server',
+                name='map_localization_server',
                 output='screen',
                 respawn=use_respawn,
                 respawn_delay=2.0,
@@ -140,7 +140,7 @@ def generate_launch_description():
                 ),
                 package='nav2_map_server',
                 executable='map_server',
-                name='map_server',
+                name='map_localization_server',
                 output='screen',
                 respawn=use_respawn,
                 respawn_delay=2.0,
@@ -187,7 +187,7 @@ def generate_launch_description():
                     ComposableNode(
                         package='nav2_map_server',
                         plugin='nav2_map_server::MapServer',
-                        name='map_server',
+                        name='map_localization_server',
                         parameters=[configured_params],
                         remappings=remappings,
                     ),
@@ -202,7 +202,7 @@ def generate_launch_description():
                     ComposableNode(
                         package='nav2_map_server',
                         plugin='nav2_map_server::MapServer',
-                        name='map_server',
+                        name='map_localization_server',
                         parameters=[
                             configured_params,
                             {'yaml_filename': map_yaml_file},

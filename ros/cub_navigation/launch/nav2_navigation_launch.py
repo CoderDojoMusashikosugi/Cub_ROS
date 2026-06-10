@@ -192,6 +192,15 @@ def generate_launch_description():
                 remappings=remappings,
             ),
             Node(
+                package='cub_behavior_tree',
+                executable='front_target_server',
+                name='front_target_server',
+                output='screen',
+                respawn=use_respawn,
+                respawn_delay=2.0,
+                parameters=[configured_params],
+                arguments=['--ros-args', '--log-level', log_level],),
+            Node(
                 package='nav2_waypoint_follower',
                 executable='waypoint_follower',
                 name='waypoint_follower',
@@ -333,6 +342,12 @@ def generate_launch_description():
                             {'autostart': autostart, 'node_names': lifecycle_nodes}
                         ],
                     ),
+                    ComposableNode(
+                        package='cub_behavior_tree',
+                        plugin='cub_behavior_tree::FrontTargetServer',
+                        name='front_target_server',
+                        parameters=[configured_params],
+                        remappings=remappings),
                 ],
             ),
         ],

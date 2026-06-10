@@ -101,7 +101,7 @@ def generate_launch_description():
     )
 
     declare_use_localization_cmd = DeclareLaunchArgument(
-        'use_localization', default_value='True',
+        'use_localization', default_value='False', # 公式ではTrueだったが、Cubでは自己位置推定は別のlaunchファイルで起動するためFalseに。
         description='Whether to enable localization or not'
     )
 
@@ -166,21 +166,45 @@ def generate_launch_description():
                     'params_file': params_file,
                 }.items(),
             ),
-            IncludeLaunchDescription(
-                PythonLaunchDescriptionSource(
-                    os.path.join(launch_dir, 'localization_launch.py')
-                ),
-                condition=IfCondition(PythonExpression(['not ', slam, ' and ', use_localization])),
-                launch_arguments={
-                    'namespace': namespace,
-                    'map': map_yaml_file,
-                    'use_sim_time': use_sim_time,
-                    'autostart': autostart,
-                    'params_file': params_file,
-                    'use_composition': use_composition,
-                    'use_respawn': use_respawn,
-                    'container_name': 'nav2_container',
-                }.items(),
+            # cubではここでlocalizationはしない。もっと上の方でlocalizationの方法を切り替えてる。
+            # IncludeLaunchDescription(
+            #     PythonLaunchDescriptionSource(
+            #         os.path.join(launch_dir, 'localization_launch.py')
+            #     ),
+            #     condition=IfCondition(PythonExpression(['not ', slam, ' and ', use_localization])),
+            #     launch_arguments={
+            #         'namespace': namespace,
+            #         'map': map_yaml_file,
+            #         'use_sim_time': use_sim_time,
+            #         'autostart': autostart,
+            #         'params_file': params_file,
+            #         'use_composition': use_composition,
+            #         'use_respawn': use_respawn,
+            #         'container_name': 'nav2_container',
+            #     }.items(),
+            # ),
+            # 経路計画用の地図読み込み。
+            Node(# 自己位置推定関係のコードが無効の場合は誰も地図を出さなくなってしまう。代わりにここで出す。
+                condition=IfCondition(PythonExpression(['not ', slam, ' and ', 'not ', use_localization])),
+                package='nav2_map_server',
+                executable='map_server',
+                name='map_server',
+                output='screen',
+                respawn=use_respawn,
+                respawn_delay=2.0,
+                parameters=[{'yaml_filename': map_yaml_file}],
+                arguments=['--ros-args', '--log-level', log_level],
+                remappings=remappings),
+            Node(
+                condition=IfCondition(PythonExpression(['not ', slam, ' and ', 'not ', use_localization])),
+                package='nav2_lifecycle_manager',
+                executable='lifecycle_manager',
+                name='lifecycle_manager',
+                output='screen',
+                emulate_tty=True,
+                parameters=[{'use_sim_time': False},
+                            {'autostart': True},
+                            {'node_names': ['map_server']}],
             ),
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
