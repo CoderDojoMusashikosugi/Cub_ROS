@@ -45,5 +45,26 @@ Terminal=false
 X-GNOME-Autostart-enabled=true
 EOF
 
+#元のswapを止めて、swapを増やす。
+systemctl stop dphys-swapfile.service
+systemctl disable dphys-swapfile.service
+
+if [ ! -f /swapfile ]; then
+    dd if=/dev/zero of=/swapfile bs=1M count=4096
+    chmod 600 /swapfile
+    mkswap /swapfile
+    swapon /swapfile
+    echo '/swapfile none swap sw 0 0' | tee -a /etc/fstab
+fi
+
+# NTFSのUSB-SSDをntfs3でマウントするよう設定
+cat > /etc/udisks2/mount_options.conf <<'EOF'
+[defaults]
+ntfs_defaults=uid=$UID,gid=$GID,noatime,prealloc,force
+ntfs_allow=uid=$UID,gid=$GID,umask,dmask,fmask,locale,norecovery,ignore_case,windows_names,compression,nocompression,big_writes,show_sys_files,case_insensitive,prealloc,discard,force
+EOF
+
+sudo systemctl restart udisks2
+
 echo "setting completed. reboot to apply."
 

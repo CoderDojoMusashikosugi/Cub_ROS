@@ -20,6 +20,10 @@ def generate_launch_description():
 
     print("file://" + os.path.join(get_package_share_directory('handy2_bringup'), 'config', 'rpgsc.yaml'))
 
+
+    lidar_config=get_package_share_directory('handy2_bringup')+'/config/jt128-config.yaml'
+    print("lidar config:", lidar_config);
+
     return LaunchDescription([
         Node(
             package='handy2_bringup',
@@ -47,6 +51,13 @@ def generate_launch_description():
                 'shutter_offset_us': 0,
             }],
         ),
+        Node(
+            namespace='hesai_ros_driver', 
+            package='hesai_ros_driver', 
+            executable='hesai_ros_driver_node', 
+            output='screen',
+            parameters=[{'config_path': lidar_config}]
+        ),
         TimerAction(
             period=2.0,
             actions=[
@@ -67,6 +78,12 @@ def generate_launch_description():
                                 'camera_info_url': "file://" + os.path.join(get_package_share_directory('handy2_bringup'), 'config', 'rpgsc.yaml'),
                                 'role': 'video',
                                 'frame_id': 'gs_camera',
+                                'ExposureTimeMode': 1, # 1: manual 0: auto
+                                'AwbEnable': False,
+                                'ColourGains': [2.56, 2.08],
+                                'AeEnable': False,
+                                'AnalogueGainMode': 1, # 1: manual 0: auto
+                                'AnalogueGain': 4.6,
                             }],
                             remappings=[('image_raw', '/camera_node/image_raw')],
                             extra_arguments=[{'use_intra_process_comms': True}],
