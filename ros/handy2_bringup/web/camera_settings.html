@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Camera Settings</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 0;
+            padding: 10px;
+            background-color: #f0f0f0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            box-sizing: border-box;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .video-container {
+            flex: 1;
+            background-color: #000;
+            position: relative;
+            overflow: hidden;
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        #video-feed {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+        .controls-container {
+            padding: 10px 0;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
+            overflow-y: auto;
+        }
+        @media (min-width: 768px) {
+            body {
+                flex-direction: row;
+                gap: 20px;
+            }
+            .video-container {
+                flex: 2;
+            }
+            .controls-container {
+                flex: 1;
+                grid-template-columns: 1fr;
+            }
+        }
+        .control-group {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .control-group h3 {
+            margin: 0 0 10px 0;
+            font-size: 1.1em;
+            color: #444;
+        }
+        .control-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .control-row input {
+            flex: 1;
+            padding: 8px;
+            font-size: 1em;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        .btn-group {
+            display: flex;
+            gap: 5px;
+        }
+        button {
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            background-color: #3498db;
+            color: white;
+            cursor: pointer;
+            font-size: 1em;
+        }
+        button:active {
+            opacity: 0.8;
+        }
+        .btn-large {
+            width: 100%;
+            font-weight: bold;
+            padding: 15px;
+        }
+        .btn-wb-active {
+            background-color: #e74c3c;
+        }
+        .back-link {
+            text-decoration: none;
+            color: #3498db;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="video-container">
+        <img id="video-feed" src="/video_feed" alt="Video Feed">
+    </div>
+
+    <div class="controls-container">
+        <div class="header">
+            <a href="/" class="back-link">← Back to Main</a>
+            <h2>Camera Settings</h2>
+            <button id="refresh_btn" style="padding: 5px 10px; background-color: #95a5a6;">Refresh</button>
+        </div>
+
+        <!-- Shutter Speed -->
+        <div class="control-group">
+            <h3>Shutter Speed (us)</h3>
+            <div class="control-row">
+                <input type="number" id="shutter_input" step="100">
+                <div class="btn-group">
+                    <button id="shutter_up">▲</button>
+                    <button id="shutter_down">▼</button>
+                </div>
+            </div>
+            <button class="btn-large" id="shutter_apply">Apply Shutter</button>
+        </div>
+
+        <!-- Exposure (Analogue Gain) -->
+        <div class="control-group">
+            <h3>Analogue Gain</h3>
+            <div class="control-row">
+                <input type="number" id="gain_input" step="0.1">
+                <div class="btn-group">
+                    <button id="gain_up">▲</button>
+                    <button id="gain_down">▼</button>
+                </div>
+            </div>
+            <button class="btn-large" id="gain_apply">Apply Gain</button>
+        </div>
+
+        <!-- White Balance -->
+        <div class="control-group">
+            <h3>White Balance</h3>
+            <div class="control-row">
+                <label>Gains:</label>
+                <input type="text" id="wb_gains_input" placeholder="[R, B]">
+            </div>
+            <button class="btn-large" id="wb_toggle">Start Auto WB</button>
+            <div id="wb_status" style="margin-top: 5px; font-size: 0.9em; color: #666;">
+                Status: Manual
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let params = {};
+        let isAwbActive = false;
+
+        async function fetchParams() {
+            try {
+                const resp = await fetch('/camera/get_params');
+                if (!resp.ok) throw new Error("Server error");
+                params = await resp.json();
+                
+                if (params.shutter_on_us !== undefined && params.shutter_on_us !== null) {
+                    document.getElementById('shutter_input').value = params.shutter_on_us;
+                }
+                if (params.AnalogueGain !== undefined && params.AnalogueGain !== null) {
+                    document.getElementById('gain_input').value = params.AnalogueGain;
+                }
+                if (params.ColourGains !== undefined && params.ColourGains !== null) {
+                    document.getElementById('wb_gains_input').value = JSON.stringify(params.ColourGains);
+                }
+                
+                if (params.AwbEnable !== undefined && params.AwbEnable !== null) {
+                    isAwbActive = params.AwbEnable;
+                    updateWbUI();
+                }
+            } catch (e) {
+                console.error("Failed to fetch params", e);
+            }
+        }
+
+        document.getElementById('refresh_btn').onclick = fetchParams;
+
+        async function setParam(node, param, value) {
+            try {
+                const resp = await fetch('/camera/set_param', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({node, param, value})
+                });
+                if (!resp.ok) {
+                    const text = await resp.text();
+                    alert("Error: " + text);
+                }
+            } catch (e) {
+                console.error("Failed to set param", e);
+            }
+        }
+
+        function updateWbUI() {
+            const btn = document.getElementById('wb_toggle');
+            const status = document.getElementById('wb_status');
+            if (isAwbActive) {
+                btn.textContent = "Stop & Lock WB";
+                btn.classList.add('btn-wb-active');
+                status.textContent = "Status: Auto (Adjusting...)";
+            } else {
+                btn.textContent = "Start Auto WB";
+                btn.classList.remove('btn-wb-active');
+                status.textContent = "Status: Locked";
+            }
+        }
+
+        // Shutter events
+        document.getElementById('shutter_apply').onclick = () => {
+            const val = parseInt(document.getElementById('shutter_input').value);
+            setParam('/pico_node', 'shutter_on_us', val);
+        };
+        document.getElementById('shutter_up').onclick = () => {
+            const input = document.getElementById('shutter_input');
+            input.value = Math.round(parseFloat(input.value) * 1.1);
+        };
+        document.getElementById('shutter_down').onclick = () => {
+            const input = document.getElementById('shutter_input');
+            input.value = Math.round(parseFloat(input.value) / 1.1);
+        };
+
+        // Gain events
+        document.getElementById('gain_apply').onclick = () => {
+            const val = parseFloat(document.getElementById('gain_input').value);
+            setParam('/camera_node', 'AnalogueGain', val);
+        };
+        document.getElementById('gain_up').onclick = () => {
+            const input = document.getElementById('gain_input');
+            input.value = (parseFloat(input.value) * 1.1).toFixed(2);
+        };
+        document.getElementById('gain_down').onclick = () => {
+            const input = document.getElementById('gain_input');
+            input.value = (parseFloat(input.value) / 1.1).toFixed(2);
+        };
+
+        // White Balance events
+        document.getElementById('wb_toggle').onclick = async () => {
+            if (!isAwbActive) {
+                // Start Auto WB
+                await setParam('/camera_node', 'AwbEnable', true);
+                isAwbActive = true;
+                updateWbUI();
+            } else {
+                // Stop & Lock WB
+                // First get current diagnostics
+                try {
+                    const resp = await fetch('/camera/get_diagnostics');
+                    const diag = await resp.json();
+                    const currentGains = diag.ColourGains;
+                    
+                    // Set AwbEnable to false
+                    await setParam('/camera_node', 'AwbEnable', false);
+                    // Set ColourGains
+                    await setParam('/camera_node', 'ColourGains', currentGains);
+                    
+                    document.getElementById('wb_gains_input').value = JSON.stringify(currentGains);
+                    isAwbActive = false;
+                    updateWbUI();
+                } catch (e) {
+                    alert("Failed to lock WB: " + e);
+                }
+            }
+        };
+
+        // Enable streaming and fetch params immediately (do not wait for window.onload because image stream blocks it)
+        (async () => {
+            // Force refresh video feed with cache buster
+            document.getElementById('video-feed').src = '/video_feed?t=' + Date.now();
+            try {
+                await fetch('/streaming/enable', {method: 'POST'});
+            } catch (e) {
+                console.error("Enable streaming error:", e);
+            }
+            fetchParams();
+        })();
+    </script>
+</body>
+</html>

@@ -18,23 +18,117 @@ class MinimalPublisher : public rclcpp::Node
 {
 public:
   MinimalPublisher()
-  : Node("minimal_publisher")
+  : Node("pico_node")
   {
     this->declare_parameter("shutter_on_us", shutter_on_us_default_);
     this->declare_parameter("shutter_offset_us", shutter_offset_us_default_);
     shutter_on_us_ = this->get_parameter("shutter_on_us").as_int();
     shutter_offset_us_ = this->get_parameter("shutter_offset_us").as_int();
-    std::cout << "Setting Shutter Params: ON=" << shutter_on_us_ << "us, Offset=" << shutter_offset_us_ << "us" << std::endl;
+    RCLCPP_INFO(this->get_logger(), "Setting Shutter Params: ON=%d us, Offset=%d us", shutter_on_us_, shutter_offset_us_);
 
-    while (!picoComm::init()) {
-        std::cout << "failed to initialize picoComm, retrying in 1 second..." << std::endl;
-        std::this_thread::sleep_for(1s);
-    }
-    std::cout << "picoComm initialized successfully." << std::endl;
+    // Register parameter change callback
+    callback_handle_ = this->add_on_set_parameters_callback(
+      [this](const std::vector<rclcpp::Parameter> & parameters) {
+        rcl_interfaces::msg::SetParametersResult result;
+        result.successful = true;
 
-    if (!picoComm::set_shutter_params(shutter_on_us_, shutter_offset_us_)) {
-        std::cerr << "Failed to set shutter params." << std::endl;
-    }
+        uint32_t target_on_us = shutter_on_us_;
+        uint32_t target_offset_us = shutter_offset_us_;
+        bool changed = false;
+
+        for (const auto & parameter : parameters) {
+          if (parameter.get_name() == "shutter_on_us") {
+            if (parameter.get_type() == rclcpp::ParameterType::PARAMETER_INTEGER) {
+              target_on_us = parameter.as_int();
+              changed = true;
+            }
+          } else if (parameter.get_name() == "shutter_offset_us") {
+            if (parameter.get_type() == rclcpp::ParameterType::PARAMETER_INTEGER) {
+              target_offset_us = parameter.as_int();
+              changed = true;
+            }
+          }
+        }
+
+        if (changed && initialized_) {
+          bool verified = false;
+          int retries = 5; // Increased retries for robustness against firmware race
+          while (retries-- > 0) {
+            if (picoComm::set_shutter_params(target_on_us, target_offset_us)) {
+              // Wait for Pico to potentially overwrite or for sysfs to settle
+              std::this_thread::sleep_for(100ms); 
+              
+              uint32_t read_on, read_offset;
+              if (picoComm::read_shutter_params(read_on, read_offset)) {
+                if (read_on == target_on_us && read_offset == target_offset_us) {
+                  verified = true;
+                  break;
+                } else {
+                  RCLCPP_WARN(this->get_logger(), "Verification failed: Expected ON=%u, Offset=%u but got ON=%u, Offset=%u. Retrying...", 
+                    target_on_us, target_offset_us, read_on, read_offset);
+                }
+              } else {
+                RCLCPP_WARN(this->get_logger(), "Failed to read back parameters for verification. Retrying...");
+              }
+            } else {
+              RCLCPP_WARN(this->get_logger(), "Failed to write parameters to Pico. Retrying...");
+            }
+            std::this_thread::sleep_for(150ms);
+          }
+
+          if (verified) {
+            shutter_on_us_ = target_on_us;
+            shutter_offset_us_ = target_offset_us;
+            RCLCPP_INFO(this->get_logger(), "Shutter params updated and verified: ON=%d us, Offset=%d us", shutter_on_us_, shutter_offset_us_);
+          } else {
+            result.successful = false;
+            result.reason = "Failed to verify parameter update on hardware after retries. Hardware may be overriding values.";
+            RCLCPP_ERROR(this->get_logger(), "%s", result.reason.c_str());
+          }
+        } else if (changed && !initialized_) {
+          shutter_on_us_ = target_on_us;
+          shutter_offset_us_ = target_offset_us;
+        }
+
+        return result;
+      });
+
+    // Use a timer to retry init without blocking constructor
+    init_timer_ = this->create_wall_timer(
+      1s,
+      [this]() {
+        if (!picoComm::init()) {
+          RCLCPP_WARN(this->get_logger(), "failed to initialize picoComm, retrying in 1 second...");
+          return;
+        }
+        RCLCPP_INFO(this->get_logger(), "picoComm initialized successfully.");
+        initialized_ = true;
+        
+        // Initial application of parameters with verification
+        bool verified = false;
+        int retries = 5;
+        while (retries-- > 0) {
+            if (picoComm::set_shutter_params(shutter_on_us_, shutter_offset_us_)) {
+                std::this_thread::sleep_for(100ms);
+                uint32_t read_on, read_offset;
+                if (picoComm::read_shutter_params(read_on, read_offset) && 
+                    read_on == shutter_on_us_ && read_offset == shutter_offset_us_) {
+                    verified = true;
+                    break;
+                }
+            }
+            std::this_thread::sleep_for(150ms);
+        }
+
+        if (verified) {
+            RCLCPP_INFO(this->get_logger(), "Initial shutter params applied and verified.");
+        } else {
+            RCLCPP_ERROR(this->get_logger(), "Failed to verify initial shutter params. Hardware might be reverting them.");
+        }
+
+        // Cancel timer once initialized
+        init_timer_->cancel();
+      });
   }
 
 private:
@@ -42,12 +136,17 @@ private:
   const int shutter_on_us_default_ = 2000;
   uint32_t shutter_offset_us_;
   const int shutter_offset_us_default_ = 0;
+  bool initialized_ = false;
+  OnSetParametersCallbackHandle::SharedPtr callback_handle_;
+  rclcpp::TimerBase::SharedPtr init_timer_;
 };
 
 int main(int argc, char * argv[])
 {
   rclcpp::init(argc, argv);
-  rclcpp::spin(std::make_shared<MinimalPublisher>());
+  auto node = std::make_shared<MinimalPublisher>();
+  RCLCPP_INFO(node->get_logger(), "pico_node is now spinning!");
+  rclcpp::spin(node);
   rclcpp::shutdown();
   return 0;
 }

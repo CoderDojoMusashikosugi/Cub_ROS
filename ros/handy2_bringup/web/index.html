@@ -68,11 +68,6 @@
             margin-top: 10px;
             font-size: 1.2em;
         }
-        #sync-status {
-            margin-top: 6px;
-            font-size: 1.1em;
-            color: #333;
-        }
         .shutdown-container {
             margin-top: 40px;
         }
@@ -121,11 +116,13 @@
             <pre id="log"></pre>
         </div>
         <div id="status">WebSocket: Disconnected</div>
-        <div id="sync-status">Sync: -</div>
     </div>
 
     <div class="shutdown-container" style="margin-top: 40px; text-align: center;">
         <button id="shutdownBtn" style="background-color: #e67e22; width: 45%; height: 100px;">Shutdown Host</button>
+        <div style="margin-top: 20px;">
+            <a href="/camera_settings" style="font-size: 1.5em; color: #3498db; text-decoration: none; font-weight: bold;">Camera Settings</a>
+        </div>
     </div>
 
     <!-- Fullscreen Modal for Live View -->
@@ -140,7 +137,6 @@
         const logElement = document.getElementById('log');
         const statusElement = document.getElementById('status');
         const shutdownBtn = document.getElementById('shutdownBtn');
-        const syncStatusElement = document.getElementById('sync-status');
         const liveViewBtn = document.getElementById('liveViewBtn');
         const fullscreenModal = document.getElementById('fullscreen-modal');
         const fullscreenImg = document.getElementById('fullscreen-img');
@@ -223,19 +219,6 @@
 
             ws.onmessage = (event) => {
                 const data = event.data || '';
-                if (typeof data === 'string' && data.startsWith('SYNC_STATUS::')) {
-                    const label = data.split('::')[1] || '-';
-                    syncStatusElement.textContent = `Sync: ${label}`;
-                    // Optional coloring
-                    if (label === 'NO') {
-                        syncStatusElement.style.color = 'red';
-                    } else if (label === 'PTP' || label === 'GPS') {
-                        syncStatusElement.style.color = 'green';
-                    } else {
-                        syncStatusElement.style.color = '#333';
-                    }
-                    return; // Do not log this control message
-                }
                 logElement.innerHTML += data;
                 logContainer.scrollTop = logContainer.scrollHeight; // Auto-scroll
             };
@@ -257,3 +240,4 @@
     </script>
 </body>
 </html>
+

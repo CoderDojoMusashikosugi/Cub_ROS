@@ -4,6 +4,7 @@ from rclpy.node import Node
 import threading
 import subprocess
 import asyncio
+import time
 """
 Compatibility shim for Python 3.10 + old websockets (<=9.x):
 websockets 9.x passes loop=... to asyncio.Lock(), which raises on 3.10.
@@ -39,32 +40,166 @@ import websockets
 import json
 import os
 import signal
-from flask import Flask, send_from_directory, Response
+from flask import Flask, send_from_directory, Response, request
 from ament_index_python.packages import get_package_share_directory
-from std_msgs.msg import Int32
 from sensor_msgs.msg import CompressedImage
+from diagnostic_msgs.msg import DiagnosticArray
+from rcl_interfaces.msg import Parameter, ParameterValue, ParameterType
+
+import logging
+logging.basicConfig(level=logging.DEBUG)
 
 # Global variables
 rosbag_process = None
-log_tail_process = None
 websocket_clients = set()
 asyncio_loop = None
 ws_port_actual = None
 WS_PORT_DEFAULT = int(os.environ.get('HANDY2_WS_PORT', '8766'))
-# Latest sync status label (e.g., "NO", "PTP", "GPS") for initial push to clients
-latest_sync_label = None
+
+latest_colour_gains = None
+diagnostics_lock = threading.Lock()
+
+# Cached parameters
+cached_params = {
+    'AnalogueGain': None,
+    'AwbEnable': None,
+    'ColourGains': None,
+    'shutter_on_us': None,
+    'shutter_offset_us': None
+}
+params_lock = threading.Lock()
+
+debug_info = {
+    "image_count": 0,
+    "diag_count": 0,
+    "last_image_time": 0,
+    "last_diag_time": 0,
+    "streaming_enabled_bool": False
+}
+debug_lock = threading.Lock()
 
 # Flask App
 app = Flask(__name__)
 web_dir = os.path.join(get_package_share_directory('handy2_bringup'), 'web')
 
+@app.route('/debug/status')
+def debug_status():
+    with debug_lock:
+        info = debug_info.copy()
+    with streaming_lock:
+        info["streaming_enabled_global"] = streaming_enabled
+    return json.dumps(info), 200, {"Content-Type": "application/json"}
+
 @app.route('/')
 def index():
     return send_from_directory(web_dir, 'index.html')
 
+@app.route('/camera_settings')
+def camera_settings_page():
+    return send_from_directory(web_dir, 'camera_settings.html')
+
 @app.route('/<path:path>')
 def send_web_files(path):
     return send_from_directory(web_dir, path)
+
+def param_polling_thread():
+    """Background thread to slowly poll parameters and update the cache without blocking the UI."""
+    while True:
+        try:
+            updates = {}
+            # Camera Node params
+            for p in ['AnalogueGain', 'AwbEnable', 'ColourGains']:
+                res = subprocess.run(['ros2', 'param', 'get', '/camera_node', p], capture_output=True, text=True)
+                if res.returncode == 0:
+                    line = res.stdout.strip()
+                    if ':' in line:
+                        val_part = line.split(':', 1)[-1].strip()
+                        if "Double value" in line or "Double values" in line:
+                            if '[' in val_part:
+                                updates[p] = json.loads(val_part)
+                            else:
+                                updates[p] = float(val_part)
+                        elif "Boolean value" in line:
+                            updates[p] = val_part.lower() == 'true'
+            
+            # Pico Node params
+            for p in ['shutter_on_us', 'shutter_offset_us']:
+                res = subprocess.run(['ros2', 'param', 'get', '/pico_node', p], capture_output=True, text=True)
+                if res.returncode == 0:
+                    line = res.stdout.strip()
+                    if ':' in line:
+                        val_part = line.split(':', 1)[-1].strip()
+                        if "Integer value" in line:
+                            updates[p] = int(val_part)
+                            
+            with params_lock:
+                cached_params.update(updates)
+                
+        except Exception as e:
+            app.logger.error(f"Param polling error: {e}")
+            
+        time.sleep(5)  # Poll every 5 seconds
+
+# Camera Parameter Endpoints
+@app.route('/camera/get_params')
+def get_camera_params():
+    if not hasattr(app, 'ros_node'):
+        return "ROS node not initialized", 500
+    
+    with params_lock:
+        params_copy = cached_params.copy()
+        
+    with diagnostics_lock:
+        params_copy['latest_colour_gains'] = latest_colour_gains
+        
+    return json.dumps(params_copy), 200, {"Content-Type": "application/json"}
+
+@app.route('/camera/set_param', methods=['POST'])
+def set_camera_param():
+    data = request.json
+    node = data.get('node')
+    param = data.get('param')
+    value = data.get('value')
+    
+    if not node or not param:
+        return "Missing node or param", 400
+        
+    try:
+        cmd = ['ros2', 'param', 'set', node, param]
+        
+        # Enforce type casting for known double parameters because JS sends whole numbers as ints
+        # and ros2 param set will reject "100" for a double, requiring "100.0".
+        if param in ['AnalogueGain'] and isinstance(value, (int, float)):
+            value = float(value)
+            
+        if isinstance(value, bool):
+            cmd.append(str(value).lower())
+        elif isinstance(value, list):
+            cmd.append(json.dumps(value))
+        elif isinstance(value, float):
+            # Ensure it always has a decimal point even if it's a whole number
+            cmd.append(f"{value:.1f}" if value.is_integer() else str(value))
+        else:
+            cmd.append(str(value))
+            
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        
+        # ros2 param set returns 0 even if it fails, so we must check stdout
+        if res.returncode == 0 and "Setting parameter failed" not in res.stdout:
+            # Optimistically update the cache so the UI sees it immediately
+            with params_lock:
+                cached_params[param] = value
+            return "Param set successfully", 200
+        else:
+            error_msg = res.stdout if "Setting parameter failed" in res.stdout else res.stderr
+            return error_msg, 500
+    except Exception as e:
+        return str(e), 500
+
+@app.route('/camera/get_diagnostics')
+def get_camera_diagnostics():
+    with diagnostics_lock:
+        return json.dumps({"ColourGains": latest_colour_gains}), 200, {"Content-Type": "application/json"}
 
 # Video streaming
 latest_jpeg_data = None
@@ -79,28 +214,33 @@ def gen_frames():
             enabled = streaming_enabled
         
         if not enabled:
-            # Send a blank frame when streaming is disabled
+            # Send a very small blank or "paused" frame would be better, but sleep for now
             import time
-            time.sleep(0.1)
+            time.sleep(0.5)
             continue
             
+        frame = None
         with jpeg_lock:
             if latest_jpeg_data is not None:
                 frame = latest_jpeg_data
-            else:
-                frame = None
         
         if frame:
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+            import time
+            time.sleep(0.06) # Slightly slower to be safer (approx 15-18 fps)
         else:
-            pass
-            
-        import time
-        time.sleep(0.04) # Limit to approx 25 fps
+            import time
+            time.sleep(0.1)
 
 @app.route('/video_feed')
 def video_feed():
+    # Automatically enable streaming when the feed is requested
+    global streaming_enabled
+    with streaming_lock:
+        streaming_enabled = True
+    if hasattr(app, 'ros_node'):
+        app.ros_node.enable_streaming()
     return Response(gen_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 @app.route('/ws_port')
@@ -139,7 +279,7 @@ def disable_streaming():
 
 @app.route('/start_rosbag')
 def start_rosbag():
-    global rosbag_process, log_tail_process
+    global rosbag_process
     if rosbag_process and rosbag_process.poll() is None:
         return "Rosbag is already running.", 400
     
@@ -151,12 +291,17 @@ def start_rosbag():
         command = ['ros2', 'launch', 'handy2_bringup', 'rosbag.launch.py']
         rosbag_process = subprocess.Popen(
             command,
-            stdout=subprocess.PIPE, # We don't stream this anymore, but capturing avoids noise
+            stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
             bufsize=1,
             universal_newlines=True
         )
+        
+        # Start streaming output
+        output_thread = threading.Thread(target=read_process_output, args=(rosbag_process,))
+        output_thread.daemon = True
+        output_thread.start()
         
         return "Rosbag recording started.", 200
     except Exception as e:
@@ -168,7 +313,8 @@ def start_rosbag():
 
 @app.route('/stop_rosbag')
 def stop_rosbag():
-    global rosbag_process, log_tail_process
+    global rosbag_process
+
     
     # Stop rosbag process
     if rosbag_process and rosbag_process.poll() is None:
@@ -229,43 +375,10 @@ def read_process_output(process):
                 asyncio.run_coroutine_threadsafe(broadcast_message(line), asyncio_loop)
         process.stdout.close()
 
-def start_log_tailing():
-    global log_tail_process
-    if log_tail_process and log_tail_process.poll() is None:
-        return
-    
-    try:
-        # Ensure log file exists
-        subprocess.run(['touch', '/home/cub/launch.log'])
-
-        # Start tail process for logs
-        tail_cmd = ['tail', '-f', '/home/cub/launch.log']
-        log_tail_process = subprocess.Popen(
-            tail_cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1,
-            universal_newlines=True
-        )
-
-        # Thread to read TAIL output and broadcast
-        output_thread = threading.Thread(target=read_process_output, args=(log_tail_process,))
-        output_thread.daemon = True
-        output_thread.start()
-    except Exception as e:
-        print(f"Failed to start log tailing: {e}")
-
 # WebSocket Server
 async def websocket_handler(websocket, path=None):
     websocket_clients.add(websocket)
     try:
-        # Send initial sync status to newly connected client
-        if latest_sync_label is not None:
-            try:
-                await websocket.send(f"SYNC_STATUS::{latest_sync_label}")
-            except Exception:
-                pass
         await websocket.wait_closed()
     finally:
         websocket_clients.remove(websocket)
@@ -335,22 +448,52 @@ class WebControlNode(Node):
         ws_thread.start()
         self.get_logger().info('WebSocket server thread started (dynamic port). Open /ws_port for actual port.')
 
-        # Start log tailing
-        start_log_tailing()
-        
-        # Subscribe to livox/time_type to monitor sync state
-        self._last_time_type = None
-        self._time_type_sub = self.create_subscription(Int32, 'livox/time_type', self._on_time_type, 10)
+        # Run Parameter Polling thread
+        param_thread = threading.Thread(target=param_polling_thread)
+        param_thread.daemon = True
+        param_thread.start()
+        self.get_logger().info('Parameter polling thread started.')
 
         # Image subscription (initially None, created on demand)
         self._image_sub = None
         
+        # Diagnostics subscription
+        self._diagnostics_sub = self.create_subscription(
+            DiagnosticArray,
+            '/diagnostics',
+            self._on_diagnostics,
+            10
+        )
+        
         # Register this node with the Flask app for streaming control
         app.ros_node = self
 
+    def _on_diagnostics(self, msg):
+        global latest_colour_gains
+        with debug_lock:
+            debug_info["diag_count"] += 1
+            debug_info["last_diag_time"] = time.time()
+            
+        for status in msg.status:
+            is_camera = "imx296" in status.hardware_id or any(v.key == "ColourGains" for v in status.values)
+            if is_camera:
+                for val in status.values:
+                    if val.key == "ColourGains":
+                        try:
+                            gains_str = val.value.replace('[', '').replace(']', '').replace(',', ' ')
+                            gains = [float(x) for x in gains_str.split()]
+                            if len(gains) == 2:
+                                with diagnostics_lock:
+                                    latest_colour_gains = gains
+                        except Exception as e:
+                            self.get_logger().error(f"Failed to parse ColourGains: {e}")
+
     def enable_streaming(self):
         """Enable image streaming by creating subscription."""
+        with debug_lock:
+            debug_info["streaming_enabled_bool"] = True
         if self._image_sub is None:
+            # ... (rest unchanged)
             self._image_sub = self.create_subscription(
                 CompressedImage,
                 '/camera_node/image_raw/compressed',
@@ -371,30 +514,13 @@ class WebControlNode(Node):
     
     def _on_image_compressed(self, msg):
         global latest_jpeg_data
+        with debug_lock:
+            debug_info["image_count"] += 1
+            debug_info["last_image_time"] = time.time()
         with jpeg_lock:
             latest_jpeg_data = msg.data
 
-    def _on_time_type(self, msg: Int32):
-        global latest_sync_label
-        value = int(msg.data)
-        if value == 0:
-            label = 'NO'
-        elif value == 1:
-            label = 'PTP'
-        elif value == 2:
-            label = 'GPS'
-        else:
-            label = f'UNKNOWN({value})'
 
-        # Only broadcast when changed
-        if label != latest_sync_label:
-            latest_sync_label = label
-            self.get_logger().info(f'Livox Sync state: {label}')
-            if asyncio_loop:
-                asyncio.run_coroutine_threadsafe(
-                    broadcast_message(f"SYNC_STATUS::{label}"),
-                    asyncio_loop
-                )
 def main(args=None):
     rclpy.init(args=args)
     node = WebControlNode()
@@ -409,13 +535,6 @@ def main(args=None):
             node.get_logger().info('Shutting down rosbag process...')
             os.kill(rosbag_process.pid, signal.SIGINT)
             rosbag_process.wait()
-        
-        # Clean up log tail process
-        global log_tail_process
-        if log_tail_process and log_tail_process.poll() is None:
-            node.get_logger().info('Shutting down log tail process...')
-            os.kill(log_tail_process.pid, signal.SIGTERM)
-            log_tail_process.wait()
 
         node.destroy_node()
         rclpy.shutdown()

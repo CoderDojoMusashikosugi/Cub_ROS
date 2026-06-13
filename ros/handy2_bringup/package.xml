@@ -11,6 +11,7 @@
   <depend>rclcpp</depend>
   <depend>rclcpp_components</depend>
   <depend>sensor_msgs</depend>
+  <depend>diagnostic_msgs</depend>
 
   <exec_depend>cub_bringup</exec_depend>
   <exec_depend>camera_ros</exec_depend>

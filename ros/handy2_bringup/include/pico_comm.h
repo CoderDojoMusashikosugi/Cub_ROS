@@ -16,4 +16,7 @@ namespace picoComm {
 
     // Set the shutter parameters (writes 8 bytes to offset 8)
     bool set_shutter_params(uint32_t on_time_us, uint32_t offset_us);
+
+    // Read the shutter parameters (reads 8 bytes from offset 8)
+    bool read_shutter_params(uint32_t &on_time_us, uint32_t &offset_us);
 }

@@ -48,6 +48,22 @@ namespace picoComm {
         return success;
     }
 
+    static bool read_eeprom(int offset, uint8_t* data, size_t len) {
+        if (w1_device_path.empty()) return false;
+        
+        std::fstream fs(w1_device_path, std::ios::in | std::ios::binary);
+        if (!fs.is_open()) {
+            std::cerr << "Failed to open EEPROM for reading." << std::endl;
+            return false;
+        }
+        
+        fs.seekg(offset);
+        fs.read((char*)data, len);
+        bool success = fs.good();
+        fs.close();
+        return success;
+    }
+
     bool send_shutter_keep_alive() {
         uint8_t val = 1;
         return write_eeprom(16, &val, 1);
@@ -71,5 +87,13 @@ namespace picoComm {
         memcpy(&buf[0], &on_time_us, 4);
         memcpy(&buf[4], &offset_us, 4);
         return write_eeprom(8, buf, 8);
+    }
+
+    bool read_shutter_params(uint32_t &on_time_us, uint32_t &offset_us) {
+        uint8_t buf[8];
+        if (!read_eeprom(8, buf, 8)) return false;
+        memcpy(&on_time_us, &buf[0], 4);
+        memcpy(&offset_us, &buf[4], 4);
+        return true;
     }
 }
