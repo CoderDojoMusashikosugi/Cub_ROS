@@ -28,4 +28,12 @@ ros2 param set /camera_node ColourGains [ 2.560000, 2.080000 ]
 ## 露出調整
 ```
 ros2 param set /camera_node AnalogueGain 20.0
+ros2 param get /camera_node AnalogueGain
+```
+
+## カメラキャリブレーション
+```
+ros2 run camera_calibration cameracalibrator --size 6x9 --square 0.0233 --no-service-check --ros-args -r image:=/camera_node/image_raw
+tar -xvf /tmp/calibrationdata.tar.gz
+cat ost.yaml
 ```
