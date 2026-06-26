@@ -87,7 +87,7 @@ def generate_launch_description():
                 'map': map_dir,
                 'use_sim_time': use_sim_time,
                 'params_file': param_dir,
-                'use_localization': "True" if (cub_target == 'mcub' or cub_target == 'mcub_direct') else "False"}.items(), # 外部の自己位置推定を利用する場合はこれをFalseに
+                'use_localization': "False"}.items(), # localizationはnav2_bringup.launch.pyで起動してるためFalseにする。
         ),
 
         Node(

@@ -8,12 +8,12 @@
   durability: volatile
   history: keep_last
   depth: 100
-/camera/image_raw/compressed:
+/camera_node/image_raw/compressed:
   reliability: reliable
   durability: volatile
   history: keep_last
   depth: 100
-/camera/image_raw:
+/camera_node/image_raw:
   reliability: reliable
   durability: volatile
   history: keep_last

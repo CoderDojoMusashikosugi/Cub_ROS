@@ -16,7 +16,7 @@ def generate_launch_description():
     print("launch target:", cub_target)
 
     map_dir = LaunchConfiguration(
-        'map',
+        'map_localization',
         default = "/home/cub/maps/oudanhodoumade/mapoudanhodoumade_manual_crean.yaml")
 
 

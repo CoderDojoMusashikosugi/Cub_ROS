@@ -2,6 +2,7 @@
 #include <unistd.h>
 #include <pigpio.h>
 #include <iostream>
+#include <iomanip>
 #include <stdio.h>
 #include <fcntl.h>
 #include <termios.h>
@@ -45,6 +46,14 @@ void gpio_callback(int gpio, int level, uint32_t tick, void *user) {
         int ms = now_ts.tv_nsec / 1000000;
         int ms2 = ms / 10; // 上2桁
         snprintf(timebuf, sizeof(timebuf), "%02d%02d%02d.%02d", utc->tm_hour, utc->tm_min, utc->tm_sec, ms2);
+
+        // Print unix time (seconds with nanosecond precision) for the first 3 calls
+        static std::atomic<int> gpio_cb_count{0};
+        int prev = gpio_cb_count.fetch_add(1);
+        if (prev < 3) {
+            double unix_seconds = now_ts.tv_sec + now_ts.tv_nsec * 1e-9;
+            std::cout << std::fixed << std::setprecision(9) << unix_seconds << std::endl;
+        }
 
         // printf("%s\n", timebuf);
 

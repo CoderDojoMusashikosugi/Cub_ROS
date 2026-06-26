@@ -95,8 +95,12 @@
 ## 使い方
 ### ROSBAGの保存先を変えたい
 - デフォルトでは、コンテナ内の`~/rosbag`は、ホストの`./docker/home/rosbag`にマウントされている。
-- これを例えば`/media/user/rosbag/`に設定したければ、target.envに`ROSBAG_MOUNT_DIR="/media/user/rosbag/"`を追記して./stop.sh&&./run.sh。
+- これを例えば`~/rosbag`に設定したければ、target.envに`ROSBAG_MOUNT_DIR="/home/ここにユーザー名/rosbag/"`を追記して./stop.sh&&./run.sh。
 - マウント先を変えても`./docker/home/rosbag`は残ってて、データが消えるわけでは無いからご安心を。
+
+### ROSBAGを外部ストレージに保存したい
+- `target.env` に `EXT_STORAGE_PATH=/media/ここにユーザー名/SSD-PSTU3A` のようにマウント先のデバイスを設定すると、コンテナ内に`ext_storage`という名前のシンボリックリンクが出る。
+- cub_bringupのrosbag.launch.pyのように、このシンボリックリンクが生きているかを確認することで保存先を自動選択させることも可能。
 
 ### Dockerコンテナに新しいaptパッケージを追加したい(ROSとは関係なく)
 1. docker/environment/${CUB_TARGET}.conf のADDITIONAL_PKGSにインストールするパッケージを追加する。
@@ -113,11 +117,12 @@
 
 インストールするパッケージのリストをADDITIONAL_PKGSにだけ書くと、どのパッケージがどのライブラリを追加したがってるのか分からなくなる。こうしておくと対応付けが楽になる。
 
-### Dockerコンテナに予めビルド済みのパッケージを追加したい
-micro_rosの追加の際に必要になった機能
+### Dockerコンテナにapt installのみでは済まない複雑な方法でインストールや設定をしたい。
+ビルドが必要なmicro_rosや、aptレポジトリ追加が必要なROSのインストールなどをする場合に利用する。  
 
-1. docker/internal/container_install_prebuilt.sh にインストールする司令を追加する
-2. あとはaptパッケージの項目と同じ
+1. `docker/internal/container_install_scripts`以下にインストールスクリプトを配置する
+2. `docker/environment/${CUB_TARGET}.conf` の `container_install_scripts` にスクリプトの名前を追記する
+3. あとはaptパッケージの項目と同じ
 
 ### 新たな種類のロボットを追加したい
 1. docker/environment/に新しい設定ファイル（例: new_robot.conf）を作成する

@@ -1,0 +1,8 @@
+services:
+  cub_ros:
+    volumes:
+      - /media:/media:rslave
+
+  cub_ros_vnc:
+    volumes:
+      - /media:/media:rslave

@@ -7,6 +7,7 @@ from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration, EnvironmentVariable
 from launch.actions import ExecuteProcess
 from launch.actions import TimerAction
+from launch.actions import LogInfo
 import os
 
 def generate_launch_description():
@@ -14,6 +15,14 @@ def generate_launch_description():
     print("launch target:", cub_target)
 
     home_directory="/home/cub/"
+    ext_storage_dir = os.path.join(home_directory, "ext_storage")
+    rosbag_dir = os.path.join(home_directory, "rosbag")
+
+    # リンク切れではなく、実体が存在する有効なディレクトリかを確認する
+    if os.path.exists(ext_storage_dir) and os.path.isdir(ext_storage_dir):
+        save_dir = ext_storage_dir
+    else:
+        save_dir = rosbag_dir
     topic_list=[
         "/SLC1L_scan",
         "/SLC1R_scan",
@@ -66,8 +75,10 @@ def generate_launch_description():
             ),
         ),
 
+        LogInfo(msg=f"rosbag is saving to: {save_dir}"),
+
         TimerAction(period=3.0, actions=[ExecuteProcess(
-            cwd=home_directory+"rosbag",
+            cwd=save_dir,
             cmd=['ros2', 'bag', 'record', '-s', 'mcap'] + topic_list,
             output='screen'
         )])

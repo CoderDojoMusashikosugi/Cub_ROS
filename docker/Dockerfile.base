@@ -4,8 +4,11 @@ FROM ${BASE_IMAGE}
 LABEL org.opencontainers.image.source=https://github.com/CoderDojoMusashikosugi/Cub_ROS
 
 # Install additional packages based on the base image
+ARG ROS_DISTRO="humble"
 ARG CONTAINER_INSTALL_SCRIPTS=""
 RUN --mount=type=bind,source=docker/internal/container_install_scripts/,dst=/container_install_scripts \
+    # nvidia/cuda:12.6.3-cudnn-devel-ubuntu24.04 が ubuntu ユーザーを持っててたまに衝突するので回避策
+    userdel -r ubuntu && \
     rm /etc/apt/sources.list.d/cuda.list && \
     sed -i.bak -e "s/http:\/\/ports\.ubuntu\.com/http:\/\/jp\.ports\.ubuntu\.com/g" /etc/apt/sources.list 2>/dev/null || true && \
     sed -i.bak -e "s/http:\/\/archive\.ubuntu\.com/http:\/\/jp\.archive\.ubuntu\.com/g" /etc/apt/sources.list 2>/dev/null || true && \

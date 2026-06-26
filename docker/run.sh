@@ -2,10 +2,7 @@
 
 set -e
 
-# handy1向けに、外部トリガを有効化
-if [ -e /sys/module/imx296/parameters/trigger_mode ]; then
-    echo 1 | sudo tee /sys/module/imx296/parameters/trigger_mode > /dev/null 2>&1 || true
-fi
+# ./stop.sh
 
 # ユーザーごとの設定を書く用のファイルを設置
 if [ ! -e docker/home/.user_config.bash ]; then
@@ -15,6 +12,17 @@ fi
 docker/internal/set_target_env.sh
 source docker/internal/docker_util.sh
 
+# 各機種固有のホスト環境設定があれば実行
+if type environment_script_at_run > /dev/null 2>&1; then
+    environment_script_at_run
+fi
+
+# EXT_STORAGE_PATHの設定に応じて、外部SSD等をDockerコンテナ内のext_storageにマウントする
+if [ -n "$EXT_STORAGE_PATH" ]; then
+    ln -sfn "$EXT_STORAGE_PATH" docker/home/ext_storage
+else
+    rm -f docker/home/ext_storage
+fi
 export HOST_UID=`id -u`
 export HOST_GID=`id -g`
 container_list=`$docker_compose ps -q`

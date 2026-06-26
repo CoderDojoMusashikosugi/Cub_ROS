@@ -4,21 +4,31 @@
 USER=${USER_NAME:-root}
 HOME=/root
 if [ "$USER" != "root" ]; then
-    echo "* enable custom user $USER as UID $HOST_UID and GID $HOST_GID"
-    groupadd -g $HOST_GID $USER_NAME
-    useradd --create-home --shell /bin/bash --groups adm,sudo,dialout,plugdev,root -u $HOST_UID -g $HOST_GID $USER
-    echo "$USER ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
-    if [ -z "$PASSWORD" ]; then
-        echo "  set default password to \"ubuntu\""
-        PASSWORD=ubuntu
+    if ! id -u $USER > /dev/null 2>&1; then
+        echo "* enable custom user $USER as UID $HOST_UID and GID $HOST_GID"
+        groupadd -g $HOST_GID $USER_NAME
+        useradd --create-home --shell /bin/bash --groups adm,sudo,dialout,plugdev,root -u $HOST_UID -g $HOST_GID $USER
+        echo "$USER ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+        if [ -z "$PASSWORD" ]; then
+            echo "  set default password to \"ubuntu\""
+            PASSWORD=ubuntu
+        fi
+        HOME=/home/$USER
+        echo "$USER:$PASSWORD" | /usr/sbin/chpasswd 2> /dev/null || echo ""
+        cp -r /root/{.config,.gtkrc-2.0,.asoundrc} ${HOME} 2>/dev/null
+        chown -R $USER:$USER ${HOME}
+        [ -d "/dev/snd" ] && chgrp -R adm /dev/snd
+        INPUT_GROUP_NAME=`getent group $INPUT_GROUP_ID | cut -d: -f1`
+        gpasswd -a $USER $INPUT_GROUP_NAME
+    else
+        HOME=/home/$USER
     fi
-    HOME=/home/$USER
-    echo "$USER:$PASSWORD" | /usr/sbin/chpasswd 2> /dev/null || echo ""
-    cp -r /root/{.config,.gtkrc-2.0,.asoundrc} ${HOME} 2>/dev/null
-    chown -R $USER:$USER ${HOME}
-    [ -d "/dev/snd" ] && chgrp -R adm /dev/snd
-    INPUT_GROUP_NAME=`getent group $INPUT_GROUP_ID | cut -d: -f1`
-    gpasswd -a $USER $INPUT_GROUP_NAME
+fi
+
+# Start chrony (if installed)
+if command -v chronyd > /dev/null 2>&1; then
+    rm -f /var/run/chrony/chronyd.pid
+    service chrony start
 fi
 
 # VNC password
@@ -75,12 +85,6 @@ command=gosu '$USER' bash '$VNCRUN_PATH'
 command=gosu '$USER' bash -c "websockify --web=/usr/lib/novnc 80 localhost:5901"
 EOF
 
-# colcon
-BASHRC_PATH=$HOME/.bashrc
-grep -F "source /opt/ros/$ROS_DISTRO/setup.bash" $BASHRC_PATH || echo "source /opt/ros/$ROS_DISTRO/setup.bash" >> $BASHRC_PATH
-grep -F "source /usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash" $BASHRC_PATH || echo "source /usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash" >> $BASHRC_PATH
-chown $USER:$USER $BASHRC_PATH
-
 # Fix rosdep permission
 mkdir -p $HOME/.ros
 cp -r /root/.ros/rosdep $HOME/.ros/rosdep
@@ -117,7 +121,7 @@ echo "==========================================================================
 echo "NOTE 1: --security-opt seccomp=unconfined flag is required to launch Ubuntu Jammy based image."
 echo -e 'See \e]8;;https://github.com/Tiryoh/docker-ros2-desktop-vnc/pull/56\e\\https://github.com/Tiryoh/docker-ros2-desktop-vnc/pull/56\e]8;;\e\\'
 echo "============================================================================================"
-su - $USER_NAME -c "/bin/bash -c 'source /opt/ros/humble/setup.bash &&
+su - $USER_NAME -c "/bin/bash -c 'source /opt/ros/${ROS_DISTRO}/setup.bash &&
 	    source ~/.user_config.bash &&
 	        ros2 launch foxglove_bridge foxglove_bridge_launch.xml port:=8765'" &
 exec /bin/tini -- supervisord -n -c /etc/supervisor/supervisord.conf

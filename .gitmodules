@@ -28,10 +28,12 @@
 [submodule "ros/livox_ros_driver2"]
 	path = ros/livox_ros_driver2
 	url = https://github.com/t-nagatani/livox_ros_driver2.git
-	branch = humble
 [submodule "ros/FAST-LIVO2-ROS2-MID360-Fisheye"]
 	path = ros/FAST-LIVO2-ROS2-MID360-Fisheye
 	url = https://github.com/t-nagatani/FAST-LIVO2-ROS2-MID360-Fisheye.git
 [submodule "ros/fast_gicp"]
 	path = ros/fast_gicp
 	url = https://github.com/koide3/fast_gicp.git
+[submodule "ros/hesai_ros_driver"]
+	path = ros/hesai_ros_driver
+	url = https://github.com/HesaiTechnology/HesaiLidar_ROS_2.0
