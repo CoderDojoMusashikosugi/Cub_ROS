@@ -30,13 +30,23 @@ else
     export ARCH="wakaran"
 fi
 
+IS_MACOS=0
+if [ -f /System/Library/CoreServices/SystemVersion.plist ]; then
+    IS_MACOS=1
+fi
+
+IS_WSL2=0
+if grep -qi 'microsoft.*WSL2' /proc/sys/kernel/osrelease 2>/dev/null; then
+    IS_WSL2=1
+fi
+
 RUNTIME_NVIDIA=`docker info 2>/dev/null | grep nvidia || true`
-if [ -n "$RUNTIME_NVIDIA" ]; then # runtime: nvidia を指定可能な環境の場合
+if [ "$IS_WSL2" -eq 0 ] && [ -n "$RUNTIME_NVIDIA" ]; then # runtime: nvidia を指定可能な環境の場合（WSL2を除く）
     docker_compose=$docker_compose" -f docker/internal/docker-compose-nvidia.yml" # runtime: nvidiaをつける
 fi
 
 # macOS向け/macOS以外向け設定
-if [ -f /System/Library/CoreServices/SystemVersion.plist ]; then # macOSの場合
+if [ "$IS_MACOS" -eq 1 ]; then # macOSの場合
     export USE_VNC_ENV=1
     export DISPLAY="" # macOSではホストの画面に出力するのを諦める。どうせVNC環境では上書きされるのでこの行の必要性も無いけど。
     export INPUT_GROUP_ID="" #getentが無いので一旦無視、そもそもmacでjoystick使えるか知らない。
@@ -46,7 +56,9 @@ else # macOS以外の場合
     if [ -z "$DISPLAY" ]; then
         export DISPLAY=:0 # DISPLAY環境変数が無い場合は:0で決め打ちしてしまう。もっと良い方法あったら取り替えたい。
     fi
-    docker_compose=$docker_compose" -f docker/internal/docker-compose-media.yml" # Linuxの場合は/mediaをマウントする。macOSでは出来ないから消してる。
+    if [ "$IS_WSL2" -eq 0 ]; then
+        docker_compose=$docker_compose" -f docker/internal/docker-compose-media.yml" # Linuxの場合は/mediaをマウントする。macOSとWSL2では利用しない。
+    fi
 fi
 
 # export USE_VNC_ENV=1 # これを有効化すると、VNC環境を強制オン
