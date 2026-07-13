@@ -1,4 +1,5 @@
 {
     "cmake.sourceDirectory": "/home/musashikosugi/Cub_ROS/ros/cub_bringup",
-    "python.REPL.enableREPLSmartSend": false
+    "python.REPL.enableREPLSmartSend": false,
+    "files.eol": "\n"
 }
