@@ -43,15 +43,15 @@ def generate_launch_description():
     use_composition = LaunchConfiguration('use_composition')
     use_respawn = LaunchConfiguration('use_respawn')
 
-    cub_target = os.getenv('CUB_TARGET', 'cub3')
-    if cub_target == 'cub3':
-        param_file_name = 'cub3_nav2.yaml'
+    cub_target = os.getenv('CUB_TARGET', 'cub4')
+    if cub_target == 'cub4':
+        param_file_name = 'cub4_nav2.yaml'
     elif cub_target == 'mcub' or cub_target == 'mcub_direct':
         param_file_name = 'mcub_nav2.yaml'
     elif cub_target == 'spidar':
         param_file_name = 'spidar.yaml'
     else:
-        param_file_name = 'cub3_nav2.yaml'
+        param_file_name = 'cub4_nav2.yaml'
 
     param_dir = LaunchConfiguration(
         'params_file',
@@ -143,7 +143,7 @@ def generate_launch_description():
         # ),
 
         # 通常のmcub(map->odom->base_link環境)では不要、オドメトリオンリーなmcubでは必要
-        # Cub3(ekf_localiがmap->base_linkを出す)では必要
+        # Cub4(ekf_localiがmap->base_linkを出す)では必要
         # Node(
         #     package='tf2_ros',
         #     executable='static_transform_publisher',

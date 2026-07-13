@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(cub3_bringup)
+project(cub4_bringup)
 
 find_package(ament_cmake REQUIRED)
 

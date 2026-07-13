@@ -1,11 +1,11 @@
 # Cub_ROS
 
 ## はじめに
-このレポジトリでは、つくばチャレンジのCoderDojo武蔵小杉チームが開発するCub3とmCub向けのソフトウェアを管理している。
+このレポジトリでは、つくばチャレンジのCoderDojo武蔵小杉チームが開発するCub4とmCub向けのソフトウェアを管理している。
 
 ## 使い方
 ### 開発環境の用意
-- Cub3またはmCubを用意
+- Cub4またはmCubを用意
   - UbuntuやWSLgやmacOS等、[ここのサポート環境](./docker/README.md)の項目にあるパソコンでも利用可能
 - このレポジトリをClone
   - `cd ~` (gitレポジトリをホームディレクトリ直下へ配置することを前提に解説するが、他のディレクトリでも問題ない)
@@ -17,12 +17,12 @@
     - `./docker/install.sh`
     - 環境によってはインストール出来ない。その場合は自力で。
     - 再起動の指示が出たら、再起動して`cd ~/Cub_ROS`に自力で帰り、次の手順を続ける。この項目の最後の再起動でまとめてやっても大丈夫。
-  - **Cub3の場合** Cub3向けデバイス設定をインストール
+  - **Cub4の場合** Cub4向けデバイス設定をインストール
     - `./scripts/install_host_settings.sh`
   - **mCubの場合** mCub向けデバイス設定をインストール
     - `./scripts/mcub_host_settings.sh`
 - 設定
-  - **Cub3の場合** target.envを`CUB_TARGET=cub3`にする (デフォルトでそうなっているので基本的には対応不要)
+  - **Cub4の場合** target.envを`CUB_TARGET=cub4`にする (デフォルトでそうなっているので基本的には対応不要)
   - **mCubの場合** target.envを`CUB_TARGET=mcub`にする。**ここ変更しないとmCubで立ち上がらないので注意**。
   - 各ロボットの設定は`./docker/environment/`内の設定ファイルで管理される。
 - 再起動する
@@ -32,7 +32,7 @@
 - [m5atom/README.md](m5atom/README.md)の内容の通りにM5 Atomにプログラムを書き込む。
 
 ### 開発・実行環境に入る
-- Cub3やmCubをGUI操作可能な画面を用意し、そこでターミナルを立ち上げて`./run.sh`を実行
+- Cub4やmCubをGUI操作可能な画面を用意し、そこでターミナルを立ち上げて`./run.sh`を実行
   - 言い換えれば、コンピュータ起動後最初の./run.shはssh経由でやらないほうが良い。やるとGUIにRViz等が出なくなってしまう。もしsshから初回起動してしまった場合は、一旦`exit`して`./stop.sh`の後再度`./run.sh`すべし。
     - こうなるのは、dockerコンテナを立ち上げた際の画面にGUIを出す設定となっているため。一度stopすると良いというのは、dockerコンテナを立ち下げる操作であるため。
     - MacはVNC環境側に画面を出すため、どこで起動しても大丈夫。
@@ -40,7 +40,7 @@
 - 完了したらDocker環境に入れる。
   - もしこのシェルを`exit`しても、コンテナ自体は立ち上がり続けている。再度`./run.sh`すれば再度入れる。
 - 他のターミナルを開いて同様に./run.shすればもっとシェルを増やせる。
-  - GUIのアプリをssh経由で立ち上げようとも、画面はCub3/mCub側に出る。
+  - GUIのアプリをssh経由で立ち上げようとも、画面はCub4/mCub側に出る。
 - 以降はこの./run.shまで実行されていることを前提に解説する。
 - RViz2(`rviz2`で起動する)等のGUIは基本的にはデスクトップ上に出るが、macでだけ出せないので代わりにwebブラウザから http://localhost:6080 にアクセスした先に出す。詳しくは[Tiryoh/docker-ros-desktop-vnc](https://github.com/Tiryoh/docker-ros-desktop-vnc)を参照。
 
@@ -65,7 +65,7 @@
 - センサやアクチュエータを`ros2 launch cub_bringup launch_at_boot.launch.py`で立ち上げる
   - これはロボットの起動と共に自動で起動させるはずのもの。起動自体の設定をしていない場合はこの通りに手動で実行する。
   - ロボット自体の電源を落とすまで開きっぱなしがおすすめ。
-- Cub3/mCub向けのROS2ノードを実行する
+- Cub4/mCub向けのROS2ノードを実行する
   - `ros2 launch cub_bringup common.launch.py`
 - ここまで実行すれば、DualSenseで操作が可能になっている
   - L2(今はL1も同様の機能)を押しながら左スティック前後左右で、前後移動と左右回転ができる。

@@ -39,15 +39,15 @@ def generate_launch_description():
         'map',
         default="/home/cub/maps/kakunin-1004/kakunin-1004-modified.yaml") # cub_bringup navigation.launch.pyで呼び出し時に上書きされる。デフォルト値設定はそちらに。
 
-    cub_target = os.getenv('CUB_TARGET', 'cub3')
-    if cub_target == 'cub3':
-        param_file_name = 'cub3_nav2.yaml'
+    cub_target = os.getenv('CUB_TARGET', 'cub4')
+    if cub_target == 'cub4':
+        param_file_name = 'cub4_nav2.yaml'
     elif cub_target == 'mcub' or cub_target == 'mcub_direct':
         param_file_name = 'mcub_nav2.yaml'
     elif cub_target == 'spidar':
         param_file_name = 'spidar.yaml'
     else:
-        param_file_name = 'cub3_nav2.yaml'
+        param_file_name = 'cub4_nav2.yaml'
 
     param_dir = LaunchConfiguration(
         'params_file',

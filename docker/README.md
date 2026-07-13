@@ -17,10 +17,10 @@
 
 ### Dockerイメージの構造
 - ベースのイメージは設定ファイルで指定（nvidia/cudaまたはros:humble等）
-- **Baseイメージ**(例: cub3_ros_base, mcub_ros_base)は、↑これに必要に応じてROSや基本パッケージを追加して作成される
-- **(通常の)コンテナイメージ**(例: cub3_ros, mcub_ros)は、↑これに設定ファイルで指定された追加パッケージを追加したもの。通常はこれが起動される。
+- **Baseイメージ**(例: cub4_ros_base, mcub_ros_base)は、↑これに必要に応じてROSや基本パッケージを追加して作成される
+- **(通常の)コンテナイメージ**(例: cub4_ros, mcub_ros)は、↑これに設定ファイルで指定された追加パッケージを追加したもの。通常はこれが起動される。
   - ベースイメージが存在するのは、設定を編集する度にROSまるごとインストールからやり直されて非常に時間がかかり面倒であったため。
-- **VNCイメージ**(例: cub3_ros_vnc, mcub_ros_vnc)は、↑これに[Tiryoh/docker-ros-desktop-vnc](https://github.com/Tiryoh/docker-ros-desktop-vnc)の機能を追加したもの。macOS環境ではこれが起動される。
+- **VNCイメージ**(例: cub4_ros_vnc, mcub_ros_vnc)は、↑これに[Tiryoh/docker-ros-desktop-vnc](https://github.com/Tiryoh/docker-ros-desktop-vnc)の機能を追加したもの。macOS環境ではこれが起動される。
   - VNCイメージのバージョンは通常イメージと同じものを使用する。
 - Dockerイメージのタグは、設定ファイル内の「IMAGE_VERSION_アーキテクチャ名」で付けられる。
   - IMAGE_VERSIONは、./docker/build.shでビルド成功時にその日の日時を秒まで入れたものに自動更新される。
@@ -81,7 +81,7 @@
 - m5atom: Docker的には関係ない。M5 Atom向けのスクリプト置き場。
 - support_tools: Docker的には関係ない。今のところDynamixel関係のファイルが置かれている。
 - scripts: Docker的には関係ないスクリプト置き場。ホスト環境のセットアップ用スクリプトなど。
-  - install_host_settings.sh: Cub3用
+  - install_host_settings.sh: Cub4用
   - mcub_host_settings.sh: mCub用
   - libuvc_installation.sh: ?
 
@@ -149,7 +149,7 @@
 1. docker/environment/に新しい設定ファイル（例: new_robot.conf）を作成する
 2. 設定ファイルに以下を追記
    ```
-   source docker/environment/cub3.conf
+   source docker/environment/cub4.conf
    ```
 3. target.envでCUB_TARGET=new_robotに設定
 4. 既存のイメージを再利用するためビルドの必要無し

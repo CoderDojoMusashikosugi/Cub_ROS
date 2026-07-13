@@ -28,13 +28,13 @@ def generate_launch_description():
     container_name_full = (namespace, '/', container_name)
     
     # modify for cub
-    cub_target = os.getenv('CUB_TARGET', 'cub3')
-    if cub_target == 'cub3':
-        param_file_name = 'cub3_nav2.yaml'
+    cub_target = os.getenv('CUB_TARGET', 'cub4')
+    if cub_target == 'cub4':
+        param_file_name = 'cub4_nav2.yaml'
     elif cub_target == 'mcub':
         param_file_name = 'mcub_nav2.yaml'
     else:
-        param_file_name = 'cub3_nav2.yaml'
+        param_file_name = 'cub4_nav2.yaml'
 
     param_dir = LaunchConfiguration(
         'params_file',

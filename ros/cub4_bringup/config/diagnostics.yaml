@@ -1,6 +1,6 @@
 topic_hz_checker:
   ros__parameters:
-    hardware_id: cub3
+    hardware_id: cub4
     update_period: 1.0
     topics:
       fix:
@@ -86,7 +86,7 @@ topic_hz_checker:
 
 linux_state:
   ros__parameters:
-    hardware_id: cub3
+    hardware_id: cub4
     update_period: 1.0
     cpu:
       warn: 0.95
@@ -103,7 +103,7 @@ linux_state:
       error: 0.9
 # jetson_state:
 #   ros__parameters:
-#     hardware_id: cub3
+#     hardware_id: cub4
 #     update_period: 1.0
 #     thermal_zones:
 #       - "cpu-thermal"

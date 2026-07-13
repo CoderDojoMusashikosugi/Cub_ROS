@@ -8,7 +8,7 @@ import os
 
 
 def generate_launch_description():
-    cub_target = os.getenv('CUB_TARGET', 'cub3')
+    cub_target = os.getenv('CUB_TARGET', 'cub4')
     print("launch target:", cub_target)
 
     return LaunchDescription([
@@ -20,9 +20,9 @@ def generate_launch_description():
         ),
         IncludeLaunchDescription(
             PathJoinSubstitution(
-                [FindPackageShare("cub3_bringup"), "launch", "common.launch.py"]
+                [FindPackageShare("cub4_bringup"), "launch", "common.launch.py"]
             ),
-            condition=IfCondition("true" if cub_target == 'cub3' else "false")
+            condition=IfCondition("true" if cub_target == 'cub4' else "false")
         ),
         IncludeLaunchDescription(
             PathJoinSubstitution(

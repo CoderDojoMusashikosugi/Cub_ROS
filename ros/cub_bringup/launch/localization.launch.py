@@ -12,7 +12,7 @@ import os
 
 
 def generate_launch_description():
-    cub_target = os.getenv('CUB_TARGET', 'cub3')
+    cub_target = os.getenv('CUB_TARGET', 'cub4')
     print("launch target:", cub_target)
 
     map_dir = LaunchConfiguration(
@@ -34,13 +34,13 @@ def generate_launch_description():
             launch_arguments=[
                 ('map_localization', map_dir)
             ],
-            condition=IfCondition("true" if cub_target == 'cub3' else "false")
+            condition=IfCondition("true" if cub_target == 'cub4' else "false")
         ),
         Node(
             package='tf2_ros',
             executable='static_transform_publisher',
             arguments=['0','0','0','0','0','0','1','map','odom'],
-            condition=IfCondition("true" if cub_target == 'cub3' else "false")
+            condition=IfCondition("true" if cub_target == 'cub4' else "false")
         ),
 
         IncludeLaunchDescription(

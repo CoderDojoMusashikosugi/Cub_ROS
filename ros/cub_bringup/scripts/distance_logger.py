@@ -284,7 +284,7 @@ if __name__ == '__main__':
 
 
 ### 走行距離の記録と集計
-# - Cub3/mCubの`launch_at_boot.launch.py`では、ホイールオドメトリ(`/odom`)から走行距離を積算してCSVに保存する`cub_bringup`パッケージの`distance_logger`ノードが自動的に起動する。
+# - Cub4/mCubの`launch_at_boot.launch.py`では、ホイールオドメトリ(`/odom`)から走行距離を積算してCSVに保存する`cub_bringup`パッケージの`distance_logger`ノードが自動的に起動する。
 # - 走行ログはDockerコンテナ内のホームディレクトリにある`~/distance_logs/`以下へ保存される(ホスト側では`docker/home/distance_logs/`)。
 #   - `sessions/<session_id>/distance_log.csv`: 起動毎の全ログ。`event`列が`data`の行の`distance_increment_m`を積算するとその起動で移動した距離になる。
 #   - `by_day/YYYY-MM-DD/HH.csv`: システム時刻が正しいと判断できた時点以降のログを日付・時刻ごとに分割したもの。`system_time_valid`列が`1`になっている行のみが格納される。

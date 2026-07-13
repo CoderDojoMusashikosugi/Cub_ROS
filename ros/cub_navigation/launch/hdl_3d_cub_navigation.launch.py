@@ -34,13 +34,13 @@ def generate_launch_description():
         'map',
         default="/home/cub/support_tools/pcd_slicer/map_output/musakosumap.yaml")
 
-    cub_target = os.getenv('CUB_TARGET', 'cub3')
-    if cub_target == 'cub3':
-        param_file_name = 'cub3_nav2_3d.yaml'
+    cub_target = os.getenv('CUB_TARGET', 'cub4')
+    if cub_target == 'cub4':
+        param_file_name = 'cub4_nav2_3d.yaml'
     elif cub_target == 'mcub':
         param_file_name = 'mcub_nav2.yaml'
     else:
-        param_file_name = 'cub3_nav2_3d.yaml'
+        param_file_name = 'cub4_nav2_3d.yaml'
 
     cub_nav_params_default_path = os.path.join(
         get_package_share_directory('cub_navigation'),

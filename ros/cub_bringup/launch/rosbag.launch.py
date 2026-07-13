@@ -11,7 +11,7 @@ from launch.actions import LogInfo
 import os
 
 def generate_launch_description():
-    cub_target = os.getenv('CUB_TARGET', 'cub3')
+    cub_target = os.getenv('CUB_TARGET', 'cub4')
     print("launch target:", cub_target)
 
     home_directory="/home/cub/"

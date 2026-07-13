@@ -97,7 +97,7 @@ def generate_launch_description():
     )
     sllidar_R_launch_delayed = TimerAction(period=3.0, actions=[sllidar_R_launch])
     
-    cub_bringup_params_path = os.path.join(get_package_share_directory('cub3_bringup'),'config')
+    cub_bringup_params_path = os.path.join(get_package_share_directory('cub4_bringup'),'config')
     zed_f9p_params = os.path.join(cub_bringup_params_path, 'zed_f9p.yaml')
     rtklib = ExecuteProcess(
         cmd=['str2str', '-in','ntrip://ntrip1.bizstation.jp:2101/3041F3CA','-out','serial://ttyGPS:230400'],  #Tsukuba

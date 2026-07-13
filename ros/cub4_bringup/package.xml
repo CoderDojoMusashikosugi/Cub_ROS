@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <package format="3">
-  <name>cub3_bringup</name>
+  <name>cub4_bringup</name>
   <version>0.0.0</version>
-  <description>Bringup (hardware + runtime) launch files for Cub3 platform.</description>
+  <description>Bringup (hardware + runtime) launch files for Cub4 platform.</description>
   <maintainer email="cub@todo.todo">cub</maintainer>
   <license>TODO: License declaration</license>
 
