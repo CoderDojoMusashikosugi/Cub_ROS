@@ -1,0 +1,345 @@
+<?xml version="1.0"?>
+<robot name="mcub" xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <!--
+    mCub simulation model template.
+
+    Coordinate convention:
+      x: forward, y: left, z: up
+      base_link: kept at the same height as the existing cub_description/mcub.urdf
+
+    Confirmed from cub_description/urdf/mcub.urdf:
+      drive wheel diameter: 0.040 m
+      displayed axle/tread span: 0.130 m (used provisionally as wheel track)
+
+    NOTE(INPUT): wheel_odometry.cpp and control_mcub_moter_node.cpp use 0.125 m
+    as the drive-wheel center-to-center distance.  Confirm whether the simulation
+    track should be 0.130 m (description model) or 0.125 m (control model).
+
+    TODO(INPUT): Replace the provisional values below with measured/CAD values.
+      - base_mass, base_cog_*, and base inertia
+      - wheel_width, wheel_mass, wheel inertia, effort, and velocity limits
+      - caster pivot position, trail, wheel size, masses, and inertias
+      - SLC1_link position, especially lidar_scan_z (actual scan-plane height)
+
+    Generate plain URDF before importing into Unity:
+      xacro mcub.urdf.xacro -o mcub.urdf
+  -->
+
+  <!-- Dimensions retained from cub_description/urdf/mcub.urdf. -->
+  <xacro:arg name="base_size_x" default="0.150"/>
+  <xacro:arg name="base_size_y" default="0.110"/>
+  <xacro:arg name="base_size_z" default="0.080"/>
+  <xacro:arg name="base_visual_x" default="-0.045"/>
+  <xacro:arg name="base_visual_z" default="0.070"/>
+
+  <!-- TODO(INPUT): Provisional physical properties. -->
+  <xacro:arg name="base_mass" default="1.000"/>
+  <xacro:arg name="base_cog_x" default="-0.045"/>
+  <xacro:arg name="base_cog_y" default="0.000"/>
+  <xacro:arg name="base_cog_z" default="0.070"/>
+  <xacro:arg name="base_ixx" default="0.0020"/>
+  <xacro:arg name="base_ixy" default="0.0"/>
+  <xacro:arg name="base_ixz" default="0.0"/>
+  <xacro:arg name="base_iyy" default="0.0030"/>
+  <xacro:arg name="base_iyz" default="0.0"/>
+  <xacro:arg name="base_izz" default="0.0040"/>
+
+  <!-- Wheel diameter is confirmed. Track requires resolving the 0.130/0.125 m discrepancy above. -->
+  <xacro:arg name="wheel_radius" default="0.020"/>
+  <xacro:arg name="wheel_track" default="0.130"/>
+  <xacro:arg name="wheel_x" default="0.000"/>
+  <xacro:arg name="wheel_width" default="0.015"/>
+  <xacro:arg name="wheel_mass" default="0.050"/>
+  <xacro:arg name="wheel_ixx" default="0.000012"/>
+  <xacro:arg name="wheel_iyy" default="0.000010"/>
+  <xacro:arg name="wheel_izz" default="0.000012"/>
+  <xacro:arg name="wheel_joint_damping" default="0.01"/>
+  <xacro:arg name="wheel_joint_friction" default="0.01"/>
+  <xacro:arg name="wheel_effort" default="1.0"/>
+  <xacro:arg name="wheel_velocity" default="20.0"/>
+
+  <!--
+    TODO(INPUT): Caster geometry.  The trail must be non-zero so that contact force
+    makes the wheel follow the travel direction.  caster_pivot_x is the vertical
+    swivel-axis position; the wheel center is behind it by caster_trail.
+  -->
+  <xacro:arg name="caster_pivot_x" default="-0.100"/>
+  <xacro:arg name="caster_pivot_z" default="0.040"/>
+  <xacro:arg name="caster_trail" default="0.015"/>
+  <xacro:arg name="caster_wheel_radius" default="0.020"/>
+  <xacro:arg name="caster_wheel_width" default="0.012"/>
+  <xacro:arg name="caster_swivel_mass" default="0.020"/>
+  <xacro:arg name="caster_wheel_mass" default="0.020"/>
+  <xacro:arg name="caster_swivel_inertia" default="0.000010"/>
+  <xacro:arg name="caster_wheel_ixx" default="0.000005"/>
+  <xacro:arg name="caster_wheel_iyy" default="0.000004"/>
+  <xacro:arg name="caster_wheel_izz" default="0.000005"/>
+  <xacro:arg name="caster_swivel_damping" default="0.02"/>
+  <xacro:arg name="caster_axle_damping" default="0.005"/>
+
+  <!--
+    The LiDAR visual geometry follows cub_description/urdf/mcub.urdf:
+      - a cylindrical scan head centered on SLC1_link
+      - a box-shaped base directly below it
+    SLC1_link is the scan-line frame, so the cylinder center represents the
+    LiDAR scan plane. RPLIDAR C1 mass is from the SLAMTEC C1 datasheet:
+      https://www.slamtec.com/en/c1
+    TODO(INPUT): lidar_scan_* locates the actual scan plane.  lidar_scan_z=0.140 m
+    only preserves the current mcub.urdf TF and is not a confirmed measurement.
+  -->
+  <xacro:arg name="lidar_scan_x" default="0.000"/>
+  <xacro:arg name="lidar_scan_y" default="0.000"/>
+  <xacro:arg name="lidar_scan_z" default="0.140"/>
+  <xacro:arg name="lidar_yaw" default="3.141592653589793"/>
+  <xacro:arg name="lidar_head_radius" default="0.025"/>
+  <xacro:arg name="lidar_head_height" default="0.015"/>
+  <xacro:arg name="lidar_base_size_x" default="0.055"/>
+  <xacro:arg name="lidar_base_size_y" default="0.055"/>
+  <xacro:arg name="lidar_base_size_z" default="0.025"/>
+  <xacro:arg name="lidar_base_center_z" default="-0.020"/>
+  <!-- TODO(INPUT): Provisional center of mass relative to the scan-line frame. -->
+  <xacro:arg name="lidar_cog_z" default="-0.0125"/>
+  <xacro:arg name="lidar_mass" default="0.110"/>
+  <xacro:arg name="lidar_ixx" default="0.000025"/>
+  <xacro:arg name="lidar_iyy" default="0.000025"/>
+  <xacro:arg name="lidar_izz" default="0.000050"/>
+
+  <xacro:property name="base_size_x" value="$(arg base_size_x)"/>
+  <xacro:property name="base_size_y" value="$(arg base_size_y)"/>
+  <xacro:property name="base_size_z" value="$(arg base_size_z)"/>
+  <xacro:property name="base_visual_x" value="$(arg base_visual_x)"/>
+  <xacro:property name="base_visual_z" value="$(arg base_visual_z)"/>
+  <xacro:property name="base_mass" value="$(arg base_mass)"/>
+  <xacro:property name="base_cog_x" value="$(arg base_cog_x)"/>
+  <xacro:property name="base_cog_y" value="$(arg base_cog_y)"/>
+  <xacro:property name="base_cog_z" value="$(arg base_cog_z)"/>
+  <xacro:property name="base_ixx" value="$(arg base_ixx)"/>
+  <xacro:property name="base_ixy" value="$(arg base_ixy)"/>
+  <xacro:property name="base_ixz" value="$(arg base_ixz)"/>
+  <xacro:property name="base_iyy" value="$(arg base_iyy)"/>
+  <xacro:property name="base_iyz" value="$(arg base_iyz)"/>
+  <xacro:property name="base_izz" value="$(arg base_izz)"/>
+  <xacro:property name="wheel_radius" value="$(arg wheel_radius)"/>
+  <xacro:property name="wheel_track" value="$(arg wheel_track)"/>
+  <xacro:property name="wheel_x" value="$(arg wheel_x)"/>
+  <xacro:property name="wheel_width" value="$(arg wheel_width)"/>
+  <xacro:property name="wheel_mass" value="$(arg wheel_mass)"/>
+  <xacro:property name="wheel_ixx" value="$(arg wheel_ixx)"/>
+  <xacro:property name="wheel_iyy" value="$(arg wheel_iyy)"/>
+  <xacro:property name="wheel_izz" value="$(arg wheel_izz)"/>
+  <xacro:property name="wheel_joint_damping" value="$(arg wheel_joint_damping)"/>
+  <xacro:property name="wheel_joint_friction" value="$(arg wheel_joint_friction)"/>
+  <xacro:property name="wheel_effort" value="$(arg wheel_effort)"/>
+  <xacro:property name="wheel_velocity" value="$(arg wheel_velocity)"/>
+  <xacro:property name="caster_pivot_x" value="$(arg caster_pivot_x)"/>
+  <xacro:property name="caster_pivot_z" value="$(arg caster_pivot_z)"/>
+  <xacro:property name="caster_trail" value="$(arg caster_trail)"/>
+  <xacro:property name="caster_wheel_radius" value="$(arg caster_wheel_radius)"/>
+  <xacro:property name="caster_wheel_width" value="$(arg caster_wheel_width)"/>
+  <xacro:property name="caster_swivel_mass" value="$(arg caster_swivel_mass)"/>
+  <xacro:property name="caster_wheel_mass" value="$(arg caster_wheel_mass)"/>
+  <xacro:property name="caster_swivel_inertia" value="$(arg caster_swivel_inertia)"/>
+  <xacro:property name="caster_wheel_ixx" value="$(arg caster_wheel_ixx)"/>
+  <xacro:property name="caster_wheel_iyy" value="$(arg caster_wheel_iyy)"/>
+  <xacro:property name="caster_wheel_izz" value="$(arg caster_wheel_izz)"/>
+  <xacro:property name="caster_swivel_damping" value="$(arg caster_swivel_damping)"/>
+  <xacro:property name="caster_axle_damping" value="$(arg caster_axle_damping)"/>
+  <xacro:property name="lidar_scan_x" value="$(arg lidar_scan_x)"/>
+  <xacro:property name="lidar_scan_y" value="$(arg lidar_scan_y)"/>
+  <xacro:property name="lidar_scan_z" value="$(arg lidar_scan_z)"/>
+  <xacro:property name="lidar_yaw" value="$(arg lidar_yaw)"/>
+  <xacro:property name="lidar_head_radius" value="$(arg lidar_head_radius)"/>
+  <xacro:property name="lidar_head_height" value="$(arg lidar_head_height)"/>
+  <xacro:property name="lidar_base_size_x" value="$(arg lidar_base_size_x)"/>
+  <xacro:property name="lidar_base_size_y" value="$(arg lidar_base_size_y)"/>
+  <xacro:property name="lidar_base_size_z" value="$(arg lidar_base_size_z)"/>
+  <xacro:property name="lidar_base_center_z" value="$(arg lidar_base_center_z)"/>
+  <xacro:property name="lidar_cog_z" value="$(arg lidar_cog_z)"/>
+  <xacro:property name="lidar_mass" value="$(arg lidar_mass)"/>
+  <xacro:property name="lidar_ixx" value="$(arg lidar_ixx)"/>
+  <xacro:property name="lidar_iyy" value="$(arg lidar_iyy)"/>
+  <xacro:property name="lidar_izz" value="$(arg lidar_izz)"/>
+
+  <material name="mcub_white">
+    <color rgba="1 1 1 1"/>
+  </material>
+  <material name="mcub_gray">
+    <color rgba="0.35 0.35 0.35 1"/>
+  </material>
+  <material name="mcub_black">
+    <color rgba="0.08 0.08 0.08 1"/>
+  </material>
+
+  <xacro:macro name="drive_wheel" params="side y sign">
+    <joint name="${side}_wheel_joint" type="continuous">
+      <parent link="base_link"/>
+      <child link="${side}_wheel_link"/>
+      <origin xyz="${wheel_x} ${y} ${wheel_radius}" rpy="0 0 0"/>
+      <axis xyz="0 ${sign} 0"/>
+      <limit effort="${wheel_effort}" velocity="${wheel_velocity}"/>
+      <dynamics damping="${wheel_joint_damping}" friction="${wheel_joint_friction}"/>
+    </joint>
+    <link name="${side}_wheel_link">
+      <inertial>
+        <mass value="${wheel_mass}"/>
+        <inertia ixx="${wheel_ixx}" ixy="0" ixz="0"
+                 iyy="${wheel_iyy}" iyz="0" izz="${wheel_izz}"/>
+      </inertial>
+      <visual>
+        <origin rpy="${pi / 2} 0 0"/>
+        <geometry>
+          <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+        </geometry>
+        <material name="mcub_gray"/>
+      </visual>
+      <collision>
+        <origin rpy="${pi / 2} 0 0"/>
+        <geometry>
+          <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+        </geometry>
+      </collision>
+    </link>
+  </xacro:macro>
+
+  <link name="base_link">
+    <inertial>
+      <origin xyz="${base_cog_x} ${base_cog_y} ${base_cog_z}" rpy="0 0 0"/>
+      <mass value="${base_mass}"/>
+      <inertia ixx="${base_ixx}" ixy="${base_ixy}" ixz="${base_ixz}"
+               iyy="${base_iyy}" iyz="${base_iyz}" izz="${base_izz}"/>
+    </inertial>
+    <visual>
+      <origin xyz="${base_visual_x} 0 ${base_visual_z}" rpy="0 0 0"/>
+      <geometry>
+        <box size="${base_size_x} ${base_size_y} ${base_size_z}"/>
+      </geometry>
+      <material name="mcub_white"/>
+    </visual>
+    <collision>
+      <origin xyz="${base_visual_x} 0 ${base_visual_z}" rpy="0 0 0"/>
+      <geometry>
+        <box size="${base_size_x} ${base_size_y} ${base_size_z}"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="base_to_footprint" type="fixed">
+    <parent link="base_link"/>
+    <child link="base_footprint"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+  <link name="base_footprint"/>
+
+  <xacro:drive_wheel side="left" y="${wheel_track / 2}" sign="1"/>
+  <xacro:drive_wheel side="right" y="${-wheel_track / 2}" sign="1"/>
+
+  <!-- Passive trailing caster: free swivel about z plus free wheel rotation about y. -->
+  <joint name="caster_swivel_joint" type="continuous">
+    <parent link="base_link"/>
+    <child link="caster_swivel_link"/>
+    <origin xyz="${caster_pivot_x} 0 ${caster_pivot_z}" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="0.1" velocity="30.0"/>
+    <dynamics damping="${caster_swivel_damping}" friction="0.0"/>
+  </joint>
+  <link name="caster_swivel_link">
+    <inertial>
+      <origin xyz="${-caster_trail / 2} 0 ${-caster_pivot_z / 2}" rpy="0 0 0"/>
+      <mass value="${caster_swivel_mass}"/>
+      <inertia ixx="${caster_swivel_inertia}" ixy="0" ixz="0"
+               iyy="${caster_swivel_inertia}" iyz="0" izz="${caster_swivel_inertia}"/>
+    </inertial>
+    <visual>
+      <origin xyz="${-caster_trail / 2} 0 ${-caster_pivot_z / 2}" rpy="0 ${pi / 2} 0"/>
+      <geometry>
+        <cylinder radius="0.004" length="${caster_trail}"/>
+      </geometry>
+      <material name="mcub_gray"/>
+    </visual>
+    <collision>
+      <origin xyz="${-caster_trail / 2} 0 ${-caster_pivot_z / 2}" rpy="0 ${pi / 2} 0"/>
+      <geometry>
+        <cylinder radius="0.004" length="${caster_trail}"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <joint name="caster_wheel_joint" type="continuous">
+    <parent link="caster_swivel_link"/>
+    <child link="caster_wheel_link"/>
+    <origin xyz="${-caster_trail} 0 ${caster_wheel_radius - caster_pivot_z}" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit effort="0.1" velocity="30.0"/>
+    <dynamics damping="${caster_axle_damping}" friction="0.0"/>
+  </joint>
+  <link name="caster_wheel_link">
+    <inertial>
+      <mass value="${caster_wheel_mass}"/>
+      <inertia ixx="${caster_wheel_ixx}" ixy="0" ixz="0"
+               iyy="${caster_wheel_iyy}" iyz="0" izz="${caster_wheel_izz}"/>
+    </inertial>
+    <visual>
+      <origin rpy="${pi / 2} 0 0"/>
+      <geometry>
+        <cylinder radius="${caster_wheel_radius}" length="${caster_wheel_width}"/>
+      </geometry>
+      <material name="mcub_gray"/>
+    </visual>
+    <collision>
+      <origin rpy="${pi / 2} 0 0"/>
+      <geometry>
+        <cylinder radius="${caster_wheel_radius}" length="${caster_wheel_width}"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <!-- SLC1_link is the ROS LaserScan frame and is located on the scan plane. -->
+  <joint name="base_to_SLC1" type="fixed">
+    <parent link="base_link"/>
+    <child link="SLC1_link"/>
+    <origin xyz="${lidar_scan_x} ${lidar_scan_y} ${lidar_scan_z}"
+            rpy="0 0 ${lidar_yaw}"/>
+  </joint>
+  <link name="SLC1_link">
+    <inertial>
+      <origin xyz="0 0 ${lidar_cog_z}" rpy="0 0 0"/>
+      <mass value="${lidar_mass}"/>
+      <inertia ixx="${lidar_ixx}" ixy="0" ixz="0"
+               iyy="${lidar_iyy}" iyz="0" izz="${lidar_izz}"/>
+    </inertial>
+    <!-- The cylinder center is the LiDAR scan line/plane. -->
+    <visual>
+      <geometry>
+        <cylinder radius="${lidar_head_radius}" length="${lidar_head_height}"/>
+      </geometry>
+      <material name="mcub_black"/>
+    </visual>
+    <collision>
+      <geometry>
+        <cylinder radius="${lidar_head_radius}" length="${lidar_head_height}"/>
+      </geometry>
+    </collision>
+  </link>
+
+  <!-- Preserve the SLC1_base frame used by the current RViz configuration. -->
+  <joint name="SLC1_base_joint" type="fixed">
+    <parent link="SLC1_link"/>
+    <child link="SLC1_base"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+  <link name="SLC1_base">
+    <visual>
+      <origin xyz="0 0 ${lidar_base_center_z}" rpy="0 0 0"/>
+      <geometry>
+        <box size="${lidar_base_size_x} ${lidar_base_size_y} ${lidar_base_size_z}"/>
+      </geometry>
+      <material name="mcub_black"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 ${lidar_base_center_z}" rpy="0 0 0"/>
+      <geometry>
+        <box size="${lidar_base_size_x} ${lidar_base_size_y} ${lidar_base_size_z}"/>
+      </geometry>
+    </collision>
+  </link>
+</robot>

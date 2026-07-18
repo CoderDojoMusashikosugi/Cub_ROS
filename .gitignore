@@ -64,3 +64,16 @@ COLCON_IGNORE
 !docker/home/colcon_ws/src/cub/.gitkeep
 !docker/home/rosbag/.gitkeep
 target.env
+
+# Unity generated files
+/unity/CubSim/[Ll]ibrary/
+/unity/CubSim/[Tt]emp/
+/unity/CubSim/[Oo]bj/
+/unity/CubSim/[Ll]ogs/
+/unity/CubSim/[Uu]ser[Ss]ettings/
+/unity/CubSim/[Bb]uilds/
+/unity/CubSim/Assets/Ros2ForUnity/
+/unity/CubSim/Assets/Ros2ForUnity.meta
+/unity/*.log
+/unity/ros2-for-unity/build/
+/unity/ros2-for-unity/install/
