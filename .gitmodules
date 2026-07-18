@@ -13,12 +13,6 @@
 [submodule "ros/ndt_omp"]
 	path = ros/ndt_omp
 	url = https://github.com/nobu323/ndt_omp.git
-[submodule "ros/hdl_global_localization"]
-	path = ros/hdl_global_localization
-	url = https://github.com/koide3/hdl_global_localization
-[submodule "ros/hdl_localization"]
-	path = ros/hdl_localization
-	url = https://github.com/nobu323/hdl_localization.git
 [submodule "ros/cxd5602pwbimu_localizer_node"]
 	path = ros/cxd5602pwbimu_localizer_node
 	url = https://github.com/nobu323/cxd5602pwbimu_localizer_node.git
@@ -37,3 +31,7 @@
 [submodule "ros/hesai_ros_driver"]
 	path = ros/hesai_ros_driver
 	url = https://github.com/HesaiTechnology/HesaiLidar_ROS_2.0
+[submodule "unity/ros2-for-unity"]
+	path = unity/ros2-for-unity
+	url = https://github.com/RobotecAI/ros2-for-unity.git
+	branch = feature/jazzy-support
