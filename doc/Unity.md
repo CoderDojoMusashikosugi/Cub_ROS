@@ -91,6 +91,8 @@ Slamtec C1は`SLC1_link`をスキャン面としてCPU Raycastで再現し、`se
 | 方向 | topic | message | frame |
 |---|---|---|---|
 | ROSからUnity | `/cmd_vel_atom` | `geometry_msgs/msg/Twist` | - |
+| UnityからROS | `/joy` | `sensor_msgs/msg/Joy` | - |
+| UnityからROS | `/joy/controller_type` | `std_msgs/msg/String` | - |
 | UnityからROS | `/odom` | `nav_msgs/msg/Odometry` | `odom` / `base_link` |
 | UnityからROS | `/scan` | `sensor_msgs/msg/LaserScan` | `SLC1_link` |
 | UnityからROS | `/joint_states` | `sensor_msgs/msg/JointState` | - |
@@ -98,6 +100,27 @@ Slamtec C1は`SLC1_link`をスキャン面としてCPU Raycastで再現し、`se
 | UnityからROS | `/clock` | `rosgraph_msgs/msg/Clock` | - |
 
 ROS接続コードは`CUB_ROS2` defineが有効なPlayerへ組み込む。WindowsではWindowsネイティブのROS 2 Jazzy環境をsourceしてJazzy対応版`ros2-for-unity`のstandalone Assetを生成し、`unity/scripts/setup.ps1`で`unity/CubSim/Assets/Ros2ForUnity`へ配置する。PlayerにはROS DLLとRMW用ament indexを同梱するため、配布先へROS 2を別途インストールする必要はない。Unity PlayerとDockerコンテナの`ROS_DOMAIN_ID`を一致させ、RMWには`rmw_fastrtps_cpp`を使用する。
+
+### ゲームパッド入力
+
+シミュレーション時はWindows上のUnityがゲームパッドを読み、Linuxの`joy_linux`と同じ`/joy`を50 Hzで発行する。対応機種はXboxコントローラーとDualSenseとし、axis/button配列は`cub_commander`の既存の`JoyToXBox1914`、`JoyToDualSense`が期待するLinux joystick番号へ変換する。対応機器がない間は`/joy`を発行せず、切断時は停止用のニュートラル値を1回発行する。
+
+WindowsのXboxコントローラーはUnityプロセスからXInputを直接ポーリングする。DualSenseとUbuntu版はUnity Input Systemを使用する。Unityは`Run In Background`を有効にし、Input Systemのbackground behaviorを`IgnoreFocus`に設定する。Editorでは入力を常にGame Viewへ送る設定も適用するため、Unity以外のウィンドウでROSコマンドやRVizを操作している間もゲームパッド入力と`/joy`発行を継続する。キーボードやマウスではなく、ゲームパッドを遠隔操作入力として使用する。
+
+Windows EditorでXbox入力が`Controller: Xbox Controller`と表示されたままの場合はEditorを一度再起動する。直接ポーリングが有効な場合は`Controller: XInput Controller 1`と表示される。
+
+Unityは検出した種類を`/joy/controller_type`へ`xbox`または`dualsense`として1 Hzで発行する。`cub_commander`はこの値を受けた場合だけ自動認識結果を上書きするため、実機ではUnityを起動しなければ従来どおり`/dev/input/js0`から種類を自動認識する。`auto`を受信すると自動認識へ戻る。種類を通知してから`/joy`を開始するまで短い待機時間を設け、起動順による誤変換を避ける。
+
+`mcub_bringup`の`joy_linux_node`はシミュレーション時も停止しない。WSL2へゲームパッドデバイスを渡していない通常構成では同nodeはデータを発行せず、Unityだけが`/joy`のpublisherになる。WSL2やコンテナへ同じコントローラーを明示的に渡すとpublisherが二重になるため、その構成は使用しない。
+
+確認時はコントローラーをWindowsへ接続してからUnityでシミュレーションを開始し、画面左上の`Controller`表示が`Xbox Controller (xbox)`または`DualSense (dualsense)`になることを確認する。接続はシミュレーション開始後でも自動検出される。Docker側では次を実行する。
+
+```bash
+./docker/run_in_container.sh ros2 topic echo /joy/controller_type --once
+./docker/run_in_container.sh ros2 topic echo /joy --once
+```
+
+入力APIで機器を認識できない場合、UnityはConsoleへInput Systemが列挙したdevice、layout、interfaceを一度だけ出力する。Windowsの`joy.cpl`にも機器が出ない場合はUnity側設定ではなく、コントローラーの電源、USBケーブル、Windowsドライバーを先に確認する。
 
 ### xacroからUnityモデルを更新する
 
@@ -135,7 +158,7 @@ WSL2上で作業する場合は次を実行する。
 ./docker/run_in_container.sh ros2 run cub_simulation cub_simulation_smoke
 ```
 
-`topic list`では`/clock`、`/cmd_vel_atom`、`/joint_states`、`/odom`、`/scan`、`/tf`を確認できる。Unity Editorは非アクティブでもシミュレーションとROS通信を継続する。`cub_simulation_smoke`はLiDAR、odometry、joint states、TFを受信し、`/cmd_vel_atom`へ前進指令を送ってUnity上の移動まで検査する。Unityは実機のhardware launchが提供するセンサ・駆動境界を置き換えるため、ROS側では実機の`control_mcub`、`wheel_odometry`、`sllidar_ros2`を同時に起動しない。mCub向けパッケージをクリーンビルドするときは、リポジトリルートの`target.env`を`CUB_TARGET=mcub`（全機種を対象にする場合は`all`）にしてからビルドする。RVizを使用するときは、xacroから`/robot_description`と`/tf_static`を生成する`robot_state_publisher`を次のコマンドで起動する。
+`topic list`では`/clock`、`/cmd_vel_atom`、`/joint_states`、`/joy`、`/joy/controller_type`、`/odom`、`/scan`、`/tf`を確認できる。Unity Editorは非アクティブでもシミュレーションとROS通信を継続する。`cub_simulation_smoke`はLiDAR、odometry、joint states、TFを受信し、`/cmd_vel_atom`へ前進指令を送ってUnity上の移動まで検査する。Unityは実機のhardware launchが提供するセンサ・駆動境界を置き換えるため、ROS側では実機の`control_mcub`、`wheel_odometry`、`sllidar_ros2`を同時に起動しない。mCub向けパッケージをクリーンビルドするときは、リポジトリルートの`target.env`を`CUB_TARGET=mcub`（全機種を対象にする場合は`all`）にしてからビルドする。RVizを使用するときは、xacroから`/robot_description`と`/tf_static`を生成する`robot_state_publisher`を次のコマンドで起動する。
 
 ```bash
 ./docker/run_in_container.sh ros2 launch mcub_bringup simulation.launch.py

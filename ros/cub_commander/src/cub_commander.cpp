@@ -4,6 +4,7 @@
 #include "sensor_msgs/msg/joy.hpp"
 #include "geometry_msgs/msg/twist.hpp"
 #include "std_msgs/msg/empty.hpp"
+#include "std_msgs/msg/string.hpp"
 #include "cub_commander/joypad.hpp"
 #include <math.h>
 #include <algorithm>
@@ -40,6 +41,8 @@ class CubCommander : public rclcpp::Node
     {
       subscription_ = this->create_subscription<sensor_msgs::msg::Joy>(
       "/joy", 10, std::bind(&CubCommander::topic_callback, this, _1));
+      controller_type_subscription_ = this->create_subscription<std_msgs::msg::String>(
+      "/joy/controller_type", 10, std::bind(&CubCommander::controller_type_callback, this, _1));
       cmd_vel_sub_ = this->create_subscription<geometry_msgs::msg::Twist>(
       "/cmd_vel", 10, std::bind(&CubCommander::cmd_vel_nav_callback, this, _1));
       publisher_ = this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel_atom", 10);
@@ -71,6 +74,19 @@ class CubCommander : public rclcpp::Node
     rclcpp::Time cmd_vel_stamp_;
 
     bool autonomous = true;
+
+    void controller_type_callback(const std_msgs::msg::String & msg)
+    {
+      if(msg.data == controller_type_override_){
+        return;
+      }
+      if(joy.setDeviceType(msg.data)){
+        controller_type_override_ = msg.data;
+        RCLCPP_INFO(this->get_logger(), "controller type override: %s", msg.data.c_str());
+      }else{
+        RCLCPP_WARN(this->get_logger(), "unsupported controller type: %s", msg.data.c_str());
+      }
+    }
 
     void topic_callback(const sensor_msgs::msg::Joy & msg)
     {
@@ -141,6 +157,8 @@ class CubCommander : public rclcpp::Node
     }
 
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr subscription_;
+    std::string controller_type_override_;
+    rclcpp::Subscription<std_msgs::msg::String>::SharedPtr controller_type_subscription_;
     rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_sub_;
     rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr publisher_; 
     rclcpp::Publisher<std_msgs::msg::Empty>::SharedPtr start_button_pub_; 

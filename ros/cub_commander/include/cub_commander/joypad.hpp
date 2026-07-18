@@ -12,6 +12,7 @@ public:
   void update(const sensor_msgs::msg::Joy &msg);
 
   void setDevice(std::string dev_name);
+  bool setDeviceType(const std::string &device_type);
   void updateDevice();
   bool connected();
 
@@ -86,6 +87,7 @@ private:
   JoypadBase* device = &dualsense;
   std::string dev_name="/dev/input/js0";
   bool device_updated = false;
+  bool device_type_overridden = false;
   std::shared_ptr<rclcpp::Clock> clock_;  
 };
 

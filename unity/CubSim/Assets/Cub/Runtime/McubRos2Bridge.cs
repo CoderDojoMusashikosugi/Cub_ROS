@@ -21,12 +21,23 @@ namespace CubSim
         private IPublisher<sensor_msgs.msg.JointState> jointStatePublisher;
         private IPublisher<rosgraph_msgs.msg.Clock> clockPublisher;
         private IPublisher<tf2_msgs.msg.TFMessage> transformPublisher;
+        private IPublisher<sensor_msgs.msg.Joy> joyPublisher;
+        private IPublisher<std_msgs.msg.String> controllerTypePublisher;
         private readonly object commandLock = new object();
         private float commandLinear;
         private float commandAngular;
         private bool hasCommand;
         private float nextOdometryPublishTime;
+        private float nextJoyPublishTime;
+        private float nextControllerTypePublishTime;
+        private float joyReadyTime;
+        private string announcedControllerType = string.Empty;
+        private int announcedControllerDeviceId = -1;
+        private bool hadSupportedController;
+        private string lastControllerDiagnostic = string.Empty;
 #endif
+
+        public string ControllerStatus { get; private set; } = "Controller: waiting";
 
         public bool IsRosReady
         {
@@ -62,6 +73,7 @@ namespace CubSim
         private void FixedUpdate()
         {
             if (node == null) return;
+            PublishGamepad();
             lock (commandLock)
             {
                 if (hasCommand)
@@ -94,7 +106,72 @@ namespace CubSim
             jointStatePublisher = node.CreatePublisher<sensor_msgs.msg.JointState>("/joint_states");
             clockPublisher = node.CreatePublisher<rosgraph_msgs.msg.Clock>("/clock");
             transformPublisher = node.CreatePublisher<tf2_msgs.msg.TFMessage>("/tf");
-            Debug.Log("ROS 2 ready: subscribe /cmd_vel_atom; publish /odom, /scan, /joint_states, /tf and /clock.");
+            joyPublisher = node.CreatePublisher<sensor_msgs.msg.Joy>("/joy");
+            controllerTypePublisher = node.CreatePublisher<std_msgs.msg.String>("/joy/controller_type");
+            Debug.Log("ROS 2 ready: subscribe /cmd_vel_atom; publish /joy, /joy/controller_type, /odom, /scan, /joint_states, /tf and /clock.");
+        }
+
+        private void PublishGamepad()
+        {
+            var now = Time.unscaledTime;
+            if (now + 1e-6f < nextJoyPublishTime) return;
+            nextJoyPublishTime = now + 0.02f;
+
+            if (!UnityGamepadJoySource.TryRead(out var sample))
+            {
+                if (hadSupportedController)
+                {
+                    PublishNeutralJoy(announcedControllerType);
+                    Debug.LogWarning("Supported gamepad disconnected; published a neutral /joy sample.");
+                }
+                hadSupportedController = false;
+                ControllerStatus = "Controller: no supported device";
+                var diagnostic = UnityGamepadJoySource.DescribeDevices();
+                if (diagnostic != lastControllerDiagnostic)
+                {
+                    lastControllerDiagnostic = diagnostic;
+                    Debug.LogWarning($"No supported gamepad detected. {diagnostic}");
+                }
+                return;
+            }
+
+            hadSupportedController = true;
+            if (sample.ControllerType != announcedControllerType ||
+                sample.DeviceId != announcedControllerDeviceId)
+            {
+                announcedControllerType = sample.ControllerType;
+                announcedControllerDeviceId = sample.DeviceId;
+                joyReadyTime = now + 0.1f;
+                nextControllerTypePublishTime = 0f;
+                ControllerStatus = $"Controller: {sample.Description} ({sample.ControllerType})";
+                Debug.Log($"Gamepad detected: {sample.Description}; ROS type={sample.ControllerType}");
+            }
+
+            if (now + 1e-6f >= nextControllerTypePublishTime)
+            {
+                controllerTypePublisher.Publish(new std_msgs.msg.String { Data = announcedControllerType });
+                nextControllerTypePublishTime = now + 1f;
+            }
+            if (now < joyReadyTime) return;
+
+            var message = new sensor_msgs.msg.Joy
+            {
+                Axes = sample.Axes,
+                Buttons = sample.Buttons
+            };
+            node.clock.UpdateROSClockTime(message.Header.Stamp);
+            joyPublisher.Publish(message);
+        }
+
+        private void PublishNeutralJoy(string controllerType)
+        {
+            var message = new sensor_msgs.msg.Joy
+            {
+                Axes = new float[8],
+                Buttons = new int[controllerType == "xbox" ? 15 : 14]
+            };
+            node.clock.UpdateROSClockTime(message.Header.Stamp);
+            joyPublisher.Publish(message);
         }
 
         private void PublishOdometry()
@@ -207,6 +284,8 @@ namespace CubSim
             if (jointStatePublisher != null) node.RemovePublisher<sensor_msgs.msg.JointState>(jointStatePublisher);
             if (clockPublisher != null) node.RemovePublisher<rosgraph_msgs.msg.Clock>(clockPublisher);
             if (transformPublisher != null) node.RemovePublisher<tf2_msgs.msg.TFMessage>(transformPublisher);
+            if (joyPublisher != null) node.RemovePublisher<sensor_msgs.msg.Joy>(joyPublisher);
+            if (controllerTypePublisher != null) node.RemovePublisher<std_msgs.msg.String>(controllerTypePublisher);
             ros2Unity.RemoveNode(node);
         }
 #endif

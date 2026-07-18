@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 namespace CubSim
 {
@@ -29,6 +30,11 @@ namespace CubSim
         private void Awake()
         {
             Application.runInBackground = true;
+            InputSystem.settings.backgroundBehavior = InputSettings.BackgroundBehavior.IgnoreFocus;
+#if UNITY_EDITOR
+            InputSystem.settings.editorInputBehaviorInPlayMode =
+                InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
+#endif
 #if CUB_ROS2
             NativeProcessEnvironment.Set("AMENT_PREFIX_PATH", NativePluginRoot());
 #endif
@@ -199,11 +205,13 @@ namespace CubSim
         {
             var ready = spawner != null && spawner.SpawnedRobot != null &&
                         spawner.SpawnedRobot.GetComponent<McubRos2Bridge>()?.IsRosReady == true;
-            GUI.Box(new Rect(12f, 12f, 390f, 106f), string.Empty);
+            var bridge = spawner?.SpawnedRobot?.GetComponent<McubRos2Bridge>();
+            GUI.Box(new Rect(12f, 12f, 430f, 130f), string.Empty);
             GUI.Label(new Rect(24f, 22f, 270f, 22f), $"{WorldNames[selectedWorld]} / {RobotNames[selectedRobot]}");
             GUI.Label(new Rect(24f, 46f, 270f, 22f), ready ? "ROS 2: ready" : "ROS 2: waiting for Docker");
-            GUI.Label(new Rect(24f, 68f, 355f, 22f), $"DDS: {rosTransportStatus}");
-            GUI.Label(new Rect(24f, 90f, 355f, 22f), "Stop Play mode to change settings.");
+            GUI.Label(new Rect(24f, 68f, 395f, 22f), $"DDS: {rosTransportStatus}");
+            GUI.Label(new Rect(24f, 90f, 395f, 22f), bridge?.ControllerStatus ?? "Controller: waiting");
+            GUI.Label(new Rect(24f, 112f, 395f, 22f), "Stop Play mode to change settings.");
         }
 
         private static GUIStyle HeaderStyle()
