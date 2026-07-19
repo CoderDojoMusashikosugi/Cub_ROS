@@ -49,7 +49,79 @@ Unity固有の依存物、設定、シナリオ、補助ツールは原則とし
 
 Unity用作業ツリーはWindows側、Docker用作業ツリーはWSL2のLinuxファイルシステムへ置いてもよい。その場合は両cloneを同じrevisionに保つ。`update_mcub_model.ps1`は稼働中`cub_ros`の実際のbind mount元を検出するため、WSL2ネイティブcloneを使用していてもWindows側の生成URDFを更新できる。ROSの`build`、`install`、`log`はDocker volumeまたはWSL2のLinuxファイルシステムに置き、Windows側へ生成しない。
 
-`ros2-for-unity`のstandalone Assetを生成するWindows環境には、[ROS 2公式のWindows binary手順](https://docs.ros.org/en/jazzy/Installation/Windows-Install-Binary.html)のpixi環境、Windows版ROS 2 Jazzy、Visual Studio 2022 C++ツール、CMake、Ninjaを導入する。pixi環境へ入りROS 2 JazzyをsourceしたPowerShellから`unity/scripts/build_ros2_for_unity.ps1`を実行する。このスクリプトは長いCMakeパスを避けるため`C:\r`を一時work rootとして使い、ROS DLL、pixi側のネイティブ依存DLL、RMW選択用ament indexをstandalone Assetへまとめる。通常は`unity/scripts/setup.ps1`がAsset未生成時だけこの処理を呼び出す。
+`ros2-for-unity`のstandalone Assetを生成するWindows環境には、[ROS 2公式のWindows binary手順](https://docs.ros.org/en/jazzy/Installation/Windows-Install-Binary.html)に従ったpixi環境、Windows版ROS 2 Jazzy、Visual Studio 2022 C++ツールを導入する。CMake、Ninja、Python、colconおよびROSのネイティブ依存物はpixi環境へ導入し、Windowsへ個別に追加しない。
+
+#### Windows版ROS 2 Jazzyのインストール
+
+Visual Studio Installerで`C++によるデスクトップ開発`とWindows SDKを導入した後、リポジトリルートの通常のPowerShellで次を実行する。管理者権限は不要である。ROS 2 Windows binaryは完全には再配置可能でないため、インストール先は公式手順と同じ`C:\pixi_ws`を使用する。
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+.\unity\scripts\install_ros2_jazzy_windows.ps1
+```
+
+このスクリプトは[Pixi公式配布](https://pixi.sh/latest/installation/)のPixi 0.72.2、ROS 2公式`jazzy`ブランチの`pixi.toml`、[ROS 2公式リリース](https://github.com/ros2/ros2/releases/tag/release-jazzy-20250820)のJazzy Patch Release 6 Windows amd64 archiveを取得する。固定した配布物はGitHub公式release metadataのSHA-256と照合する。pixi環境の生成とROS 2 archiveの展開後、`rcl.dll`、`rmw_fastrtps_cpp.dll`、`rclcpp`のament indexを検査する。ROS archiveは約650 MBで、pixi依存物を含めると数GBの空き容量が必要である。途中で再実行した場合は正常な既存ファイルを再利用し、既存環境を自動削除しない。インストール済み環境だけを検査する場合は次を使用する。
+
+```powershell
+.\unity\scripts\install_ros2_jazzy_windows.ps1 -CheckOnly
+```
+
+新しいPowerShellでWindows版ROS 2を使用するときは、リポジトリルートで有効化スクリプトをdot sourceする。
+
+```powershell
+. .\unity\scripts\activate_ros2_jazzy_windows.ps1
+$env:ROS_DISTRO
+```
+
+`ros2-for-unity` Assetを初回生成または再生成するときも、同じPowerShellで続けて実行する。
+
+```powershell
+.\unity\scripts\setup.ps1
+```
+
+スクリプトを使わず手動で導入する場合は、次の順に実行する。リリースを更新する場合はROS 2のリリースページでJazzyのWindows release archive名を確認し、pixi環境とUnity疎通試験を同時に更新する。
+
+```powershell
+New-Item -ItemType Directory -Path C:\pixi_ws -Force
+
+# Pixiを取得してC:\pixi_ws\pixi.exeへ展開
+Invoke-WebRequest `
+  https://github.com/prefix-dev/pixi/releases/download/v0.72.2/pixi-x86_64-pc-windows-msvc.zip `
+  -OutFile C:\pixi_ws\pixi.zip
+if ((Get-FileHash C:\pixi_ws\pixi.zip -Algorithm SHA256).Hash -ne `
+    '6C6C4B1E7E55EC590BD755AE720956B5549526442F0DCB8707941D3289E31477') {
+  throw 'Pixi archiveのSHA-256が一致しません。'
+}
+Expand-Archive C:\pixi_ws\pixi.zip C:\pixi_ws\pixi-extract
+Move-Item C:\pixi_ws\pixi-extract\pixi.exe C:\pixi_ws\pixi.exe
+
+# ROS 2が指定する依存物をpixi環境へ導入
+Invoke-WebRequest `
+  https://raw.githubusercontent.com/ros2/ros2/refs/heads/jazzy/pixi.toml `
+  -OutFile C:\pixi_ws\pixi.toml
+C:\pixi_ws\pixi.exe install --manifest-path C:\pixi_ws\pixi.toml
+
+# ROS 2 Jazzy Windows binaryを取得して展開
+Invoke-WebRequest `
+  https://github.com/ros2/ros2/releases/download/release-jazzy-20250820/ros2-jazzy-20250820-windows-release-amd64.zip `
+  -OutFile C:\pixi_ws\ros2-jazzy.zip
+if ((Get-FileHash C:\pixi_ws\ros2-jazzy.zip -Algorithm SHA256).Hash -ne `
+    'B2DECBC86BDC6103FA839ABA49DD320AD7A2E00657E97E8E2778CED0106A58C8') {
+  throw 'ROS 2 archiveのSHA-256が一致しません。'
+}
+Expand-Archive C:\pixi_ws\ros2-jazzy.zip C:\pixi_ws
+
+# 現在のPowerShellでpixiとROS 2を有効化
+$hook = & C:\pixi_ws\pixi.exe shell-hook `
+  --manifest-path C:\pixi_ws\pixi.toml --shell powershell
+Invoke-Expression ($hook -join [Environment]::NewLine)
+$env:QT_QPA_PLATFORM_PLUGIN_PATH = `
+  'C:\pixi_ws\.pixi\envs\default\Library\plugins\platforms'
+. C:\pixi_ws\ros2-windows\local_setup.ps1
+$env:ROS_DISTRO
+```
+
+pixi環境へ入りROS 2 JazzyをsourceしたPowerShellから`unity/scripts/build_ros2_for_unity.ps1`を実行する。このスクリプトは長いCMakeパスを避けるため`C:\r`を一時work rootとして使い、ROS DLL、pixi側のネイティブ依存DLL、RMW選択用ament indexをstandalone Assetへまとめる。通常は`unity/scripts/setup.ps1`がAsset未生成時だけこの処理を呼び出す。
 
 ### Ubuntu
 
@@ -249,7 +321,170 @@ CubSim.exe --world mobility_lab --robot cub3 --scenario curb_50mm --autostart --
 
 高低差の評価には大規模な市街地ワールドに加えて、小規模な`MobilityLab`を用意する。50 mm段差への正面進入、片輪進入、段差からの降下、横断勾配、底面接触、空転等をSpawnPointとscenarioの組合せとして管理し、自動回帰試験に使用する。
 
+## 次期CubSim拡張の採用方針
+
+現在のmCub向け仮実装を、Cub4、SPiDAR、複雑なmesh形状、多種類のLiDARおよびIMUへ拡張する。既存実装と`Unity_ROS2_Robot_Simulator`の調査結果を踏まえ、次を基本方針とする。
+
+- ROS 2通信はJazzy対応版`ros2-for-unity`によるネイティブDDS構成を維持する。ROS-TCP-Connectorへは移行しない。
+- センサ計測には`UnitySensors`を採用する。`UnitySensorsROS`には依存せず、計測結果を`ros2-for-unity`へ渡すCubSim固有adapterを実装する。
+- ロボットモデルはUnity公式`URDF-Importer`を使用し、EditorでURDFからArticulationBody階層とPrefabを生成する。Player起動時にURDFを解釈して毎回モデルを組み立てる方式は標準としない。
+- ロボット固有情報の原本はURDF/Xacroとし、手動管理する`RobotDefinition`ファイルは必須にしない。
+- 複数ロボットおよび人間参加者はLAN内のUnityネットワークで同期できるようにする。当面はロボット間およびロボット・人間間の物理衝突を扱わず、互いにセンサから観測できることを対象とする。
+- 現在の「起動後に設定GUIを表示し、設定確定後にシミュレーションを開始する」操作フローを維持する。
+
+既存のmCub専用runtime parserとSlamtec C1実装は、移行完了までの互換実装および比較基準として残す。C1固有の反射率、量子化、距離誤差等がUnitySensorsの標準機能だけでは再現できない場合は、UnitySensorsの共通計測機構にC1固有モデルを追加するか、同じpublisher adapterへ接続できる専用backendとして保持する。
+
+### 責務の分離
+
+次の依存方向を維持し、センサ計測、ROS message変換、ロボット制御、ネットワーク同期を一つのMonoBehaviourへ集中させない。
+
+```text
+URDF/Xacro
+  └─ Editor Import Pipeline
+       ├─ URDF-Importer
+       ├─ CubSim URDF Extension Reader
+       └─ Generated Robot Prefab
+            ├─ ArticulationBody / Collider
+            ├─ Robot Controller
+            ├─ UnitySensors Sensor
+            ├─ ros2-for-unity Adapter
+            └─ Network Participant / Sensor Proxy
+```
+
+UnitySensorsは計測とセンサ固有データ生成、ros2-for-unity adapterはROS message、topic、frame、QoSとpublish周期、Robot Controllerは走行指令と機体物理、Network ParticipantはLAN参加者の所有権と姿勢同期だけを担当する。UnityのネットワークへPointCloud2や画像を流さず、センサを所有するクライアントがローカルで計測してDDSへ直接publishする。
+
+### URDFを中心とするロボット定義
+
+ロボットごとに手動管理する定義ファイルを増やさないため、機体固有情報は可能な限りURDF/Xacroへ置く。CubSimへ取り込む全ロボットは`base_link`を持つことを規約とし、`base_link`を別ファイルで指定しない。現在のmCub、Cub4、SPiDARもこの規約を満たす。
+
+| 情報 | 保持場所 |
+|---|---|
+| robot名、link、joint、visual、collision、inertial | URDF/Xacro |
+| センサの取付位置とframe | URDF/Xacroのlink/joint |
+| センサ種類、機種、走査条件、更新周期、ノイズ | URDF内のシミュレータ拡張要素 |
+| 駆動方式、制御対象joint | `ros2_control`要素またはCubSim拡張要素 |
+| `base_link` | CubSim規約 |
+| topic、QoSの標準値 | センサ種別および互換profileのCubSim既定値 |
+| 実体名、初期姿勢、操作担当 | 設定GUI、Sceneまたはspawn request |
+| ROS namespace、TF prefix、ROS Domain | 実体生成時のruntime設定 |
+| ArticulationBody、UnitySensors、adapter | Editorが生成するPrefab |
+
+URDF標準だけで表現できないUnitySensors固有設定は、`<gazebo><sensor>`に近い要素または名前を明示したCubSim拡張要素として記述し、Editor import pipelineが元XMLから読み取る。URDF-Importerが未知の要素をUnity Componentへ変換することは期待しない。Xacroを原本とし、展開URDFとPrefabは生成物として再生成する。生成Prefabを直接編集せず、必要な追加Componentはimport後処理またはwrapper Prefabで付与する。
+
+`RobotDefinition` ScriptableObjectは採用必須としない。将来、Prefab検索やEditor表示の高速化にcatalogが必要になった場合も、URDFの`<robot name>`と生成Prefabから自動生成し、人がURDFと二重管理しない。センサ機種ごとに再利用する走査pattern等は共有assetまたは実装内registryとして管理してよいが、ロボットごとの定義を複製しない。
+
+ROS namespace、実体名、初期姿勢は同じURDFから複数実体を生成したときに変わるため、URDFへ固定しない。frame名はURDF link名から取得し、複数ROSロボットを同一ROS graphへ接続する場合だけruntimeのTF prefixを加える。
+
+### mesh、LODおよびCollider
+
+複雑な外観meshは描画用`visual`と接触判定用`collision`を分離する。大規模meshに対するLODは、カメラから遠い物体ほど三角形数の少ないmeshへ切り替え、描画負荷を下げる機能である。簡略Colliderは、見た目のmeshをそのまま物理判定へ使用せず、box、sphere、capsule、convex hullまたは低ポリゴンmeshで接触形状を近似し、Physicsの負荷と不安定性を抑える機能である。
+
+- 静的な建物、地形、設備にはLOD Groupと簡略MeshColliderを適用してよい。
+- ロボットのvisualにはLODを適用できるが、車輪、段差、底面等の走行評価に関係するcollisionはURDFで明示した低ポリゴン形状を使用する。
+- 動的ArticulationBodyへ、表示meshから自動生成した大規模な非convex MeshColliderを付けない。
+- リモートロボットのセンサ用proxyには、LiDARから見える外形を保つ簡略Colliderを使用する。
+
+通常使用するワールドはUnity EditorでSceneまたはPrefabとして作成し、Gitで管理する。primitive、外部mesh、ライトを実行中に配置する機能は、ビルド済みPlayerでCube、Sphere、外部モデル、Directional/Point/Spot Light等を追加して簡易試験環境を作るruntime editorであり、通常のUnity Editor編集とは別機能である。標準ワールドの制作手段にはせず、臨時障害物の配置、デモ、ユーザー作成シナリオ用の追加機能として扱う。保存する場合はSceneを直接変更せず、配置物のasset ID、Transform、物理設定等をscenarioデータへ保存する。
+
+### LAN内マルチ参加者シミュレーション
+
+初期のネットワーク実装にはNetcode for GameObjectsとUnity Transportを使用し、同一LAN内のIPアドレスとUDP portによる直接接続を対象とする。Lobby、Relay、Matchmaker等の外部サービスは使用しない。クライアント同士を直接接続せず、全参加者はHostへ接続する。
+
+同じPlayerを次のいずれかの役割で起動できるようにする。
+
+| 起動モード | 動作 |
+|---|---|
+| `Single` | ネットワークなしで従来どおり開始する |
+| `Host` | ServerとローカルClientを同一Playerで開始し、画面操作も行う |
+| `Join` | 指定したLAN内HostへClientとして接続する |
+| `Server` | 将来必要になった場合の画面操作を持たない調整用Server |
+
+Hostは接続、参加者、実体ID、所有権、world/scenario、Pause/Resetおよび共有時刻を管理する。各ロボットまたは人間には`cub4_01`、`manual_robot_01`、`human_01`等のUnityセッション内で一意な実体名を付ける。この実体名はUnityの接続Client IDやROS namespaceとは別物とし、Clientの再接続で変更しない。
+
+ロボットごとに`Autonomous`、`Manual`、`EmergencyStop`のcommand modeを持ち、ROSの`cmd_vel`とUnity操作入力を同時に車体へ適用しない。所有Clientがcommand sourceを選択し、Hostは所有権とmodeを全Clientへ通知する。
+
+今回の対象では、各Clientが所有するロボットと静的環境との接触だけをローカルで計算する。所有していないロボットと人間は、受信した姿勢で動くkinematicなsensor proxyとして表示する。proxyはカメラへ描画し、LiDAR用Colliderを持つが、ロボットとの物理衝突は無効にする。
+
+```text
+LocalRobotPhysics × Environment       = collision有効
+LocalRobotPhysics × RemoteActorSensor = collision無効
+Sensor query       → Environment       = 検出
+Sensor query       → RemoteActorSensor = 検出
+Sensor query       → LocalRobotPhysics = 自己検出を除外
+```
+
+所有Clientだけが対象ロボットのArticulationBody/Rigidbody、Robot Controller、UnitySensorsおよびROS bridgeを有効にする。リモートproxyはroot pose、速度、必要なjoint角だけを補間表示し、センサデータそのものは同期しない。人間は初期段階ではCapsule Colliderを持つsensor proxyでよい。
+
+この分散方式は床、壁、棚等の静的環境に適用する。押して動く箱、自動ドア等はHostまたは一つのClientへ所有権を割り当てて状態を同期する。複数参加者が同じ動的環境物へ同時に力を加える試験、ロボット間衝突、接触力の定量評価は対象外とし、必要になった時点でserver-authoritative physicsを別途検討する。
+
+リモート物体は通信遅延と補間を経た位置でセンサに映るため、定性的な停止・回避動作の手動確認には使用できるが、厳密な安全距離や接触時刻の評価には使用しない。必要に応じて姿勢と共にHost時刻、速度を同期し、`位置誤差 ≒ 移動速度 × 通信遅延`を評価する。
+
+将来ROS 2の`simulation_interfaces`からspawn、reset等を操作する場合は、実装済みfeatureだけを公開する。spawn requestの`name`はUnity root objectと実体registryへ必ず反映し、重複時は`allow_renaming`に従い、応答へ確定した`entity_name`を返す。`entity_namespace`は`Namespaced` profileでだけROS namespaceとして使用する。未実装のStep等を成功扱いにせず、Unityの設定GUIと外部serviceが同じ`SimulationSessionManager`を呼び出す構成にする。
+
+### 分散時のROS 2通信
+
+当面の標準シナリオは、ROSで自律走行するロボットを1台だけとし、対向ロボットと人間はUnity内部から手動操作する。この構成ではROS namespaceを導入せず、現在のmCubの絶対topic名とROS側ソフトウェアを変更しない。
+
+```text
+Autonomous Robot
+  ROS bridge: enabled
+  /cmd_vel_atom, /odom, /scan, /joint_states, /tf, /clock
+
+Manual Robot / Human / Observer
+  ROS bridge: disabled
+  Unityネットワーク内だけで同期
+```
+
+Unityセッション内の実体名はnamespaceがなくても必須であるが、ROSから見えるロボットが1台ならROS名へ反映する必要はない。複数Clientで同じROS bridgeを重複起動しないよう、所有Clientだけがnode、publisher、subscriberを生成する。
+
+複数のROS制御ロボットを同じ`ROS_DOMAIN_ID`へ接続し、全台が`/scan`、`/odom`、`/cmd_vel_atom`等を使用するとデータと指令が混在する。node名を変えるだけでは回避できない。将来この構成が必要になった場合は、次のいずれかを明示的に選ぶ。
+
+1. topicを相対名にしてロボットごとのROS namespaceとTF prefixを使用する。
+2. 既存topicを変更しない場合は、ロボットごとに異なる`ROS_DOMAIN_ID`を使用してROS graphを分離する。
+
+ROS Domainを分離する場合、ロボット側コードとtopic名は変更しなくてよいが、Domain間のnodeは互いに見えない。`/clock`はROS Domainごとに一つとし、全Domainで同じHost由来のシミュレーション時刻をpublishする。複数Domainを一つのRVizや評価nodeから見る必要が出た場合はDDS Router等を別途検討する。
+
+ROS設定は次の互換profileとして扱い、既存mCubを既定値とする。
+
+| profile | 用途 |
+|---|---|
+| `Disabled` | 人間、観察者、Unity内だけで操作するロボット |
+| `Legacy mCub` | 現在の絶対topicと既定ROS Domainをそのまま使用する |
+| `Isolated Legacy` | topicは変更せず、ロボット固有のROS Domainを使用する |
+| `Namespaced` | 将来、複数ロボットを同一ROS graphへ接続する |
+
+### 設定GUIとセッション開始フロー
+
+既存の設定GUIを廃止せず、ネットワークと参加者設定を追加する。引数なしの起動では必ず設定GUIを表示し、`Start Simulation`を押すまでPhysics、UnitySensors、ROS nodeを開始しない。
+
+```text
+Session:       Single / Host / Join
+Participant:   ROS Robot / Manual Robot / Human / Observer
+World:         HostまたはSingleで選択
+Robot Model:   Robot参加者だけ選択
+ROS Profile:   Disabled / Legacy mCub / Isolated Legacy / Namespaced
+ROS Domain ID: ROSを有効にした場合だけ表示
+Host Address:  Joinの場合だけ表示
+Port:          HostまたはJoinの場合だけ表示
+```
+
+`Host`はworld、scenario、共有時計を決定して待受を開始した後、ローカル参加者を生成する。`Join`はHostへ接続し、Hostが指定したworld/scenarioをロードしてから、承認された参加者Prefabを生成する。Join側でworldを独自選択させない。全Clientは同じScene、Prefab、meshおよびcollision assetを持ち、ネットワークではasset本体ではなく安定したIDと状態だけを送る。
+
+シミュレーション開始後も現在の一時停止、再開、リセット、センサ状態表示、終了操作を維持する。ネットワークセッションではHostだけがworld全体のPause、Reset、終了を確定し、Clientの操作要求をHostが全参加者へ反映する。セッション終了後は設定GUIへ戻り、Single、Host、Joinまたは参加者種別を選び直せるようにする。
+
+### 段階的な実装順序
+
+1. `URDF-Importer`によるmCub Editor importと生成Prefabを成立させ、現在の走行・ROS回帰試験を通す。
+2. URDF import後処理とUnitySensors adapterを実装し、C1、IMU、Velodyne、Mid-360を順に追加する。
+3. Cub4とSPiDARを同じpipelineで生成し、機体ごとの物理値、駆動方式、collisionを検証する。
+4. 静的ワールドへLOD、簡略Collider、センサ反射特性を追加する。
+5. 設定GUIへ`Single`、`Host`、`Join`と参加者種別を追加し、LAN内で人間および手動ロボットのsensor proxyを同期する。
+6. ROS bridgeを所有Clientだけで動作させ、`Legacy mCub`で既存ROSソフトウェアとの互換性を確認する。
+7. 必要性が確認された段階で`Isolated Legacy`、複数ROSロボット、runtime object placement、動的環境物を追加する。
+
 ## センサシミュレーション
+
+本節はセンサの要求仕様と将来の性能改善案を示す。標準実装は前節の方針どおり`UnitySensors`を使用し、CubSimはセンサ機種profile、URDF import後処理、スケジューリングおよび`ros2-for-unity` adapterを追加する。以下に記載する独自の`GpuDepthBackend`、`CpuRaycastBackend`、`LidarSensorDefinition`等は、UnitySensorsの公開APIで要求精度または性能を満たせないことを計測で確認した場合の拡張境界であり、UnitySensorsを置き換える実装を最初から並行開発しない。
 
 各センサはロボットPrefabへ複数配置できる独立したコンポーネントとして実装し、センサ固有仕様、計測バックエンド、ROS出力を分離する。センサの位置と向きはURDF/Xacroのframeを基準とし、Unity側だけに外部パラメータを保持しない。
 
