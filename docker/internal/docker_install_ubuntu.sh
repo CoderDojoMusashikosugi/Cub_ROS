@@ -21,3 +21,16 @@ echo -e "{\n    \"detachKeys\": \"ctrl-\\\\\\\"\n}" > /home/$USER/.docker/config
 sudo gpasswd -a $USER docker
 sudo service docker restart
 echo "sudo無しでdockerコマンドを使用するには、コンピューターを再起動してください。"
+
+if [ -n "${WSL_INTEROP:-}" ] || grep -qi microsoft /proc/sys/kernel/osrelease 2>/dev/null; then
+  cat <<'EOF'
+
+WSL上でDocker CEを動作させるにはsystemdを有効にする必要があります。
+/etc/wsl.confに次の設定を追記してください（既存の[boot]セクションがある場合は統合してください）。
+
+[boot]
+systemd=true
+
+設定後、WindowsのPowerShellで `wsl --shutdown` を実行してからUbuntuを起動し直してください。
+EOF
+fi

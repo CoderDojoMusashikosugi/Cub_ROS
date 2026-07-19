@@ -99,6 +99,7 @@ Move-Item C:\pixi_ws\pixi-extract\pixi.exe C:\pixi_ws\pixi.exe
 Invoke-WebRequest `
   https://raw.githubusercontent.com/ros2/ros2/refs/heads/jazzy/pixi.toml `
   -OutFile C:\pixi_ws\pixi.toml
+C:\pixi_ws\pixi.exe add --manifest-path C:\pixi_ws\pixi.toml "ninja>=1.11,<2"
 C:\pixi_ws\pixi.exe install --manifest-path C:\pixi_ws\pixi.toml
 
 # ROS 2 Jazzy Windows binaryを取得して展開
@@ -120,6 +121,8 @@ $env:QT_QPA_PLATFORM_PLUGIN_PATH = `
 . C:\pixi_ws\ros2-windows\local_setup.ps1
 $env:ROS_DISTRO
 ```
+
+`activate_ros2_jazzy_windows.ps1`はPixiとROS 2に加え、Visual Studio Installerから最新のVisual Studioを検出してx64 MSVC開発環境も現在のPowerShellへ読み込む。実行後に`cl.exe`、`ninja.exe`、`cmake.exe`が見つからない場合は、Visual Studio Installerの`C++によるデスクトップ開発`、Windows SDK、またはPixi環境のNinjaが不足している。
 
 pixi環境へ入りROS 2 JazzyをsourceしたPowerShellから`unity/scripts/build_ros2_for_unity.ps1`を実行する。このスクリプトは長いCMakeパスを避けるため`C:\r`を一時work rootとして使い、ROS DLL、pixi側のネイティブ依存DLL、RMW選択用ament indexをstandalone Assetへまとめる。通常は`unity/scripts/setup.ps1`がAsset未生成時だけこの処理を呼び出す。
 

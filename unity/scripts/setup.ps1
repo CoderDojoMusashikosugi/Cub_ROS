@@ -16,8 +16,13 @@ if (-not (Test-Path $assetSource) -and -not $SkipRos2AssetBuild) {
         throw "Windows ROS 2 Jazzy is not sourced. Source local_setup.ps1, then rerun setup.ps1."
     }
     if (-not (Test-Path (Join-Path $ros2ForUnity "src\ros2cs"))) {
-        & (Join-Path $ros2ForUnity "pull_repositories.ps1")
-        if ($LASTEXITCODE -ne 0) { throw "Failed to fetch ros2-for-unity dependencies." }
+        Push-Location $ros2ForUnity
+        try {
+            & ".\pull_repositories.ps1"
+            if ($LASTEXITCODE -ne 0) { throw "Failed to fetch ros2-for-unity dependencies." }
+        } finally {
+            Pop-Location
+        }
     }
     & (Join-Path $PSScriptRoot "build_ros2_for_unity.ps1") -Clean
     if ($LASTEXITCODE -ne 0) { throw "ros2-for-unity standalone build failed." }

@@ -98,6 +98,9 @@ function Test-Environment {
     if ($LASTEXITCODE -ne 0) { throw "pixi environment activation failed." }
     Invoke-Expression ($hook -join [Environment]::NewLine)
     $env:QT_QPA_PLATFORM_PLUGIN_PATH = Join-Path $InstallRoot ".pixi\envs\default\Library\plugins\platforms"
+    if (-not (Get-Command ninja -ErrorAction SilentlyContinue)) {
+        throw "Ninja is missing from the pixi environment. Rerun this installer without -CheckOnly."
+    }
     . $rosSetup
     if ($env:ROS_DISTRO -ne "jazzy") {
         throw "Expected ROS_DISTRO=jazzy after sourcing $rosSetup, got '$env:ROS_DISTRO'."
@@ -133,6 +136,11 @@ if (-not (Test-Path $pixi)) {
 }
 
 Download-File -Uri $pixiManifestUrl -Destination $pixiManifest -MinimumBytes 1000
+if (-not (Select-String -LiteralPath $pixiManifest -Pattern '^\s*ninja\s*=' -Quiet)) {
+    Write-Host "Adding Ninja to the ROS 2 pixi environment."
+    & $pixi add --manifest-path $pixiManifest "ninja>=1.11,<2"
+    if ($LASTEXITCODE -ne 0) { throw "Failed to add Ninja to the pixi environment." }
+}
 Write-Host "Installing the pinned ROS 2 dependency environment. This can take several minutes."
 & $pixi install --manifest-path $pixiManifest
 if ($LASTEXITCODE -ne 0) { throw "pixi install failed." }
