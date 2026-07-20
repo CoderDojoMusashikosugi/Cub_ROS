@@ -12,27 +12,14 @@ namespace CubSim.Editor
     public static class CubSimProjectTools
     {
         private const string ScenePath = "Assets/Cub/Scenes/Bootstrap.unity";
-        private const string UrdfPath = "Assets/StreamingAssets/Robots/mcub.urdf";
 
         [MenuItem("CubSim/Validate generated mCub URDF")]
         public static void ValidateProject()
         {
-            var absoluteUrdfPath = Path.Combine(Application.dataPath, "StreamingAssets/Robots/mcub.urdf");
-            if (!File.Exists(absoluteUrdfPath)) throw new FileNotFoundException("Run the model update script first.", absoluteUrdfPath);
-            var model = UrdfModel.Parse(File.ReadAllText(absoluteUrdfPath));
-            McubUrdfSpawner.ValidateMcubModel(model);
-
-            var scanJoint = model.Joint("base_to_SLC1");
-            var scanHead = model.Links["SLC1_link"].Visuals.Single(item => item.Type == UrdfGeometryType.Cylinder);
-            if (Mathf.Abs(scanJoint.Origin.PositionRos.z - 0.140f) > 1e-5f)
-                throw new InvalidOperationException("Expected provisional SLC1 scan height 0.140 m.");
-            if (Mathf.Abs(scanHead.Radius - 0.025f) > 1e-5f)
-                throw new InvalidOperationException("Expected SLC1 head radius 0.025 m.");
-            if (SlamtecC1Lidar.SamplesPerScan * SlamtecC1Lidar.ScanFrequencyHz != SlamtecC1Lidar.SampleFrequencyHz)
-                throw new InvalidOperationException("C1 sample count does not match its sample frequency.");
-
+            McubPrefabImporter.Import();
+            McubPrefabImporter.LoadAndValidateGeneratedPrefab();
             CreateBootstrapScene();
-            Debug.Log($"CubSim validation passed: {model.Links.Count} links, {model.Joints.Count} joints, C1 5000 samples/s.");
+            Debug.Log("CubSim validation passed: URDF-Importer prefab, ArticulationBody drive, UnitySensors C1.");
         }
 
         [MenuItem("CubSim/Create bootstrap scene")]

@@ -1,5 +1,6 @@
 <?xml version="1.0"?>
-<robot name="mcub" xmlns:xacro="http://www.ros.org/wiki/xacro">
+<robot name="mcub" xmlns:xacro="http://www.ros.org/wiki/xacro"
+       xmlns:cubsim="https://github.com/tomoki-na/Cub_ROS/cubsim">
   <!--
     mCub simulation model template.
 
@@ -36,7 +37,7 @@
   <xacro:arg name="base_mass" default="1.000"/>
   <xacro:arg name="base_cog_x" default="-0.045"/>
   <xacro:arg name="base_cog_y" default="0.000"/>
-  <xacro:arg name="base_cog_z" default="0.070"/>
+  <xacro:arg name="base_cog_z" default="0.040"/>
   <xacro:arg name="base_ixx" default="0.0020"/>
   <xacro:arg name="base_ixy" default="0.0"/>
   <xacro:arg name="base_ixz" default="0.0"/>
@@ -46,7 +47,7 @@
 
   <!-- Wheel diameter is confirmed. Track requires resolving the 0.130/0.125 m discrepancy above. -->
   <xacro:arg name="wheel_radius" default="0.020"/>
-  <xacro:arg name="wheel_track" default="0.130"/>
+  <xacro:arg name="wheel_track" default="0.125"/>
   <xacro:arg name="wheel_x" default="0.000"/>
   <xacro:arg name="wheel_width" default="0.015"/>
   <xacro:arg name="wheel_mass" default="0.050"/>
@@ -74,8 +75,6 @@
   <xacro:arg name="caster_wheel_ixx" default="0.000005"/>
   <xacro:arg name="caster_wheel_iyy" default="0.000004"/>
   <xacro:arg name="caster_wheel_izz" default="0.000005"/>
-  <xacro:arg name="caster_swivel_damping" default="0.02"/>
-  <xacro:arg name="caster_axle_damping" default="0.005"/>
 
   <!--
     The LiDAR visual geometry follows cub_description/urdf/mcub.urdf:
@@ -142,8 +141,6 @@
   <xacro:property name="caster_wheel_ixx" value="$(arg caster_wheel_ixx)"/>
   <xacro:property name="caster_wheel_iyy" value="$(arg caster_wheel_iyy)"/>
   <xacro:property name="caster_wheel_izz" value="$(arg caster_wheel_izz)"/>
-  <xacro:property name="caster_swivel_damping" value="$(arg caster_swivel_damping)"/>
-  <xacro:property name="caster_axle_damping" value="$(arg caster_axle_damping)"/>
   <xacro:property name="lidar_scan_x" value="$(arg lidar_scan_x)"/>
   <xacro:property name="lidar_scan_y" value="$(arg lidar_scan_y)"/>
   <xacro:property name="lidar_scan_z" value="$(arg lidar_scan_z)"/>
@@ -233,14 +230,15 @@
   <xacro:drive_wheel side="left" y="${wheel_track / 2}" sign="1"/>
   <xacro:drive_wheel side="right" y="${-wheel_track / 2}" sign="1"/>
 
-  <!-- Passive trailing caster: free swivel about z plus free wheel rotation about y. -->
-  <joint name="caster_swivel_joint" type="continuous">
+  <!--
+    Stable simulation approximation: preserve the caster frames and visual wheel,
+    but use fixed joints and a spherical contact shape. This behaves as a ball
+    caster without an undamped swivel degree of freedom or faceted wheel contact.
+  -->
+  <joint name="caster_swivel_joint" type="fixed">
     <parent link="base_link"/>
     <child link="caster_swivel_link"/>
     <origin xyz="${caster_pivot_x} 0 ${caster_pivot_z}" rpy="0 0 0"/>
-    <axis xyz="0 0 1"/>
-    <limit effort="0.1" velocity="30.0"/>
-    <dynamics damping="${caster_swivel_damping}" friction="0.0"/>
   </joint>
   <link name="caster_swivel_link">
     <inertial>
@@ -264,13 +262,10 @@
     </collision>
   </link>
 
-  <joint name="caster_wheel_joint" type="continuous">
+  <joint name="caster_wheel_joint" type="fixed">
     <parent link="caster_swivel_link"/>
     <child link="caster_wheel_link"/>
     <origin xyz="${-caster_trail} 0 ${caster_wheel_radius - caster_pivot_z}" rpy="0 0 0"/>
-    <axis xyz="0 1 0"/>
-    <limit effort="0.1" velocity="30.0"/>
-    <dynamics damping="${caster_axle_damping}" friction="0.0"/>
   </joint>
   <link name="caster_wheel_link">
     <inertial>
@@ -286,9 +281,8 @@
       <material name="mcub_gray"/>
     </visual>
     <collision>
-      <origin rpy="${pi / 2} 0 0"/>
       <geometry>
-        <cylinder radius="${caster_wheel_radius}" length="${caster_wheel_width}"/>
+        <sphere radius="${caster_wheel_radius}"/>
       </geometry>
     </collision>
   </link>
@@ -330,6 +324,7 @@
   <link name="SLC1_base">
     <visual>
       <origin xyz="0 0 ${lidar_base_center_z}" rpy="0 0 0"/>
+
       <geometry>
         <box size="${lidar_base_size_x} ${lidar_base_size_y} ${lidar_base_size_z}"/>
       </geometry>
@@ -342,4 +337,8 @@
       </geometry>
     </collision>
   </link>
+
+  <!-- CubSim Editor import metadata. UnitySensorsROS is intentionally not used. -->
+  <cubsim:sensor name="slc1" type="raycast_lidar" link="SLC1_link"
+                 frequency="10.0" samples="500" min_range="0.05" max_range="12.0"/>
 </robot>

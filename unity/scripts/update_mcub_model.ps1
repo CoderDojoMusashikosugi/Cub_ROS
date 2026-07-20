@@ -1,6 +1,6 @@
 param(
-    [string]$WslDistribution = "Ubuntu-22.04",
-    [string]$UnityEditor = "C:\Program Files\Unity\Hub\Editor\6000.4.2f1\Editor\Unity.exe",
+    [string]$WslDistribution = "Ubuntu",
+    [string]$UnityEditor = "C:\Program Files\Unity\Hub\Editor\6000.5.3f1\Editor\Unity.exe",
     [switch]$SkipUnityValidation
 )
 

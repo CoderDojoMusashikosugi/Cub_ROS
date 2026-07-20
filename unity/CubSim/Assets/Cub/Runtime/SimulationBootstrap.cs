@@ -24,7 +24,7 @@ namespace CubSim
         private string rosTransportStatus = "not configured";
         private bool simulationRunning;
         private string validationMessage = string.Empty;
-        private McubUrdfSpawner spawner;
+        private McubPrefabSpawner spawner;
         private FollowCamera followCamera;
 
         private void Awake()
@@ -155,7 +155,7 @@ namespace CubSim
 #endif
 
             CreateWorld(selectedWorld);
-            spawner = new GameObject("RobotSpawner").AddComponent<McubUrdfSpawner>();
+            spawner = new GameObject("RobotSpawner").AddComponent<McubPrefabSpawner>();
             spawner.ConfigureSpawn(position, new Vector3(0f, yaw, 0f));
             followCamera.TargetProvider = () => spawner.SpawnedRobot == null ? null : spawner.SpawnedRobot.transform;
             if (localSmoke)
@@ -335,11 +335,29 @@ namespace CubSim
 
     public sealed class LocalSimulationSmoke : MonoBehaviour
     {
-        public McubUrdfSpawner Spawner;
-        private SlamtecC1Lidar lidar;
+        // cub_commander defaults to 60 degrees per second at full stick.
+        private const float ManualTurnCommand = Mathf.PI / 3f;
+        private const float StoppedAngularSpeed = 0.05f;
+        private const float RequiredStopTime = 0.3f;
+        public McubPrefabSpawner Spawner;
+        private IC1ScanSource lidar;
         private int scanCount;
         private float startedAt;
         private double initialX;
+        private Vector3 initialPosition;
+        private Vector3 initialForward;
+        private float maximumTiltDegrees;
+        private float minimumBodyHeight = float.PositiveInfinity;
+        private float maximumBodyHeight = float.NegativeInfinity;
+        private float maximumVerticalSpeed;
+        private Vector3 turnStartForward;
+        private double wheelYawRateSum;
+        private double bodyYawRateSum;
+        private int yawRateSamples;
+        private bool turnStarted;
+        private float turnStopStartedAt = -1f;
+        private float turnStoppedAt = -1f;
+        private float bodyYawRateAtStopCommand;
         private bool initialized;
 
         private void Start()
@@ -353,30 +371,114 @@ namespace CubSim
             if (!initialized && robot != null)
             {
                 initialized = true;
+                startedAt = Time.realtimeSinceStartup;
                 initialX = robot.Odometry.X;
-                lidar = robot.GetComponentInChildren<SlamtecC1Lidar>();
+                initialPosition = robot.RootArticulation.transform.position;
+                initialForward = PlanarForward(robot.RootArticulation.transform);
+                lidar = robot.GetComponentsInChildren<MonoBehaviour>(true)
+                    .OfType<IC1ScanSource>()
+                    .Single();
                 lidar.ScanReady += OnScan;
             }
 
             if (!initialized) return;
-            robot.SetVelocityCommand(0.1f, 0f);
             var elapsed = Time.realtimeSinceStartup - startedAt;
-            var travel = Math.Abs(robot.Odometry.X - initialX);
-            if (scanCount >= 10 && travel >= 0.02)
+            var root = robot.RootArticulation.transform;
+            maximumTiltDegrees = Mathf.Max(maximumTiltDegrees, Vector3.Angle(root.up, Vector3.up));
+            if (elapsed >= 0.5f)
             {
-                Debug.Log($"LOCAL_SMOKE_PASSED scans={scanCount} travel={travel:F3}m");
+                minimumBodyHeight = Mathf.Min(minimumBodyHeight, root.position.y);
+                maximumBodyHeight = Mathf.Max(maximumBodyHeight, root.position.y);
+                maximumVerticalSpeed = Mathf.Max(
+                    maximumVerticalSpeed,
+                    Mathf.Abs(robot.RootArticulation.linearVelocity.y));
+            }
+
+            if (elapsed < 0.5f)
+            {
+                robot.SetVelocityCommand(0f, 0f);
+            }
+            else if (elapsed < 3.5f)
+            {
+                robot.SetVelocityCommand(0.3f, 0f);
+            }
+            else if (elapsed < 4.0f)
+            {
+                robot.SetVelocityCommand(0f, 0f);
+            }
+            else if (elapsed < 6.0f)
+            {
+                if (!turnStarted)
+                {
+                    turnStarted = true;
+                    turnStartForward = PlanarForward(root);
+                }
+
+                robot.SetVelocityCommand(0f, ManualTurnCommand);
+                wheelYawRateSum += Math.Abs(robot.Odometry.AngularVelocity);
+                bodyYawRateSum += Math.Abs(robot.RootArticulation.angularVelocity.y);
+                yawRateSamples++;
+            }
+            else
+            {
+                robot.SetVelocityCommand(0f, 0f);
+                if (turnStopStartedAt < 0f)
+                {
+                    turnStopStartedAt = elapsed;
+                    bodyYawRateAtStopCommand = Mathf.Abs(robot.RootArticulation.angularVelocity.y);
+                }
+
+                if (turnStoppedAt < 0f &&
+                    Mathf.Abs(robot.RootArticulation.angularVelocity.y) <= StoppedAngularSpeed)
+                {
+                    turnStoppedAt = elapsed;
+                }
+            }
+
+            var odometryTravel = Math.Abs(robot.Odometry.X - initialX);
+            var physicalTravel = Vector3.ProjectOnPlane(root.position - initialPosition, Vector3.up).magnitude;
+            var yawReference = turnStarted ? turnStartForward : initialForward;
+            var physicalYaw = Mathf.Abs(Vector3.SignedAngle(yawReference, PlanarForward(root), Vector3.up));
+            var averageWheelYawRate = yawRateSamples == 0 ? 0.0 : wheelYawRateSum / yawRateSamples;
+            var averageBodyYawRate = yawRateSamples == 0 ? 0.0 : bodyYawRateSum / yawRateSamples;
+            var bodyHeightRange = maximumBodyHeight - minimumBodyHeight;
+            var turnStopTime = turnStoppedAt < 0f ? float.PositiveInfinity : turnStoppedAt - turnStopStartedAt;
+            if (elapsed >= 6.4f && scanCount >= 10 && physicalTravel >= 0.02f &&
+                physicalYaw >= 60f && maximumTiltDegrees <= 25f && bodyHeightRange <= 0.01f &&
+                bodyYawRateAtStopCommand >= 0.5f && turnStopTime <= RequiredStopTime)
+            {
+                Debug.Log(
+                    $"LOCAL_SMOKE_PASSED scans={scanCount} physicalTravel={physicalTravel:F3}m " +
+                    $"odomTravel={odometryTravel:F3}m yaw={physicalYaw:F1}deg " +
+                    $"wheelYawRate={averageWheelYawRate:F2} bodyYawRate={averageBodyYawRate:F2}rad/s " +
+                    $"stopYawRate={bodyYawRateAtStopCommand:F2}rad/s stopTime={turnStopTime:F3}s " +
+                    $"currentWheelYaw={robot.Odometry.AngularVelocity:F2} currentBodyYaw={robot.RootArticulation.angularVelocity.y:F2}rad/s " +
+                    $"maxTilt={maximumTiltDegrees:F1}deg " +
+                    $"heightRange={bodyHeightRange:F4}m maxVertical={maximumVerticalSpeed:F3}m/s");
                 Application.Quit(0);
             }
-            else if (elapsed > 10f)
+            else if (elapsed > 8f)
             {
-                Debug.LogError($"LOCAL_SMOKE_FAILED scans={scanCount} travel={travel:F3}m");
+                Debug.LogError(
+                    $"LOCAL_SMOKE_FAILED scans={scanCount} physicalTravel={physicalTravel:F3}m " +
+                    $"odomTravel={odometryTravel:F3}m yaw={physicalYaw:F1}deg " +
+                    $"wheelYawRate={averageWheelYawRate:F2} bodyYawRate={averageBodyYawRate:F2}rad/s " +
+                    $"stopYawRate={bodyYawRateAtStopCommand:F2}rad/s stopTime={turnStopTime:F3}s " +
+                    $"currentWheelYaw={robot.Odometry.AngularVelocity:F2} currentBodyYaw={robot.RootArticulation.angularVelocity.y:F2}rad/s " +
+                    $"maxTilt={maximumTiltDegrees:F1}deg " +
+                    $"heightRange={bodyHeightRange:F4}m maxVertical={maximumVerticalSpeed:F3}m/s");
                 Application.Quit(1);
             }
         }
 
+        private static Vector3 PlanarForward(Transform root)
+        {
+            return Vector3.ProjectOnPlane(root.forward, Vector3.up).normalized;
+        }
+
         private void OnScan(C1Scan scan)
         {
-            if (scan.Ranges.Length == SlamtecC1Lidar.SamplesPerScan) scanCount++;
+            if (scan.Ranges.Length == 500) scanCount++;
         }
 
         private void OnDestroy()

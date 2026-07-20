@@ -1,6 +1,6 @@
 param(
     [ValidateSet("Windows")][string]$Target = "Windows",
-    [string]$UnityEditor = "C:\Program Files\Unity\Hub\Editor\6000.4.2f1\Editor\Unity.exe"
+    [string]$UnityEditor = "C:\Program Files\Unity\Hub\Editor\6000.5.3f1\Editor\Unity.exe",
 )
 
 $ErrorActionPreference = "Stop"

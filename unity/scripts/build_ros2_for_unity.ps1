@@ -9,6 +9,7 @@ $sourceRoot = Join-Path $repoRoot "unity\ros2-for-unity"
 $buildRoot = Join-Path $WorkRoot "b"
 $installRoot = Join-Path $WorkRoot "i"
 $logRoot = Join-Path $WorkRoot "l"
+$opensslRuntimeDependencies = @()
 Push-Location $sourceRoot
 try {
     if ($env:ROS_DISTRO -ne "jazzy") { throw "ROS 2 Jazzy must be sourced before this script is run." }
@@ -21,12 +22,46 @@ try {
     & python "src\scripts\metadata_generator.py" --standalone
     if ($LASTEXITCODE -ne 0) { throw "ros2-for-unity metadata generation failed." }
 
+    $standaloneDependencyCmakeArgs = @()
+    if ($env:OS -eq "Windows_NT") {
+        if (-not $env:CONDA_PREFIX) {
+            throw "The Pixi environment is not active. Source activate_ros2_jazzy_windows.ps1 first."
+        }
+        $pixiRuntime = Join-Path $env:CONDA_PREFIX "Library\bin"
+        $opensslSsl = Get-ChildItem -LiteralPath $pixiRuntime -Filter "libssl-*-x64.dll" -File |
+            Sort-Object Name -Descending |
+            Select-Object -First 1
+        if (-not $opensslSsl) {
+            throw "An OpenSSL runtime DLL was not found in $pixiRuntime."
+        }
+        $opensslCryptoName = $opensslSsl.Name -replace '^libssl-', 'libcrypto-'
+        $opensslCrypto = Join-Path $pixiRuntime $opensslCryptoName
+        if (-not (Test-Path -LiteralPath $opensslCrypto -PathType Leaf)) {
+            throw "$opensslCryptoName matching $($opensslSsl.Name) was not found in $pixiRuntime."
+        }
+
+        # ros2cs currently names the OpenSSL 1.1 DLLs explicitly. ROS 2 Jazzy's
+        # Pixi environment provides OpenSSL 3, so point those CMake cache entries
+        # at the installed version without modifying the checked-out dependency.
+        $standaloneDependencyCmakeArgs = @(
+            "-Dlibssl-1_1-x64.dll_PATH=$($opensslSsl.FullName)",
+            "-Dlibcrypto-1_1-x64.dll_PATH=$opensslCrypto"
+        )
+        $opensslRuntimeDependencies = @($opensslSsl.Name, $opensslCryptoName)
+    }
+
     New-Item -ItemType Directory -Force $WorkRoot | Out-Null
-    & colcon --log-base $logRoot build --merge-install --build-base $buildRoot --install-base $installRoot `
-        --event-handlers console_direct+ `
-        --cmake-args "-G" "Ninja" "-DSTANDALONE_BUILD:int=1" `
-        "-DCMAKE_BUILD_TYPE=Release" "-DBUILD_TESTING:int=0" `
-        "-DCMAKE_OBJECT_PATH_MAX=260" "--no-warn-unused-cli"
+    $cmakeArgs = @(
+        "-G", "Ninja", "-DSTANDALONE_BUILD:int=1",
+        "-DCMAKE_BUILD_TYPE=Release", "-DBUILD_TESTING:int=0",
+        "-DCMAKE_OBJECT_PATH_MAX=260", "--no-warn-unused-cli"
+    ) + $standaloneDependencyCmakeArgs
+    $colconArgs = @(
+        "--log-base", $logRoot, "build", "--merge-install",
+        "--build-base", $buildRoot, "--install-base", $installRoot,
+        "--event-handlers", "console_direct+", "--cmake-args"
+    ) + $cmakeArgs
+    & colcon @colconArgs
     if ($LASTEXITCODE -ne 0) { throw "ros2cs colcon build failed." }
 
     $assetRoot = Join-Path $sourceRoot "install\asset"
@@ -57,9 +92,8 @@ try {
         $null
     }
     $pixiDependencies = @(
-        "yaml.dll", "spdlog.dll", "fmt.dll", "console_bridge.dll",
-        "libcrypto-3-x64.dll", "libssl-3-x64.dll"
-    )
+        "yaml.dll", "spdlog.dll", "fmt.dll", "console_bridge.dll"
+    ) + $opensslRuntimeDependencies
     foreach ($dependency in $pixiDependencies) {
         $source = if ($pixiRuntime) { Join-Path $pixiRuntime $dependency } else { $null }
         if (-not $source -or -not (Test-Path $source)) {

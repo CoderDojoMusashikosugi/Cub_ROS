@@ -39,7 +39,7 @@
   </material>
   <link name="base_link">
     <inertial>
-      <origin rpy="0 0 0" xyz="-0.045 0.0 0.04"/>
+      <origin rpy="0 0 0" xyz="-0.045 0.0 0.07"/>
       <mass value="1.0"/>
       <inertia ixx="0.002" ixy="0.0" ixz="0.0" iyy="0.003" iyz="0.0" izz="0.004"/>
     </inertial>
@@ -117,15 +117,14 @@
       </geometry>
     </collision>
   </link>
-  <!--
-    Stable simulation approximation: preserve the caster frames and visual wheel,
-    but use fixed joints and a spherical contact shape. This behaves as a ball
-    caster without an undamped swivel degree of freedom or faceted wheel contact.
-  -->
-  <joint name="caster_swivel_joint" type="fixed">
+  <!-- Passive trailing caster: free swivel about z plus free wheel rotation about y. -->
+  <joint name="caster_swivel_joint" type="continuous">
     <parent link="base_link"/>
     <child link="caster_swivel_link"/>
     <origin rpy="0 0 0" xyz="-0.1 0 0.04"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="0.1" velocity="30.0"/>
+    <dynamics damping="0.02" friction="0.0"/>
   </joint>
   <link name="caster_swivel_link">
     <inertial>
@@ -147,10 +146,13 @@
       </geometry>
     </collision>
   </link>
-  <joint name="caster_wheel_joint" type="fixed">
+  <joint name="caster_wheel_joint" type="continuous">
     <parent link="caster_swivel_link"/>
     <child link="caster_wheel_link"/>
     <origin rpy="0 0 0" xyz="-0.015 0 -0.02"/>
+    <axis xyz="0 1 0"/>
+    <limit effort="0.1" velocity="30.0"/>
+    <dynamics damping="0.005" friction="0.0"/>
   </joint>
   <link name="caster_wheel_link">
     <inertial>
@@ -165,8 +167,9 @@
       <material name="mcub_gray"/>
     </visual>
     <collision>
+      <origin rpy="1.5707963267948966 0 0"/>
       <geometry>
-        <sphere radius="0.02"/>
+        <cylinder length="0.012" radius="0.02"/>
       </geometry>
     </collision>
   </link>

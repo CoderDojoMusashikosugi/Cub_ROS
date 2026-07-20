@@ -52,6 +52,7 @@ namespace CubSim
         public string Child;
         public UrdfPose Origin;
         public Vector3 AxisRos = Vector3.right;
+        public float Effort;
     }
 
     public sealed class UrdfModel
@@ -115,7 +116,8 @@ namespace CubSim
                     Parent = RequiredAttribute(jointElement.Element("parent"), "link"),
                     Child = RequiredAttribute(jointElement.Element("child"), "link"),
                     Origin = ParseOrigin(jointElement.Element("origin")),
-                    AxisRos = ParseVector(jointElement.Element("axis")?.Attribute("xyz")?.Value, Vector3.right)
+                    AxisRos = ParseVector(jointElement.Element("axis")?.Attribute("xyz")?.Value, Vector3.right),
+                    Effort = ParseFloat(jointElement.Element("limit")?.Attribute("effort")?.Value, 0f)
                 });
             }
 

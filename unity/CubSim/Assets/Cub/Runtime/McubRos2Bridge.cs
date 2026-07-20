@@ -10,7 +10,7 @@ namespace CubSim
     public sealed class McubRos2Bridge : MonoBehaviour
     {
         private McubRobot robot;
-        private SlamtecC1Lidar lidar;
+        private IC1ScanSource lidar;
 
 #if CUB_ROS2
         private ROS2UnityComponent ros2Unity;
@@ -35,6 +35,7 @@ namespace CubSim
         private int announcedControllerDeviceId = -1;
         private bool hadSupportedController;
         private string lastControllerDiagnostic = string.Empty;
+        private bool shuttingDown;
 #endif
 
         public string ControllerStatus { get; private set; } = "Controller: waiting";
@@ -44,14 +45,14 @@ namespace CubSim
             get
             {
 #if CUB_ROS2
-                return node != null;
+                return !shuttingDown && node != null;
 #else
                 return false;
 #endif
             }
         }
 
-        public void Initialize(McubRobot mcubRobot, SlamtecC1Lidar c1Lidar)
+        public void Initialize(McubRobot mcubRobot, IC1ScanSource c1Lidar)
         {
             robot = mcubRobot;
             lidar = c1Lidar;
@@ -66,12 +67,14 @@ namespace CubSim
 #if CUB_ROS2
         private void Update()
         {
+            if (shuttingDown) return;
             if (ros2Unity == null || !ros2Unity.Ok()) return;
             if (node == null) CreateRosEntities();
         }
 
         private void FixedUpdate()
         {
+            if (shuttingDown) return;
             if (node == null) return;
             PublishGamepad();
             lock (commandLock)
@@ -242,7 +245,7 @@ namespace CubSim
 
         private void PublishScan(C1Scan scan)
         {
-            if (scanPublisher == null) return;
+            if (shuttingDown || scanPublisher == null) return;
             var message = new sensor_msgs.msg.LaserScan
             {
                 Angle_min = scan.AngleMin,
@@ -274,8 +277,20 @@ namespace CubSim
             stamp.Nanosec = (uint)((time - seconds) * 1_000_000_000.0);
         }
 
+        private void OnDisable()
+        {
+            ShutdownRos();
+        }
+
         private void OnDestroy()
         {
+            ShutdownRos();
+        }
+
+        private void ShutdownRos()
+        {
+            if (shuttingDown) return;
+            shuttingDown = true;
             if (lidar != null) lidar.ScanReady -= PublishScan;
             if (node == null || ros2Unity == null || !ros2Unity.Ok()) return;
             if (commandSubscription != null) node.RemoveSubscription<geometry_msgs.msg.Twist>(commandSubscription);
@@ -287,6 +302,7 @@ namespace CubSim
             if (joyPublisher != null) node.RemovePublisher<sensor_msgs.msg.Joy>(joyPublisher);
             if (controllerTypePublisher != null) node.RemovePublisher<std_msgs.msg.String>(controllerTypePublisher);
             ros2Unity.RemoveNode(node);
+            node = null;
         }
 #endif
     }

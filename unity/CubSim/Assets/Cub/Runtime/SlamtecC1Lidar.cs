@@ -36,7 +36,7 @@ namespace CubSim
         [Range(0f, 1f)] public float Value = 0.7f;
     }
 
-    public sealed class SlamtecC1Lidar : MonoBehaviour
+    public sealed class SlamtecC1Lidar : MonoBehaviour, IC1ScanSource
     {
         public const int SamplesPerScan = 500;
         public const float ScanFrequencyHz = 10f;

@@ -86,7 +86,8 @@ namespace CubSim
                 FindVisual(links[leftJoint.Child]),
                 FindVisual(links[rightJoint.Child]),
                 leftGeometry.Radius,
-                track);
+                track,
+                Mathf.Min(leftJoint.Effort, rightJoint.Effort));
 
             var lidar = links["SLC1_link"].gameObject.AddComponent<SlamtecC1Lidar>();
             var bridge = baseLink.AddComponent<McubRos2Bridge>();
