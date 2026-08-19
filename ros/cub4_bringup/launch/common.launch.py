@@ -40,16 +40,6 @@ def generate_launch_description():
     #                                                   executable='velodyne_transform_node',
     #                                                   output='both',
     #                                                   parameters=[velodyne_convert_params])
-    realsense_launch_file_dir = os.path.join(
-        get_package_share_directory("realsense2_camera"),
-        'launch'
-    )
-    realsense_launch=IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(os.path.join(realsense_launch_file_dir, "rs_launch.py")),
-        launch_arguments={
-            'config_file': os.path.join(realsense_launch_file_dir, "config", "config.yaml"),
-        }.items()
-    )
 
     joy_dev = "/dev/input/js0"
 
@@ -173,8 +163,6 @@ def generate_launch_description():
         # velodyne_driver_node,
         # velodyne_transform_node, 
 
-        # RGB-D Camera -> launch_at_boot.launch.pyから移動
-        # realsense_launch,
         # # 3D LiDAR -> minipc_launch_at_boot.launch.pyへ移動したため、こちらはコメントアウト
         # Node(
         #     package='cub_commander',

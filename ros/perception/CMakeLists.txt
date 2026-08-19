@@ -11,7 +11,6 @@ find_package(ament_cmake_python REQUIRED)
 find_package(rclpy REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
-find_package(realsense2_camera_msgs REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(image_transport REQUIRED)
 find_package(PCL REQUIRED COMPONENTS common filters geometry)
@@ -57,7 +56,6 @@ ament_target_dependencies(
   HumanTracker
   "std_msgs"
   "sensor_msgs"
-  "realsense2_camera_msgs"
   "cv_bridge"
   "image_transport"
   "pcl_ros"

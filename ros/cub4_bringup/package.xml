@@ -12,7 +12,6 @@
   <exec_depend>cxd5602pwbimu_localizer_node</exec_depend>
   <exec_depend>velodyne_driver</exec_depend>
   <exec_depend>velodyne_pointcloud</exec_depend>
-  <exec_depend>realsense2_camera</exec_depend>
   <exec_depend>sllidar_ros2</exec_depend>
   <exec_depend>ublox_gps</exec_depend>
   <exec_depend>pointcloud_to_laserscan</exec_depend>

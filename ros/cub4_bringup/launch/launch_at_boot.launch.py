@@ -64,12 +64,6 @@ def generate_launch_description():
                                                       executable='velodyne_transform_node',
                                                       output='both',
                                                       parameters=[velodyne_convert_params])
-
-
-    realsense_launch_file_dir = os.path.join(
-        get_package_share_directory("realsense2_camera"),
-        'launch'
-    )
     
     # sllidarの起動　LとRで分ける
     sllidar_L_launch = IncludeLaunchDescription(
@@ -119,13 +113,6 @@ def generate_launch_description():
         ]
     )
 
-    realsense_launch=IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(os.path.join(realsense_launch_file_dir, "rs_launch.py")),
-        launch_arguments={
-            'config_file': os.path.join(realsense_launch_file_dir, "config", "config.yaml"),
-        }.items()
-    )
-    
     # LIDARのGroupAction
     slc_L_group = GroupAction(
         actions=[PushRosNamespace('sllidar_l'),sllidar_L_launch_delayed],
@@ -160,7 +147,4 @@ def generate_launch_description():
         # 3D LiDAR -> commmon.launch.pyでの起動に移動
         # velodyne_driver_node,
         # velodyne_transform_node,
-
-        # RGB-D Camera -> commmon.launch.pyでの起動に移動
-        # realsense_launch,
     ])

@@ -4,12 +4,6 @@
 [submodule "ros/sllidar_ros2"]
 	path = ros/sllidar_ros2
 	url = https://github.com/nobu323/sllidar_ros2
-[submodule "ros/lidarslam_ros2"]
-	path = ros/lidarslam_ros2
-	url = https://github.com/rsasaki0109/lidarslam_ros2.git
-[submodule "ros/realsense-ros"]
-	path = ros/realsense-ros
-	url = https://github.com/nobu323/realsense-ros.git
 [submodule "ros/ndt_omp"]
 	path = ros/ndt_omp
 	url = https://github.com/nobu323/ndt_omp.git
@@ -22,16 +16,9 @@
 [submodule "ros/livox_ros_driver2"]
 	path = ros/livox_ros_driver2
 	url = https://github.com/t-nagatani/livox_ros_driver2.git
-[submodule "ros/FAST-LIVO2-ROS2-MID360-Fisheye"]
-	path = ros/FAST-LIVO2-ROS2-MID360-Fisheye
-	url = https://github.com/t-nagatani/FAST-LIVO2-ROS2-MID360-Fisheye.git
 [submodule "ros/fast_gicp"]
 	path = ros/fast_gicp
 	url = https://github.com/koide3/fast_gicp.git
 [submodule "ros/hesai_ros_driver"]
 	path = ros/hesai_ros_driver
 	url = https://github.com/HesaiTechnology/HesaiLidar_ROS_2.0
-[submodule "unity/ros2-for-unity"]
-	path = unity/ros2-for-unity
-	url = https://github.com/RobotecAI/ros2-for-unity.git
-	branch = feature/jazzy-support
