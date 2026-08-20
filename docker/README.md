@@ -72,7 +72,8 @@
     - docker_install_raspi.sh: ./docker/install.shで、環境がRasPiだと判定されたらこれが呼び出される。
     - docker_install_ubuntu.sh: ./docker/install.shで、環境がUbuntuだと判定されたらこれが呼び出される。
     - docker_util.sh: docker-composeのための設定を読み込む。特に.env系のファイルなど。
-    - docker-compose-nvidia.yml: NVIDIA Container Toolkitを利用する際に、docker composeのoverride機能を利用してこのファイルの設定を追加する。
+    - docker-compose-nvidia.yml: PC等の環境でNVIDIA Container Toolkitを利用する際に、docker composeのoverride機能を利用してこのファイルの設定（deploy）を追加する。
+    - docker-compose-nvidia-jetson.yml: Jetson環境でNVIDIA Container Toolkitを利用する際に、docker composeのoverride機能を利用してこのファイルの設定（runtime: nvidia）を追加する。
     - entrypoint_vnc.sh: VNCコンテナ用のentrypoint。イメージ作成時にコピーされるので、書き換えだけでは動作は変化しない。
     - entrypoint.sh: VNCコンテナ用のentrypoint。イメージ作成時にコピーされるので、書き換えだけでは動作は変化しない。
     - ★vnc_build.sh: 現在の設定に従って新たなVNCイメージを生成するスクリプト。これを使う機会は極めて少ないので、間違えて実行しないようにinternalに置いた。

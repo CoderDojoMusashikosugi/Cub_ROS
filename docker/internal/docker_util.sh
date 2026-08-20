@@ -40,9 +40,18 @@ if grep -qi 'microsoft.*WSL2' /proc/sys/kernel/osrelease 2>/dev/null; then
     IS_WSL2=1
 fi
 
+IS_JETSON=0
+if [ -f /etc/nv_tegra_release ] || uname -r | grep -qi tegra; then
+    IS_JETSON=1
+fi
+
 RUNTIME_NVIDIA=`docker info 2>/dev/null | grep nvidia || true`
-if [ "$IS_WSL2" -eq 0 ] && [ -n "$RUNTIME_NVIDIA" ]; then # runtime: nvidia を指定可能な環境の場合（WSL2を除く）
-    docker_compose=$docker_compose" -f docker/internal/docker-compose-nvidia.yml" # runtime: nvidiaをつける
+if [ "$IS_WSL2" -eq 0 ] && [ -n "$RUNTIME_NVIDIA" ]; then # GPU利用可能な環境の場合（WSL2を除く）
+    if [ "$IS_JETSON" -eq 1 ]; then
+        docker_compose=$docker_compose" -f docker/internal/docker-compose-nvidia-jetson.yml" # Jetson向け (runtime: nvidia)
+    else
+        docker_compose=$docker_compose" -f docker/internal/docker-compose-nvidia.yml"        # PC向け (deploy: driver: nvidia)
+    fi
 fi
 
 # macOS向け/macOS以外向け設定
