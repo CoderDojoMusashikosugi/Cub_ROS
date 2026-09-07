@@ -8,6 +8,10 @@
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
+  <depend>rclcpp</depend>
+  <depend>sensor_msgs</depend>
+  <depend>libserial-dev</depend>
+
   <exec_depend>micro_ros_agent</exec_depend>
   <exec_depend>cxd5602pwbimu_localizer_node</exec_depend>
   <exec_depend>velodyne_driver</exec_depend>
