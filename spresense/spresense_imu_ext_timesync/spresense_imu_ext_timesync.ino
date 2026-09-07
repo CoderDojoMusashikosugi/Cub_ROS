@@ -40,7 +40,7 @@
  ****************************************************************************/
 
 // Serial Communication
-constexpr uint32_t SERIAL_BAUD = 1152000;   // Host PC Serial (1152000 bps recommended for high-rate IMU)
+constexpr uint32_t SERIAL_BAUD = 230400;    // Host PC Serial (230400 bps for 240Hz binary IMU stream)
 constexpr uint32_t GNSS_BAUD   = 9600;      // UM982 GNSS Serial2 (D0: RX, D1: TX)
 
 // Pin Configuration
@@ -57,37 +57,46 @@ constexpr uint8_t EVENT_CAPTURE_PIN = PIN_D04;  // Shared event input (FALLING e
  * Gyro Range (dps):       125, 250, 500, 1000, 2000, 4000
  * FIFO Threshold:         1, 2, 3, 4
  */
-#define SAMPLING_RATE       960
+#define SAMPLING_RATE       240
 #define ACCEL_RANGE         16
 #define GYRO_RANGE          500
 #define FIFO_THRESHOLD      4
 
-/*
- * Output format:
- * 0: Human-readable floating point CSV (timestamp[s], temp, gx, gy, gz, ax, ay, az)
- * 1: Official cxd5602pwbimu_logger Hex format (%08x,%08x,... - compatible with gyrocompass.py)
- * 2: GNSS-synchronized UTC microsecond CSV (utc_us, temp, gx, gy, gz, ax, ay, az)
- */
-#define OUTPUT_FORMAT_FLOAT 0
-#define OUTPUT_FORMAT_HEX   1
-#define OUTPUT_FORMAT_UTC   2
+// Status Bitmask Definitions
+constexpr uint8_t STATUS_CLOCK_SYNCHRONIZED = 0x01; // Bit 0: Currently synchronized
+constexpr uint8_t STATUS_SYNC_EVER           = 0x02; // Bit 1: Synchronized at least once since boot
+constexpr uint8_t STATUS_SYNC_WITHIN_2S      = 0x04; // Bit 2: Last sync was within 2 seconds
+constexpr uint8_t STATUS_SYNC_WITHIN_1M      = 0x08; // Bit 3: Last sync was within 1 minute (60s)
+constexpr uint8_t STATUS_SYNC_WITHIN_1H      = 0x10; // Bit 4: Last sync was within 1 hour (3600s)
 
-#define CURRENT_OUTPUT_FORMAT OUTPUT_FORMAT_HEX
+// Binary Protocol for IMU Data (Total packet: 46 bytes fixed length)
+struct __attribute__((packed)) SyncedIMUData {
+  uint64_t utc_timestamp_us; // Synchronized UTC timestamp in microseconds (0 if not synchronized)
+  uint32_t sensor_timestamp; // 19.2MHz clock timestamp from cxd5602pwbimu_data_t
+  float temp;                // Temperature [degC]
+  float gx;                  // Gyro X [rad/s]
+  float gy;                  // Gyro Y [rad/s]
+  float gz;                  // Gyro Z [rad/s]
+  float ax;                  // Accel X [G]
+  float ay;                  // Accel Y [G]
+  float az;                  // Accel Z [G]
+  uint8_t status;            // Status bit flags
+};
+
+const uint8_t HEADER[] = {0xAA, 0xBB, 0xCC, 0xDD};
+
+static inline uint8_t calculate_checksum(const uint8_t* data, size_t len)
+{
+  uint8_t checksum = 0;
+  for (size_t i = 0; i < len; i++) {
+    checksum ^= data[i];
+  }
+  return checksum;
+}
 
 // GNSS Synchronization Parameters
 constexpr uint32_t NMEA_TIMEOUT_US   = 950000;
 constexpr uint32_t PRINT_INTERVAL_MS = 1000;
-
-/****************************************************************************
- * Private Data Types / Helpers
- ****************************************************************************/
-
-static inline uint32_t float_to_hex_uint32(float f)
-{
-  uint32_t u;
-  memcpy(&u, &f, sizeof(u));
-  return u;
-}
 
 /****************************************************************************
  * Global State: GNSS Clock Synchronization
@@ -108,6 +117,30 @@ bool awaiting_nmea = false;
 uint32_t base_unix_seconds = 0;
 uint32_t base_pps_us = 0;
 bool clock_synchronized = false;
+bool has_synced_ever = false;
+uint32_t last_sync_time_ms = 0;
+
+uint8_t getSyncStatus()
+{
+  uint8_t status = 0;
+  if (clock_synchronized) {
+    status |= STATUS_CLOCK_SYNCHRONIZED;
+  }
+  if (has_synced_ever) {
+    status |= STATUS_SYNC_EVER;
+    uint32_t elapsed_ms = millis() - last_sync_time_ms;
+    if (elapsed_ms <= 2000) {
+      status |= STATUS_SYNC_WITHIN_2S;
+    }
+    if (elapsed_ms <= 60000) {
+      status |= STATUS_SYNC_WITHIN_1M;
+    }
+    if (elapsed_ms <= 3600000) {
+      status |= STATUS_SYNC_WITHIN_1H;
+    }
+  }
+  return status;
+}
 
 const uint8_t DAYS_IN_MONTH[] = {
   31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31
@@ -157,19 +190,19 @@ void onPpsRise() {
 }
 
 void waitForPpsLowAndAttachInterrupt() {
-  Serial.println("Waiting for PPS LOW. Connect the PPS input.");
+  // Serial.println("Waiting for PPS LOW. Connect the PPS input.");
 
   uint32_t last_message_ms = millis();
   while (digitalRead(PPS_PIN) == HIGH) {
     if (millis() - last_message_ms >= 1000) {
       last_message_ms = millis();
-      Serial.println("Waiting for PPS LOW...");
+      // Serial.println("Waiting for PPS LOW...");
     }
     delay(1);
   }
 
   attachInterrupt(digitalPinToInterrupt(PPS_PIN), onPpsRise, RISING);
-  Serial.println("PPS input ready.");
+  // Serial.println("PPS input ready.");
 }
 
 void handlePendingPps() {
@@ -227,6 +260,8 @@ void synchronizeFromGnss() {
   );
   base_pps_us = pending_pps_us;
   clock_synchronized = true;
+  has_synced_ever = true;
+  last_sync_time_ms = millis();
 }
 
 // Reads GNSS data and updates the synchronized clock when a PPS/NMEA pair is
@@ -280,14 +315,14 @@ void printCurrentTime() {
   last_print_ms = now_ms;
 
   if (!clock_synchronized) {
-    Serial.println("[GNSS] Waiting for GNSS sync (PPS + NMEA)...");
+    // Serial.println("[GNSS] Waiting for GNSS sync (PPS + NMEA)...");
     return;
   }
 
   char timestamp[32];
   formatTimestamp(currentTimeUs(), timestamp, sizeof(timestamp));
-  Serial.print("[GNSS] Precise UTC Time: ");
-  Serial.println(timestamp);
+  // Serial.print("[GNSS] Precise UTC Time: ");
+  // Serial.println(timestamp);
 }
 
 /****************************************************************************
@@ -353,46 +388,28 @@ static int drop_50msdata(int fd, int samprate, int nfifo)
   return 0;
 }
 
-static void log2uart_hex(cxd5602pwbimu_data_t *dat, int num)
+static void send_imu_binary(cxd5602pwbimu_data_t *dat, int num, uint64_t sample_utc_us, uint8_t status)
 {
   for (int i = 0; i < num; i++)
     {
-      printf("%08x,%08x,%08x,%08x,"
-             "%08x,%08x,%08x,%08x\n",
-             (unsigned int)dat[i].timestamp,
-             float_to_hex_uint32(dat[i].temp),
-             float_to_hex_uint32(dat[i].gx),
-             float_to_hex_uint32(dat[i].gy),
-             float_to_hex_uint32(dat[i].gz),
-             float_to_hex_uint32(dat[i].ax),
-             float_to_hex_uint32(dat[i].ay),
-             float_to_hex_uint32(dat[i].az));
-    }
-}
+      SyncedIMUData packet_data;
+      packet_data.utc_timestamp_us = sample_utc_us;
+      packet_data.sensor_timestamp = dat[i].timestamp;
+      packet_data.temp = dat[i].temp;
+      packet_data.gx = dat[i].gx;
+      packet_data.gy = dat[i].gy;
+      packet_data.gz = dat[i].gz;
+      packet_data.ax = dat[i].ax;
+      packet_data.ay = dat[i].ay;
+      packet_data.az = dat[i].az;
+      packet_data.status = status;
 
-static void log2uart_float(cxd5602pwbimu_data_t *dat, int num)
-{
-  for (int i = 0; i < num; i++)
-    {
-      /* timestamp is in 19.2MHz clock ticks (19,200,000 counts per second) */
-      printf("%.6f,%.2f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f\n",
-             dat[i].timestamp / 19200000.0f,
-             dat[i].temp,
-             dat[i].gx, dat[i].gy, dat[i].gz,
-             dat[i].ax, dat[i].ay, dat[i].az);
-    }
-}
-
-static void log2uart_utc(cxd5602pwbimu_data_t *dat, int num, uint64_t sample_utc_us)
-{
-  for (int i = 0; i < num; i++)
-    {
-      /* Outputs microsecond UTC timestamp + IMU values */
-      printf("%llu,%.2f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f\n",
-             (unsigned long long)sample_utc_us,
-             dat[i].temp,
-             dat[i].gx, dat[i].gy, dat[i].gz,
-             dat[i].ax, dat[i].ay, dat[i].az);
+      uint8_t checksum = calculate_checksum((const uint8_t*)&packet_data, sizeof(packet_data));
+      uint8_t packet[sizeof(HEADER) + sizeof(packet_data) + 1];
+      memcpy(packet, HEADER, sizeof(HEADER));
+      memcpy(packet + sizeof(HEADER), &packet_data, sizeof(packet_data));
+      packet[sizeof(HEADER) + sizeof(packet_data)] = checksum;
+      Serial.write(packet, sizeof(packet));
     }
 }
 
@@ -413,7 +430,7 @@ void setup()
       /* Wait up to 2 seconds for Serial Monitor connection */
     }
 
-  Serial.println("\n=== Spresense IMU + GNSS TimeSync Starting ===");
+  // Serial.println("\n=== Spresense IMU + GNSS TimeSync Starting ===");
 
   // 2. Initialize CXD5602PWBIMU SPI driver (SPI bus 5)
   ret = board_cxd5602pwbimu_initialize(5);
@@ -431,11 +448,11 @@ void setup()
       while (1) { delay(1000); }
     }
 
-  printf("Configuring IMU sensor:\n");
-  printf("  Rate: %d Hz\n", SAMPLING_RATE);
-  printf("  Accel Range: +-%d g\n", ACCEL_RANGE);
-  printf("  Gyro Range: +-%d dps\n", GYRO_RANGE);
-  printf("  FIFO Threshold: %d\n", FIFO_THRESHOLD);
+  // printf("Configuring IMU sensor:\n");
+  // printf("  Rate: %d Hz\n", SAMPLING_RATE);
+  // printf("  Accel Range: +-%d g\n", ACCEL_RANGE);
+  // printf("  Gyro Range: +-%d dps\n", GYRO_RANGE);
+  // printf("  FIFO Threshold: %d\n", FIFO_THRESHOLD);
 
   ret = start_sensing(g_devfd, SAMPLING_RATE, ACCEL_RANGE, GYRO_RANGE, FIFO_THRESHOLD);
   if (ret < 0)
@@ -447,7 +464,7 @@ void setup()
 
   // Drop first 50ms of data as it can be invalid
   drop_50msdata(g_devfd, SAMPLING_RATE, FIFO_THRESHOLD);
-  printf("IMU sensing initialized.\n");
+  // printf("IMU sensing initialized.\n");
 
   // 4. Initialize GNSS PPS input (D3) and wait for PPS idle LOW
   // (The extension board pulls an unconnected input HIGH. Registering the
@@ -460,7 +477,7 @@ void setup()
     Serial2, EVENT_CAPTURE_PIN, synchronizedTimeAtMicros
   );
 
-  Serial.println("System Ready. Streaming IMU and monitoring GNSS Sync...\n");
+  // Serial.println("System Ready. Streaming IMU and monitoring GNSS Sync...\n");
 }
 
 void loop()
@@ -476,25 +493,25 @@ void loop()
       if (c == 'q' || c == 's')
         {
           g_logging_active = !g_logging_active;
-          printf("\n[CMD] Logging %s\n", g_logging_active ? "resumed" : "paused");
+          // printf("\n[CMD] Logging %s\n", g_logging_active ? "resumed" : "paused");
         }
       else if (c == 't')
         {
-          if (clock_synchronized) {
-            char ts[32];
-            formatTimestamp(currentTimeUs(), ts, sizeof(ts));
-            printf("\n[SYNC] Current UTC: %s (base_unix_sec=%u)\n", ts, base_unix_seconds);
-          } else {
-            printf("\n[SYNC] GNSS clock is not synchronized yet.\n");
-          }
+          // if (clock_synchronized) {
+          //   char ts[32];
+          //   formatTimestamp(currentTimeUs(), ts, sizeof(ts));
+          //   printf("\n[SYNC] Current UTC: %s (base_unix_sec=%u)\n", ts, base_unix_seconds);
+          // } else {
+          //   printf("\n[SYNC] GNSS clock is not synchronized yet.\n");
+          // }
         }
       else if (c == 'h')
         {
-          printf("\n--- Available Commands ---\n");
-          printf("  's' or 'q': Pause/Resume IMU logging\n");
-          printf("  't'       : Print current synchronized UTC time\n");
-          printf("  'h'       : Show this help\n");
-          printf("--------------------------\n");
+          // printf("\n--- Available Commands ---\n");
+          // printf("  's' or 'q': Pause/Resume IMU logging\n");
+          // printf("  't'       : Print current synchronized UTC time\n");
+          // printf("  'h'       : Show this help\n");
+          // printf("--------------------------\n");
         }
     }
 
@@ -516,18 +533,13 @@ void loop()
       ret = read(g_devfd, g_data, sizeof(g_data[0]) * FIFO_THRESHOLD);
       if (ret == sizeof(g_data[0]) * FIFO_THRESHOLD)
         {
-#if CURRENT_OUTPUT_FORMAT == OUTPUT_FORMAT_HEX
-          log2uart_hex(g_data, FIFO_THRESHOLD);
-#elif CURRENT_OUTPUT_FORMAT == OUTPUT_FORMAT_FLOAT
-          log2uart_float(g_data, FIFO_THRESHOLD);
-#elif CURRENT_OUTPUT_FORMAT == OUTPUT_FORMAT_UTC
           uint64_t sample_utc_us = currentTimeUs();
-          log2uart_utc(g_data, FIFO_THRESHOLD, sample_utc_us);
-#endif
+          uint8_t status = getSyncStatus();
+          send_imu_binary(g_data, FIFO_THRESHOLD, sample_utc_us, status);
         }
       else if (ret < 0)
         {
-          printf("ERROR: Read failed : %d (errno=%d)\n", ret, errno);
+          // printf("ERROR: Read failed : %d (errno=%d)\n", ret, errno);
         }
     }
 }

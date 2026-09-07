@@ -204,7 +204,7 @@ void beginUm982EventComparison(Stream& gnss_serial,
   utc_converter = utc_at_micros;
 
   pinMode(event_pin, INPUT_PULLUP);
-  Serial.println("Release the EVENT button to make D4 HIGH.");
+  // Serial.println("Release the EVENT button to make D4 HIGH.");
   while (digitalRead(event_pin) == LOW) {
     delay(1);
   }
@@ -218,7 +218,7 @@ void beginUm982EventComparison(Stream& gnss_serial,
   um982_serial->println("GPGGA 1");
   um982_serial->println("EVENTFLAGA ONCHANGED");
 
-  Serial.println("UM982 EVENT comparison ready on D4 (active LOW).");
+  // Serial.println("UM982 EVENT comparison ready on D4 (active LOW).");
 }
 
 void feedUm982EventByte(char received) {
