@@ -46,10 +46,16 @@ constexpr uint32_t GNSS_BAUD   = 9600;      // UM982 GNSS Serial2 (D0: RX, D1: T
 // Pin Configuration
 constexpr uint8_t PPS_PIN           = PIN_D03;  // 1PPS input from UM982 (RISING edge)
 constexpr uint8_t EVENT_CAPTURE_PIN = PIN_D04;  // Shared event input (FALLING edge)
+constexpr uint8_t IMU_DRDY_PIN      = PIN_D27;  // IMU DRDY interrupt input (RISING edge)
+
+// IMU DRDY Timing Offset
+// Microsecond delay offset added to DRDY edge timestamp (positive or negative)
+// to calibrate internal sensor filter/pipeline delay.
+constexpr int32_t DRDY_DELAY_OFFSET_US = 0;
 
 // IMU Configuration
 #define CXD5602PWBIMU_DEVPATH "/dev/imu0"
-#define MAX_NFIFO             (4)
+#define MAX_NFIFO             (1)
 
 /*
  * IMU Sampling Rate (Hz): 15, 30, 60, 120, 240, 480, 960, 1920
@@ -60,7 +66,7 @@ constexpr uint8_t EVENT_CAPTURE_PIN = PIN_D04;  // Shared event input (FALLING e
 #define SAMPLING_RATE       240
 #define ACCEL_RANGE         16
 #define GYRO_RANGE          500
-#define FIFO_THRESHOLD      4
+#define FIFO_THRESHOLD      1
 
 // Status Bitmask Definitions
 constexpr uint8_t STATUS_CLOCK_SYNCHRONIZED = 0x01; // Bit 0: Currently synchronized
@@ -68,6 +74,7 @@ constexpr uint8_t STATUS_SYNC_EVER           = 0x02; // Bit 1: Synchronized at l
 constexpr uint8_t STATUS_SYNC_WITHIN_2S      = 0x04; // Bit 2: Last sync was within 2 seconds
 constexpr uint8_t STATUS_SYNC_WITHIN_1M      = 0x08; // Bit 3: Last sync was within 1 minute (60s)
 constexpr uint8_t STATUS_SYNC_WITHIN_1H      = 0x10; // Bit 4: Last sync was within 1 hour (3600s)
+constexpr uint8_t STATUS_DRDY_TIMED          = 0x20; // Bit 5: Timestamp derived from IMU DRDY interrupt
 
 // Binary Protocol for IMU Data (Total packet: 46 bytes fixed length)
 struct __attribute__((packed)) SyncedIMUData {
@@ -99,8 +106,7 @@ constexpr uint32_t NMEA_TIMEOUT_US   = 950000;
 constexpr uint32_t PRINT_INTERVAL_MS = 1000;
 
 /****************************************************************************
- * Global State: GNSS Clock Synchronization
- * (Preserved directly from spresense_gnss_sync.ino)
+ * Global State: GNSS Clock Synchronization & DRDY Interrupt
  ****************************************************************************/
 
 TinyGPSPlus gps;
@@ -108,6 +114,15 @@ TinyGPSPlus gps;
 // Written by the PPS interrupt and consumed by loop().
 volatile uint32_t captured_pps_us = 0;
 volatile bool pps_pending = false;
+
+// Written by the IMU DRDY interrupt on PIN_D27
+volatile uint32_t captured_drdy_us = 0;
+volatile bool drdy_pulse_received = false;
+
+void onImuDrdyRise() {
+  captured_drdy_us = static_cast<uint32_t>(micros());
+  drdy_pulse_received = true;
+}
 
 // PPS currently waiting for its corresponding NMEA time.
 uint32_t pending_pps_us = 0;
@@ -120,7 +135,7 @@ bool clock_synchronized = false;
 bool has_synced_ever = false;
 uint32_t last_sync_time_ms = 0;
 
-uint8_t getSyncStatus()
+uint8_t getSyncStatus(bool drdy_used = false)
 {
   uint8_t status = 0;
   if (clock_synchronized) {
@@ -138,6 +153,9 @@ uint8_t getSyncStatus()
     if (elapsed_ms <= 3600000) {
       status |= STATUS_SYNC_WITHIN_1H;
     }
+  }
+  if (drdy_used) {
+    status |= STATUS_DRDY_TIMED;
   }
   return status;
 }
@@ -203,6 +221,22 @@ void waitForPpsLowAndAttachInterrupt() {
 
   attachInterrupt(digitalPinToInterrupt(PPS_PIN), onPpsRise, RISING);
   // Serial.println("PPS input ready.");
+}
+
+void waitForImuDrdyLowAndAttachInterrupt() {
+  // Wait until DRDY pin is LOW to prevent Spresense interrupt lockup when attached while HIGH.
+  // At 240Hz, the period is ~4.17ms. If unconnected, INPUT_PULLDOWN is immediately LOW.
+  // We use a 50ms timeout in case the pin is stuck HIGH (e.g. wiring issue).
+  uint32_t start_ms = millis();
+  while (digitalRead(IMU_DRDY_PIN) == HIGH) {
+    if (millis() - start_ms >= 50) {
+      // DRDY pin is held HIGH; do not attach interrupt to prevent stall
+      return;
+    }
+    delay(1);
+  }
+
+  attachInterrupt(digitalPinToInterrupt(IMU_DRDY_PIN), onImuDrdyRise, RISING);
 }
 
 void handlePendingPps() {
@@ -477,6 +511,12 @@ void setup()
     Serial2, EVENT_CAPTURE_PIN, synchronizedTimeAtMicros
   );
 
+  // 6. Initialize IMU DRDY interrupt on D27
+  // Use INPUT_PULLDOWN so if D27 is unconnected/floating, it stays LOW
+  // and no false DRDY interrupts occur.
+  pinMode(IMU_DRDY_PIN, INPUT_PULLDOWN);
+  waitForImuDrdyLowAndAttachInterrupt();
+
   // Serial.println("System Ready. Streaming IMU and monitoring GNSS Sync...\n");
 }
 
@@ -533,8 +573,47 @@ void loop()
       ret = read(g_devfd, g_data, sizeof(g_data[0]) * FIFO_THRESHOLD);
       if (ret == sizeof(g_data[0]) * FIFO_THRESHOLD)
         {
-          uint64_t sample_utc_us = currentTimeUs();
-          uint8_t status = getSyncStatus();
+          uint32_t drdy_us = 0;
+          bool has_drdy = false;
+
+          noInterrupts();
+          if (drdy_pulse_received)
+            {
+              drdy_us = captured_drdy_us;
+              drdy_pulse_received = false;
+              has_drdy = true;
+            }
+          interrupts();
+
+          uint64_t sample_utc_us = 0;
+          bool drdy_used = false;
+
+          if (has_drdy)
+            {
+              // Apply calibration delay offset
+              uint32_t effective_drdy_us = static_cast<uint32_t>(static_cast<int64_t>(drdy_us) + DRDY_DELAY_OFFSET_US);
+
+              // Convert DRDY edge micros to synchronized UTC timestamp
+              if (synchronizedTimeAtMicros(effective_drdy_us, &sample_utc_us))
+                {
+                  drdy_used = true;
+                }
+              else
+                {
+                  // Clock not synchronized yet; mark drdy_used true for status tracking
+                  drdy_used = true;
+                  sample_utc_us = 0;
+                }
+            }
+
+          // Fallback: If DRDY pulse was not received (unconnected, missed, etc.),
+          // use the current time when data arrived/read.
+          if (!drdy_used)
+            {
+              sample_utc_us = currentTimeUs();
+            }
+
+          uint8_t status = getSyncStatus(drdy_used);
           send_imu_binary(g_data, FIFO_THRESHOLD, sample_utc_us, status);
         }
       else if (ret < 0)
