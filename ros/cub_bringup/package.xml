@@ -23,6 +23,7 @@
   <depend>slam_toolbox</depend>
   <depend>rosbag2_storage_mcap</depend>
   <depend>joy_linux</depend>
+  <depend>rqt_common_plugins</depend>
   <exec_depend>rclpy</exec_depend>
   
   <!-- <depend>Eigen3</depend>  -->
