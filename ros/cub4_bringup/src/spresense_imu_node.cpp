@@ -19,7 +19,7 @@ constexpr uint8_t STATUS_SYNC_EVER           = 0x02; // Bit 1: Synchronized at l
 constexpr uint8_t STATUS_SYNC_WITHIN_2S      = 0x04; // Bit 2: Last sync was within 2 seconds
 constexpr uint8_t STATUS_SYNC_WITHIN_1M      = 0x08; // Bit 3: Last sync was within 1 minute (60s)
 constexpr uint8_t STATUS_SYNC_WITHIN_1H      = 0x10; // Bit 4: Last sync was within 1 hour (3600s)
-constexpr uint8_t STATUS_DRDY_TIMED          = 0x20; // Bit 5: Timestamp derived from IMU DRDY interrupt (D27)
+constexpr uint8_t STATUS_DRDY_TIMED          = 0x20; // Bit 5: Timestamp derived from IMU DRDY interrupt (D18)
 
 // Data structure for binary communication with Spresense
 // Total struct size: 41 bytes
@@ -247,10 +247,10 @@ private:
     if (!was_drdy_logged_ || drdy_active != was_drdy_active_) {
       if (drdy_active) {
         RCLCPP_INFO(this->get_logger(),
-                    "IMU DRDY edge capture (D27) ACTIVE. Timestamps locked to DRDY interrupt edge.");
+                    "IMU DRDY edge capture (D18) ACTIVE. Timestamps locked to DRDY interrupt edge.");
       } else {
         RCLCPP_INFO(this->get_logger(),
-                    "IMU DRDY (D27) not detected / unconnected. Falling back to data arrival time.");
+                    "IMU DRDY (D18) not detected / unconnected. Falling back to data arrival time.");
       }
       was_drdy_active_ = drdy_active;
       was_drdy_logged_ = true;

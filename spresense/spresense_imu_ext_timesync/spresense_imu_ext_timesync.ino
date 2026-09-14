@@ -46,7 +46,7 @@ constexpr uint32_t GNSS_BAUD   = 9600;      // UM982 GNSS Serial2 (D0: RX, D1: T
 // Pin Configuration
 constexpr uint8_t PPS_PIN           = PIN_D03;  // 1PPS input from UM982 (RISING edge)
 constexpr uint8_t EVENT_CAPTURE_PIN = PIN_D04;  // Shared event input (FALLING edge)
-constexpr uint8_t IMU_DRDY_PIN      = PIN_D27;  // IMU DRDY interrupt input (RISING edge)
+constexpr uint8_t IMU_DRDY_PIN      = PIN_D18;  // IMU DRDY interrupt input (RISING edge)
 
 // IMU DRDY Timing Offset
 // Microsecond delay offset added to DRDY edge timestamp (positive or negative)
@@ -115,7 +115,7 @@ TinyGPSPlus gps;
 volatile uint32_t captured_pps_us = 0;
 volatile bool pps_pending = false;
 
-// Written by the IMU DRDY interrupt on PIN_D27
+// Written by the IMU DRDY interrupt on PIN_D18
 volatile uint32_t captured_drdy_us = 0;
 volatile bool drdy_pulse_received = false;
 
@@ -236,7 +236,8 @@ void waitForImuDrdyLowAndAttachInterrupt() {
     delay(1);
   }
 
-  attachInterrupt(digitalPinToInterrupt(IMU_DRDY_PIN), onImuDrdyRise, RISING);
+  // Disable built-in debounce filter (~100us) by passing false as the 4th argument so 40us DRDY pulses are captured
+  attachInterrupt(digitalPinToInterrupt(IMU_DRDY_PIN), onImuDrdyRise, RISING, false);
 }
 
 void handlePendingPps() {
