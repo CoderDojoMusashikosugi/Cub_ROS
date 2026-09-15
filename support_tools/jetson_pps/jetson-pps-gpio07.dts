@@ -1,0 +1,34 @@
+/dts-v1/;
+/plugin/;
+
+/ {
+    overlay-name = "Jetson PPS GPIO Overlay (Pin 32 / GPIO07)";
+    compatible = "nvidia,p3768-0000+p3767-0005-super", "nvidia,tegra234";
+
+    fragment@0 {
+        target = <&pinmux>;
+        __overlay__ {
+            pps_pins: pps_pins {
+                hdr40-pin32 {
+                    nvidia,pins = "soc_gpio19_pg6";
+                    nvidia,function = "gp";
+                    nvidia,tristate = <0x01>;      /* 入力モード */
+                    nvidia,enable-input = <0x01>;  /* 入力バッファ有効化 */
+                };
+            };
+        };
+    };
+
+    fragment@1 {
+        target-path = "/";
+        __overlay__ {
+            pps {
+                compatible = "pps-gpio";
+                pinctrl-names = "default";
+                pinctrl-0 = <&pps_pins>;
+                gpios = <&gpio 54 0>;              /* 54 = TEGRA234_MAIN_GPIO(G, 6) = PG.06 (Pin 32 / GPIO07), 0 = ACTIVE_HIGH */
+                status = "okay";
+            };
+        };
+    };
+};
