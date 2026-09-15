@@ -12,6 +12,8 @@
 #include <cstring>
 #include <iomanip>
 #include <sstream>
+#include <chrono>
+#include <unistd.h>
 
 // Status Bitmask Definitions (matching Spresense firmware)
 constexpr uint8_t STATUS_CLOCK_SYNCHRONIZED = 0x01; // Bit 0: Clock is currently synchronized
@@ -97,25 +99,10 @@ public:
       temp_pub_ = this->create_publisher<sensor_msgs::msg::Temperature>("imu/temperature", 10);
     }
 
-    // Open serial port
-    try {
-      serial_port_.Open(serial_port_name_);
-      serial_port_.SetDTR(true);
-      serial_port_.SetBaudRate(get_libserial_baudrate(baud_rate_));
-      serial_port_.SetCharacterSize(LibSerial::CharacterSize::CHAR_SIZE_8);
-      serial_port_.SetFlowControl(LibSerial::FlowControl::FLOW_CONTROL_NONE);
-      serial_port_.SetParity(LibSerial::Parity::PARITY_NONE);
-      serial_port_.SetStopBits(LibSerial::StopBits::STOP_BITS_1);
-    } catch (const LibSerial::OpenFailed& e) {
-      RCLCPP_ERROR(this->get_logger(), "Failed to open serial port '%s': %s",
-                   serial_port_name_.c_str(), e.what());
-      rclcpp::shutdown();
-      return;
-    }
+    // Attempt initial open (non-fatal if port is not yet available)
+    try_open_serial();
 
-    RCLCPP_INFO(this->get_logger(), "Serial port opened successfully. Waiting for IMU packets...");
-
-    // Create timer for non-blocking serial reading
+    // Create timer for non-blocking serial reading and reconnection
     timer_ = this->create_wall_timer(
       std::chrono::milliseconds(1),
       std::bind(&SpresenseImuNode::read_serial_data, this)
@@ -124,14 +111,93 @@ public:
 
   ~SpresenseImuNode() override {
     if (serial_port_.IsOpen()) {
-      serial_port_.Close();
+      try {
+        serial_port_.Close();
+      } catch (...) {}
       RCLCPP_INFO(this->get_logger(), "Serial port closed.");
     }
   }
 
 private:
+  bool try_open_serial() {
+    // Check if device file exists first
+    if (access(serial_port_name_.c_str(), F_OK) != 0) {
+      RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 3000,
+                           "Waiting for serial port '%s' to appear...",
+                           serial_port_name_.c_str());
+      return false;
+    }
+
+    try {
+      if (serial_port_.IsOpen()) {
+        try {
+          serial_port_.Close();
+        } catch (...) {}
+      }
+      serial_port_.Open(serial_port_name_);
+      serial_port_.SetDTR(true);
+      serial_port_.SetBaudRate(get_libserial_baudrate(baud_rate_));
+      serial_port_.SetCharacterSize(LibSerial::CharacterSize::CHAR_SIZE_8);
+      serial_port_.SetFlowControl(LibSerial::FlowControl::FLOW_CONTROL_NONE);
+      serial_port_.SetParity(LibSerial::Parity::PARITY_NONE);
+      serial_port_.SetStopBits(LibSerial::StopBits::STOP_BITS_1);
+
+      data_buffer_.clear();
+      was_gnss_synced_ = false;
+      was_drdy_logged_ = false;
+      was_drdy_active_ = false;
+      is_connected_ = true;
+      last_data_received_ = std::chrono::steady_clock::now();
+
+      RCLCPP_INFO(this->get_logger(),
+                  "Serial port '%s' opened successfully. Waiting for IMU packets...",
+                  serial_port_name_.c_str());
+      return true;
+    } catch (const std::exception& e) {
+      is_connected_ = false;
+      try {
+        if (serial_port_.IsOpen()) {
+          serial_port_.Close();
+        }
+      } catch (...) {}
+      RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 3000,
+                           "Waiting for serial port '%s': %s",
+                           serial_port_name_.c_str(), e.what());
+      return false;
+    }
+  }
+
+  void disconnect_serial(const std::string& reason) {
+    RCLCPP_WARN(this->get_logger(),
+                "Serial port '%s' disconnected (%s). Will attempt to reconnect...",
+                serial_port_name_.c_str(), reason.c_str());
+    is_connected_ = false;
+    try {
+      if (serial_port_.IsOpen()) {
+        serial_port_.Close();
+      }
+    } catch (...) {}
+
+    data_buffer_.clear();
+    was_gnss_synced_ = false;
+    was_drdy_logged_ = false;
+    was_drdy_active_ = false;
+  }
+
   void read_serial_data() {
-    if (!serial_port_.IsOpen()) {
+    auto now = std::chrono::steady_clock::now();
+
+    if (!is_connected_) {
+      if (now - last_reconnect_attempt_ >= std::chrono::seconds(1)) {
+        last_reconnect_attempt_ = now;
+        try_open_serial();
+      }
+      return;
+    }
+
+    // Check if device file still exists
+    if (access(serial_port_name_.c_str(), F_OK) != 0) {
+      disconnect_serial("device file disappeared");
       return;
     }
 
@@ -139,12 +205,21 @@ private:
     try {
       serial_port_.Read(byte_buffer, 256, 50); // Read up to 256 bytes with 50ms timeout
     } catch (const LibSerial::ReadTimeout&) {
+      // If no data has been received for more than 2 seconds, consider it disconnected
+      if (now - last_data_received_ >= std::chrono::seconds(2)) {
+        disconnect_serial("data timeout (>2s)");
+        return;
+      }
       RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
                            "No data from Spresense IMU (timeout). Check wiring and power.");
+      return;
+    } catch (const std::exception& e) {
+      disconnect_serial(e.what());
       return;
     }
 
     if (!byte_buffer.empty()) {
+      last_data_received_ = now;
       process_serial_buffer(byte_buffer);
     }
   }
@@ -211,7 +286,6 @@ private:
 
   void process_imu_data(const SyncedIMUData& data) {
     rclcpp::Time stamp;
-    bool using_gnss_time = false;
 
     // Check if GNSS clock is synchronized and fresh (within last 2 seconds)
     bool is_gnss_fresh = (data.status & STATUS_SYNC_WITHIN_2S) && (data.utc_timestamp_us > 0);
@@ -219,7 +293,6 @@ private:
     if (use_gnss_time_ && is_gnss_fresh) {
       // Convert microseconds to nanoseconds
       stamp = rclcpp::Time(static_cast<int64_t>(data.utc_timestamp_us * 1000ULL));
-      using_gnss_time = true;
 
       if (!was_gnss_synced_) {
         RCLCPP_INFO(this->get_logger(),
@@ -303,6 +376,9 @@ private:
   bool was_gnss_synced_{false};
   bool was_drdy_active_{false};
   bool was_drdy_logged_{false};
+  bool is_connected_{false};
+  std::chrono::steady_clock::time_point last_reconnect_attempt_{};
+  std::chrono::steady_clock::time_point last_data_received_{};
 
   LibSerial::SerialPort serial_port_;
   std::vector<uint8_t> data_buffer_;
