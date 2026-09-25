@@ -1,0 +1,21 @@
+{
+  "name": "Cub ROS Development",
+  "dockerComposeFile": [
+    "../docker/docker-compose-common.yml",
+    "../docker/docker-compose.yml"
+  ],
+  "service": "cub_ros",
+  "workspaceFolder": "/home/cub/colcon_ws/src/cub",
+  "remoteUser": "cub",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-iot.vscode-ros",
+        "ms-vscode.cpptools",
+        "ms-python.python",
+        "twxs.cmake",
+        "streetsidesoftware.code-spell-checker"
+      ]
+    }
+  }
+}
