@@ -126,6 +126,7 @@ alias ros='ros2'
 alias bashrc='source ~/.bashrc'
 alias cb="cd ~/colcon_ws && colcon build --symlink-install ; cd - > /dev/null 2>&1"
 alias cbj1="cd ~/colcon_ws && MAKEFLAGS="-j1" colcon build --symlink-install ; cd - > /dev/null 2>&1"
+alias cbc="cd ~/colcon_ws && colcon build --symlink-install --packages-select fast_gicp ekf_localizer --cmake-args -DBUILD_VGICP_CUDA=ON ; cd - > /dev/null 2>&1"
 cbs(){
   cd ~/colcon_ws
   colcon build --symlink-install --packages-select $1
