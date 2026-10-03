@@ -64,7 +64,7 @@ IMU 内部のデジタルフィルタ群遅延（group delay）や信号線遅�
     - `sensor_timestamp` (`uint32_t`, 4B): CXD5602PWBIMU 19.2MHz チックカウント
     - `temp` (`float`, 4B): 温度 [℃]
     - `gx, gy, gz` (`float` × 3, 12B): 角速度 [rad/s]
-    - `ax, ay, az` (`float` × 3, 12B): 加速度 [G]
+    - `ax, ay, az` (`float` × 3, 12B): 加速度 [m/s^2]
     - `status` (`uint8_t`, 1B): 時刻同期ステータスフラグ
   - **チェックサム (1 byte)**: ペイロード全41バイトの XOR 値
 
@@ -83,5 +83,5 @@ ros2 run cub4_bringup spresense_imu_node --ros-args -p serial_port:=/dev/ttyMULI
 - `/imu/data_raw` (`sensor_msgs/msg/Imu`):
   - `header.stamp`: 2秒以内に同期されている場合は GNSS UTC 時刻、未同期時は ROS システム時刻へフォールバック
   - `angular_velocity`: rad/s
-  - `linear_acceleration`: m/s^2 (G から 9.80665 を乗算して変換)
+  - `linear_acceleration`: m/s^2
 - `/imu/temperature` (`sensor_msgs/msg/Temperature`): 温度データ

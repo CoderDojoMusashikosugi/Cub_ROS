@@ -43,6 +43,23 @@ if ! grep -q "^[[:space:]]*${SWAP_FILE}" /etc/fstab; then
     echo "[INFO] Added ${SWAP_FILE} to /etc/fstab."
 fi
 
+# Install required host packages
+REQUIRED_PKGS=()
+for pkg in device-tree-compiler ntpsec pps-tools; do
+    if ! dpkg -s "$pkg" >/dev/null 2>&1; then
+        REQUIRED_PKGS+=("$pkg")
+    fi
+done
+
+if [ ${#REQUIRED_PKGS[@]} -gt 0 ]; then
+    echo "[INFO] Installing required packages: ${REQUIRED_PKGS[*]}..."
+    apt-get update -qq
+    apt-get install -y -qq "${REQUIRED_PKGS[@]}"
+    echo "[INFO] Required packages installed."
+else
+    echo "[INFO] Required packages (device-tree-compiler, ntpsec, pps-tools) are already installed."
+fi
+
 # setup pps input
 DTS_FILE="${SCRIPT_DIR}/../support_tools/jetson_pps/jetson-pps-gpio07.dts"
 DTBO_FILE="/boot/jetson-pps-gpio07.dtbo"
@@ -102,8 +119,78 @@ else
     echo "[WARN] $EXTLINUX_CONF not found. Skipping extlinux configuration."
 fi
 
+# Configure NTPsec for GNSS (NMEA + PPS) Time Sync
+echo "[INFO] Configuring NTPsec and time synchronization..."
 
+# Disable conflicting time services
+for svc in systemd-timesyncd chrony; do
+    if systemctl is-enabled "$svc" >/dev/null 2>&1 || systemctl is-active "$svc" >/dev/null 2>&1; then
+        echo "[INFO] Disabling conflicting service: $svc..."
+        systemctl stop "$svc" 2>/dev/null || true
+        systemctl disable "$svc" 2>/dev/null || true
+    fi
+done
+
+# Grant ntpsec permission to access serial port (/dev/ttyTHS1) and PPS (/dev/pps1)
+if id "ntpsec" >/dev/null 2>&1; then
+    usermod -aG dialout ntpsec
+    echo "[INFO] Added ntpsec user to dialout group."
+fi
+
+# Configure AppArmor to allow ntpd access to serial ports (/dev/ttyTHS*)
+APPARMOR_LOCAL="/etc/apparmor.d/local/usr.sbin.ntpd"
+if [ -d "/etc/apparmor.d/local" ]; then
+    if [ ! -f "$APPARMOR_LOCAL" ]; then
+        touch "$APPARMOR_LOCAL"
+    fi
+    if ! grep -qF "/dev/ttyTHS" "$APPARMOR_LOCAL"; then
+        echo "[INFO] Allowing /dev/ttyTHS* in AppArmor profile ($APPARMOR_LOCAL)..."
+        echo "/dev/ttyTHS[0-9]* rw," >> "$APPARMOR_LOCAL"
+        if command -v apparmor_parser >/dev/null 2>&1 && [ -f "/etc/apparmor.d/usr.sbin.ntpd" ]; then
+            apparmor_parser -r /etc/apparmor.d/usr.sbin.ntpd 2>/dev/null || true
+            echo "[INFO] Reloaded AppArmor profile for ntpd."
+        fi
+    else
+        echo "[INFO] /dev/ttyTHS* is already allowed in AppArmor."
+    fi
+fi
+
+NTP_CONF="/etc/ntpsec/ntp.conf"
+if [ -f "$NTP_CONF" ]; then
+    NTP_MARKER="# --- Cub GNSS Time Sync Settings ---"
+    if grep -qF "$NTP_MARKER" "$NTP_CONF"; then
+        echo "[INFO] NTPsec GNSS settings already present in $NTP_CONF. Skipping."
+    else
+        echo "[INFO] Appending GNSS refclock (NMEA + PPS) to $NTP_CONF..."
+        if [ ! -f "${NTP_CONF}.bak" ]; then
+            cp "$NTP_CONF" "${NTP_CONF}.bak"
+            echo "[INFO] Created backup: ${NTP_CONF}.bak"
+        fi
+
+        cat << 'EOF' >> "$NTP_CONF"
+
+# --- Cub GNSS Time Sync Settings ---
+# NMEA serial (/dev/ttyTHS1) with PPS (/dev/pps1)
+# flag1 1: enable PPS processing, prefer: prefer this refclock when synced
+refclock nmea path /dev/ttyTHS1 ppspath /dev/pps1 baud 9600 flag1 1 prefer
+# --- End of Cub GNSS Time Sync Settings ---
+EOF
+        echo "[INFO] NTPsec configuration updated."
+    fi
+
+    systemctl enable ntpsec >/dev/null 2>&1 || true
+    systemctl restart ntpsec >/dev/null 2>&1 || true
+else
+    echo "[WARN] $NTP_CONF not found. Skipping NTPsec configuration."
+fi
+
+# udev rules for serial devices and PPS permissions
 echo 'KERNEL=="ttyUSB*",  ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6001", SYMLINK+="ttyATOM"' > /etc/udev/rules.d/99-atom.rules
 # echo 'KERNEL=="ttyACM*",  ATTRS{idVendor}=="1546", ATTRS{idProduct}=="01a9", SYMLINK+="ttyGPS"' > /etc/udev/rules.d/99-gps.rules
 echo 'KERNEL=="ttyUSB*", ENV{ID_SERIAL_SHORT}=="b69c7db1d29de8118347301338b01545", SYMLINK+="ttyMULIMU"' > /etc/udev/rules.d/99-multiIMU.rules
-echo "reboot to apply"
+echo 'KERNEL=="pps*", GROUP="dialout", MODE="0660"' > /etc/udev/rules.d/99-pps.rules
+udevadm control --reload-rules 2>/dev/null || true
+udevadm trigger 2>/dev/null || true
+
+echo "[INFO] Host settings installation completed. Please reboot the system to apply all changes."
+
