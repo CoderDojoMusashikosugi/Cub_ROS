@@ -32,9 +32,9 @@ struct __attribute__((packed)) SyncedIMUData {
   float gx;                  // Gyro X [rad/s]
   float gy;                  // Gyro Y [rad/s]
   float gz;                  // Gyro Z [rad/s]
-  float ax;                  // Accel X [G]
-  float ay;                  // Accel Y [G]
-  float az;                  // Accel Z [G]
+  float ax;                  // Accel X [m/s^2]
+  float ay;                  // Accel Y [m/s^2]
+  float az;                  // Accel Z [m/s^2]
   uint8_t status;            // Status bit flags
 };
 
@@ -47,6 +47,24 @@ uint8_t calculate_checksum(const uint8_t* data, size_t len) {
     checksum ^= data[i];
   }
   return checksum;
+}
+
+// Helper function to format status bitmask into "[xxxxxx]" style string
+// Bit 5: STATUS_DRDY_TIMED
+// Bit 4: STATUS_SYNC_WITHIN_1H
+// Bit 3: STATUS_SYNC_WITHIN_1M
+// Bit 2: STATUS_SYNC_WITHIN_2S
+// Bit 1: STATUS_SYNC_EVER
+// Bit 0: STATUS_CLOCK_SYNCHRONIZED
+std::string format_status_bits(uint8_t status) {
+  std::string s = "------";
+  if (status & STATUS_DRDY_TIMED)          s[0] = 'x'; // Bit 5
+  if (status & STATUS_SYNC_WITHIN_1H)      s[1] = 'x'; // Bit 4
+  if (status & STATUS_SYNC_WITHIN_1M)      s[2] = 'x'; // Bit 3
+  if (status & STATUS_SYNC_WITHIN_2S)      s[3] = 'x'; // Bit 2
+  if (status & STATUS_SYNC_EVER)           s[4] = 'x'; // Bit 1
+  if (status & STATUS_CLOCK_SYNCHRONIZED)  s[5] = 'x'; // Bit 0
+  return "[" + s + "]";
 }
 
 // Helper function to convert integer baud rate to LibSerial BaudRate enum
@@ -85,9 +103,10 @@ public:
     frame_id_ = this->declare_parameter<std::string>("frame_id", "imu_link");
     publish_temperature_ = this->declare_parameter<bool>("publish_temperature", true);
     use_gnss_time_ = this->declare_parameter<bool>("use_gnss_time", true);
-    gravity_acceleration_ = this->declare_parameter<double>("gravity_acceleration", 9.80665);
+    data_timeout_sec_ = this->declare_parameter<double>("data_timeout_sec", 5.0);
 
-    RCLCPP_INFO(this->get_logger(), "Opening serial port: %s at %d baud", serial_port_name_.c_str(), baud_rate_);
+    RCLCPP_INFO(this->get_logger(), "Opening serial port: %s at %d baud (timeout: %.1fs)",
+                serial_port_name_.c_str(), baud_rate_, data_timeout_sec_);
     RCLCPP_INFO(this->get_logger(), "IMU frame_id: '%s', GNSS sync time: %s",
                 frame_id_.c_str(), use_gnss_time_ ? "ENABLED" : "DISABLED");
     RCLCPP_INFO(this->get_logger(), "sizeof(SyncedIMUData): %zu bytes, packet size: %zu bytes",
@@ -205,9 +224,12 @@ private:
     try {
       serial_port_.Read(byte_buffer, 256, 50); // Read up to 256 bytes with 50ms timeout
     } catch (const LibSerial::ReadTimeout&) {
-      // If no data has been received for more than 2 seconds, consider it disconnected
-      if (now - last_data_received_ >= std::chrono::seconds(2)) {
-        disconnect_serial("data timeout (>2s)");
+      // If no data has been received for more than data_timeout_sec_, consider it disconnected
+      double elapsed_sec = std::chrono::duration<double>(now - last_data_received_).count();
+      if (elapsed_sec >= data_timeout_sec_) {
+        std::ostringstream ss;
+        ss << "data timeout (>" << data_timeout_sec_ << "s)";
+        disconnect_serial(ss.str());
         return;
       }
       RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
@@ -296,8 +318,8 @@ private:
 
       if (!was_gnss_synced_) {
         RCLCPP_INFO(this->get_logger(),
-                    "GNSS time synchronization locked! Using GNSS UTC timestamps (status=0x%02X).",
-                    data.status);
+                    "%s GNSS time synchronization locked! Using GNSS UTC timestamps.",
+                    format_status_bits(data.status).c_str());
         was_gnss_synced_ = true;
       }
     } else {
@@ -306,13 +328,13 @@ private:
 
       if (was_gnss_synced_) {
         RCLCPP_WARN(this->get_logger(),
-                    "GNSS time sync lost (status=0x%02X). Falling back to ROS system time.",
-                    data.status);
+                    "%s GNSS time sync lost. Falling back to ROS system time.",
+                    format_status_bits(data.status).c_str());
         was_gnss_synced_ = false;
       } else {
         RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
-                             "Waiting for GNSS sync (status=0x%02X). Using ROS system time.",
-                             data.status);
+                             "%s Waiting for GNSS sync. Using ROS system time.",
+                             format_status_bits(data.status).c_str());
       }
     }
 
@@ -320,10 +342,12 @@ private:
     if (!was_drdy_logged_ || drdy_active != was_drdy_active_) {
       if (drdy_active) {
         RCLCPP_INFO(this->get_logger(),
-                    "IMU DRDY edge capture (D18) ACTIVE. Timestamps locked to DRDY interrupt edge.");
+                    "%s IMU DRDY edge capture (D18) ACTIVE. Timestamps locked to DRDY interrupt edge.",
+                    format_status_bits(data.status).c_str());
       } else {
         RCLCPP_INFO(this->get_logger(),
-                    "IMU DRDY (D18) not detected / unconnected. Falling back to data arrival time.");
+                    "%s IMU DRDY (D18) not detected / unconnected. Falling back to data arrival time.",
+                    format_status_bits(data.status).c_str());
       }
       was_drdy_active_ = drdy_active;
       was_drdy_logged_ = true;
@@ -339,10 +363,10 @@ private:
     imu_msg->angular_velocity.y = data.gy;
     imu_msg->angular_velocity.z = data.gz;
 
-    // Linear acceleration: convert from G to m/s^2
-    imu_msg->linear_acceleration.x = data.ax * gravity_acceleration_;
-    imu_msg->linear_acceleration.y = data.ay * gravity_acceleration_;
-    imu_msg->linear_acceleration.z = data.az * gravity_acceleration_;
+    // Linear acceleration: already in m/s^2 from cxd5602pwbimu driver
+    imu_msg->linear_acceleration.x = data.ax;
+    imu_msg->linear_acceleration.y = data.ay;
+    imu_msg->linear_acceleration.z = data.az;
 
     // Orientation is not estimated on this node; flag as unknown
     imu_msg->orientation.w = 1.0;
@@ -372,7 +396,7 @@ private:
   std::string frame_id_;
   bool publish_temperature_;
   bool use_gnss_time_;
-  double gravity_acceleration_;
+  double data_timeout_sec_{5.0};
   bool was_gnss_synced_{false};
   bool was_drdy_active_{false};
   bool was_drdy_logged_{false};
