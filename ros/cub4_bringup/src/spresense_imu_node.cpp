@@ -1,8 +1,6 @@
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/imu.hpp>
 #include <sensor_msgs/msg/temperature.hpp>
-#include <libserial/SerialPort.h>
-
 #include <vector>
 #include <string>
 #include <memory>
@@ -14,6 +12,10 @@
 #include <sstream>
 #include <chrono>
 #include <unistd.h>
+#include <fcntl.h>
+#include <termios.h>
+#include <poll.h>
+#include <sys/ioctl.h>
 
 // Status Bitmask Definitions (matching Spresense firmware)
 constexpr uint8_t STATUS_CLOCK_SYNCHRONIZED = 0x01; // Bit 0: Clock is currently synchronized
@@ -67,29 +69,29 @@ std::string format_status_bits(uint8_t status) {
   return "[" + s + "]";
 }
 
-// Helper function to convert integer baud rate to LibSerial BaudRate enum
-LibSerial::BaudRate get_libserial_baudrate(int baudrate) {
+// Helper function to convert integer baud rate to termios speed_t
+speed_t get_termios_baudrate(int baudrate) {
   switch (baudrate) {
-    case 110: return LibSerial::BaudRate::BAUD_110;
-    case 300: return LibSerial::BaudRate::BAUD_300;
-    case 600: return LibSerial::BaudRate::BAUD_600;
-    case 1200: return LibSerial::BaudRate::BAUD_1200;
-    case 2400: return LibSerial::BaudRate::BAUD_2400;
-    case 4800: return LibSerial::BaudRate::BAUD_4800;
-    case 9600: return LibSerial::BaudRate::BAUD_9600;
-    case 19200: return LibSerial::BaudRate::BAUD_19200;
-    case 38400: return LibSerial::BaudRate::BAUD_38400;
-    case 57600: return LibSerial::BaudRate::BAUD_57600;
-    case 115200: return LibSerial::BaudRate::BAUD_115200;
-    case 230400: return LibSerial::BaudRate::BAUD_230400;
-    case 460800: return LibSerial::BaudRate::BAUD_460800;
-    case 500000: return LibSerial::BaudRate::BAUD_500000;
-    case 576000: return LibSerial::BaudRate::BAUD_576000;
-    case 921600: return LibSerial::BaudRate::BAUD_921600;
-    case 1000000: return LibSerial::BaudRate::BAUD_1000000;
-    case 1152000: return LibSerial::BaudRate::BAUD_1152000;
-    case 1500000: return LibSerial::BaudRate::BAUD_1500000;
-    case 2000000: return LibSerial::BaudRate::BAUD_2000000;
+    case 110: return B110;
+    case 300: return B300;
+    case 600: return B600;
+    case 1200: return B1200;
+    case 2400: return B2400;
+    case 4800: return B4800;
+    case 9600: return B9600;
+    case 19200: return B19200;
+    case 38400: return B38400;
+    case 57600: return B57600;
+    case 115200: return B115200;
+    case 230400: return B230400;
+    case 460800: return B460800;
+    case 500000: return B500000;
+    case 576000: return B576000;
+    case 921600: return B921600;
+    case 1000000: return B1000000;
+    case 1152000: return B1152000;
+    case 1500000: return B1500000;
+    case 2000000: return B2000000;
     default: throw std::invalid_argument("Invalid baud rate");
   }
 }
@@ -129,16 +131,21 @@ public:
   }
 
   ~SpresenseImuNode() override {
-    if (serial_port_.IsOpen()) {
-      try {
-        serial_port_.Close();
-      } catch (...) {}
-      RCLCPP_INFO(this->get_logger(), "Serial port closed.");
-    }
+    close_serial();
+    RCLCPP_INFO(this->get_logger(), "Serial port closed.");
   }
 
 private:
+  void close_serial() {
+    if (serial_fd_ >= 0) {
+      ::close(serial_fd_);
+      serial_fd_ = -1;
+    }
+  }
+
   bool try_open_serial() {
+    close_serial();
+
     // Check if device file exists first
     if (access(serial_port_name_.c_str(), F_OK) != 0) {
       RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 3000,
@@ -147,43 +154,82 @@ private:
       return false;
     }
 
-    try {
-      if (serial_port_.IsOpen()) {
-        try {
-          serial_port_.Close();
-        } catch (...) {}
-      }
-      serial_port_.Open(serial_port_name_);
-      serial_port_.SetDTR(true);
-      serial_port_.SetBaudRate(get_libserial_baudrate(baud_rate_));
-      serial_port_.SetCharacterSize(LibSerial::CharacterSize::CHAR_SIZE_8);
-      serial_port_.SetFlowControl(LibSerial::FlowControl::FLOW_CONTROL_NONE);
-      serial_port_.SetParity(LibSerial::Parity::PARITY_NONE);
-      serial_port_.SetStopBits(LibSerial::StopBits::STOP_BITS_1);
-
-      data_buffer_.clear();
-      was_gnss_synced_ = false;
-      was_drdy_logged_ = false;
-      was_drdy_active_ = false;
-      is_connected_ = true;
-      last_data_received_ = std::chrono::steady_clock::now();
-
-      RCLCPP_INFO(this->get_logger(),
-                  "Serial port '%s' opened successfully. Waiting for IMU packets...",
-                  serial_port_name_.c_str());
-      return true;
-    } catch (const std::exception& e) {
-      is_connected_ = false;
-      try {
-        if (serial_port_.IsOpen()) {
-          serial_port_.Close();
-        }
-      } catch (...) {}
+    int fd = ::open(serial_port_name_.c_str(), O_RDWR | O_NOCTTY | O_NONBLOCK);
+    if (fd < 0) {
       RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 3000,
                            "Waiting for serial port '%s': %s",
-                           serial_port_name_.c_str(), e.what());
+                           serial_port_name_.c_str(), std::strerror(errno));
       return false;
     }
+
+    struct termios tio;
+    std::memset(&tio, 0, sizeof(tio));
+    if (tcgetattr(fd, &tio) != 0) {
+      RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 3000,
+                           "Waiting for serial port '%s': %s",
+                           serial_port_name_.c_str(), std::strerror(errno));
+      ::close(fd);
+      return false;
+    }
+
+    speed_t speed;
+    try {
+      speed = get_termios_baudrate(baud_rate_);
+    } catch (const std::exception& e) {
+      RCLCPP_ERROR(this->get_logger(), "%s", e.what());
+      ::close(fd);
+      return false;
+    }
+
+    cfsetispeed(&tio, speed);
+    cfsetospeed(&tio, speed);
+
+    // 8 data bits, 1 stop bit, no parity, no hardware flow control
+    tio.c_cflag &= ~PARENB;
+    tio.c_cflag &= ~CSTOPB;
+    tio.c_cflag &= ~CSIZE;
+    tio.c_cflag |= CS8;
+    tio.c_cflag &= ~CRTSCTS;
+    tio.c_cflag |= (CLOCAL | CREAD);
+
+    // Raw input
+    tio.c_iflag &= ~(IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL | IXON | IXOFF | IXANY);
+    // Raw output
+    tio.c_oflag &= ~OPOST;
+    // Raw mode (non-canonical, no echo, no signals)
+    tio.c_lflag &= ~(ECHO | ECHONL | ICANON | ISIG | IEXTEN);
+
+    tio.c_cc[VMIN] = 0;
+    tio.c_cc[VTIME] = 0;
+
+    tcflush(fd, TCIFLUSH);
+    if (tcsetattr(fd, TCSANOW, &tio) != 0) {
+      RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 3000,
+                           "Waiting for serial port '%s': %s",
+                           serial_port_name_.c_str(), std::strerror(errno));
+      ::close(fd);
+      return false;
+    }
+
+    // Set DTR high
+    int status = 0;
+    if (ioctl(fd, TIOCMGET, &status) == 0) {
+      status |= TIOCM_DTR;
+      ioctl(fd, TIOCMSET, &status);
+    }
+
+    serial_fd_ = fd;
+    data_buffer_.clear();
+    was_gnss_synced_ = false;
+    was_drdy_logged_ = false;
+    was_drdy_active_ = false;
+    is_connected_ = true;
+    last_data_received_ = std::chrono::steady_clock::now();
+
+    RCLCPP_INFO(this->get_logger(),
+                "Serial port '%s' opened successfully. Waiting for IMU packets...",
+                serial_port_name_.c_str());
+    return true;
   }
 
   void disconnect_serial(const std::string& reason) {
@@ -191,11 +237,7 @@ private:
                 "Serial port '%s' disconnected (%s). Will attempt to reconnect...",
                 serial_port_name_.c_str(), reason.c_str());
     is_connected_ = false;
-    try {
-      if (serial_port_.IsOpen()) {
-        serial_port_.Close();
-      }
-    } catch (...) {}
+    close_serial();
 
     data_buffer_.clear();
     was_gnss_synced_ = false;
@@ -206,7 +248,7 @@ private:
   void read_serial_data() {
     auto now = std::chrono::steady_clock::now();
 
-    if (!is_connected_) {
+    if (!is_connected_ || serial_fd_ < 0) {
       if (now - last_reconnect_attempt_ >= std::chrono::seconds(1)) {
         last_reconnect_attempt_ = now;
         try_open_serial();
@@ -220,11 +262,24 @@ private:
       return;
     }
 
-    std::vector<uint8_t> byte_buffer;
-    try {
-      serial_port_.Read(byte_buffer, 256, 50); // Read up to 256 bytes with 50ms timeout
-    } catch (const LibSerial::ReadTimeout&) {
-      // If no data has been received for more than data_timeout_sec_, consider it disconnected
+    struct pollfd pfd;
+    pfd.fd = serial_fd_;
+    pfd.events = POLLIN;
+    pfd.revents = 0;
+
+    // Wait up to 50ms for data
+    int poll_ret = poll(&pfd, 1, 50);
+
+    if (poll_ret < 0) {
+      if (errno == EINTR) {
+        return;
+      }
+      disconnect_serial(std::strerror(errno));
+      return;
+    }
+
+    if (poll_ret == 0) {
+      // Timeout: Check if data timeout threshold exceeded
       double elapsed_sec = std::chrono::duration<double>(now - last_data_received_).count();
       if (elapsed_sec >= data_timeout_sec_) {
         std::ostringstream ss;
@@ -235,14 +290,29 @@ private:
       RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
                            "No data from Spresense IMU (timeout). Check wiring and power.");
       return;
-    } catch (const std::exception& e) {
-      disconnect_serial(e.what());
+    }
+
+    // Check for errors or disconnection on file descriptor
+    if (pfd.revents & (POLLERR | POLLHUP | POLLNVAL)) {
+      disconnect_serial("device hangup/error detected by poll");
       return;
     }
 
-    if (!byte_buffer.empty()) {
-      last_data_received_ = now;
-      process_serial_buffer(byte_buffer);
+    if (pfd.revents & POLLIN) {
+      uint8_t buffer[256];
+      ssize_t bytes_read = ::read(serial_fd_, buffer, sizeof(buffer));
+      if (bytes_read > 0) {
+        last_data_received_ = now;
+        std::vector<uint8_t> byte_buffer(buffer, buffer + bytes_read);
+        process_serial_buffer(byte_buffer);
+      } else if (bytes_read < 0) {
+        if (errno != EAGAIN && errno != EWOULDBLOCK) {
+          disconnect_serial(std::strerror(errno));
+        }
+      } else if (bytes_read == 0) {
+        // EOF indicates device disconnected
+        disconnect_serial("end of file (device disconnected)");
+      }
     }
   }
 
@@ -404,7 +474,7 @@ private:
   std::chrono::steady_clock::time_point last_reconnect_attempt_{};
   std::chrono::steady_clock::time_point last_data_received_{};
 
-  LibSerial::SerialPort serial_port_;
+  int serial_fd_{-1};
   std::vector<uint8_t> data_buffer_;
   rclcpp::TimerBase::SharedPtr timer_;
   rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_raw_pub_;
