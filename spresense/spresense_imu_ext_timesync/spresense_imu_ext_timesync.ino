@@ -84,9 +84,9 @@ struct __attribute__((packed)) SyncedIMUData {
   float gx;                  // Gyro X [rad/s]
   float gy;                  // Gyro Y [rad/s]
   float gz;                  // Gyro Z [rad/s]
-  float ax;                  // Accel X [G]
-  float ay;                  // Accel Y [G]
-  float az;                  // Accel Z [G]
+  float ax;                  // Accel X [m/s^2]
+  float ay;                  // Accel Y [m/s^2]
+  float az;                  // Accel Z [m/s^2]
   uint8_t status;            // Status bit flags
 };
 
