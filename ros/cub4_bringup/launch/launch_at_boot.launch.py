@@ -121,6 +121,6 @@ def generate_launch_description():
         ublox_gps_delayed,
 
         # 3D LiDAR -> commmon.launch.pyでの起動に移動
-        # velodyne_driver_node,
-        # velodyne_transform_node,
+        velodyne_driver_node,
+        velodyne_transform_node,
     ])
