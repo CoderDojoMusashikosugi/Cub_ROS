@@ -31,22 +31,22 @@ def generate_launch_description():
         output='screen'
     )
 
-    # joy_dev = "/dev/input/js0"
-    # cub_commander = Node(
-    #     package='cub_commander',
-    #     executable='cub_commander_node',
-    #     output='screen',
-    #     parameters=[{'dev': joy_dev}],
-    # )
+    joy_dev = "/dev/input/js0"
+    cub_commander = Node(
+        package='cub_commander',
+        executable='cub_commander_node',
+        output='screen',
+        parameters=[{'dev': joy_dev}],
+    )
 
-    # joy_linux = Node(
-    #     package='joy_linux',
-    #     executable='joy_linux_node',
-    #     parameters=[{'dev': joy_dev}],
-    # )
+    joy_linux = Node(
+        package='joy_linux',
+        executable='joy_linux_node',
+        parameters=[{'dev': joy_dev}],
+    )
 
     # sllidar_ros2パッケージの共有ディレクトリを取得
-    sllidar_ros2_share_dir = FindPackageShare('sllidar_ros2').find('sllidar_ros2')
+    # sllidar_ros2_share_dir = FindPackageShare('sllidar_ros2').find('sllidar_ros2')
     
     # velodyneの起動
     velodyne_driver_share_dir = ament_index_python.packages.get_package_share_directory('velodyne_driver')
@@ -65,31 +65,31 @@ def generate_launch_description():
                                                       output='both',
                                                       parameters=[velodyne_convert_params])
     
-    # sllidarの起動　LとRで分ける
-    sllidar_L_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource([
-            os.path.join(sllidar_ros2_share_dir, 'launch', 'sllidar_c1_launch.py')
-        ]),
-        launch_arguments={
-            'serial_port': "/dev/ttySLC1L",
-            'frame_id': "SLC1L",
-            'topic_name': "/SLC1L_scan",
-        }.items()
-    )
-    sllidar_L_launch_delayed = TimerAction(period=1.0, actions=[sllidar_L_launch])
+    # # sllidarの起動　LとRで分ける
+    # sllidar_L_launch = IncludeLaunchDescription(
+    #     PythonLaunchDescriptionSource([
+    #         os.path.join(sllidar_ros2_share_dir, 'launch', 'sllidar_c1_launch.py')
+    #     ]),
+    #     launch_arguments={
+    #         'serial_port': "/dev/ttySLC1L",
+    #         'frame_id': "SLC1L",
+    #         'topic_name': "/SLC1L_scan",
+    #     }.items()
+    # )
+    # sllidar_L_launch_delayed = TimerAction(period=1.0, actions=[sllidar_L_launch])
     
-    # R側の設定
-    sllidar_R_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource([
-            os.path.join(sllidar_ros2_share_dir, 'launch', 'sllidar_c1_launch.py')
-        ]),
-        launch_arguments={
-            'serial_port': "/dev/ttySLC1R",
-            'frame_id': "SLC1R",
-            'topic_name': "/SLC1R_scan",
-        }.items()
-    )
-    sllidar_R_launch_delayed = TimerAction(period=3.0, actions=[sllidar_R_launch])
+    # # R側の設定
+    # sllidar_R_launch = IncludeLaunchDescription(
+    #     PythonLaunchDescriptionSource([
+    #         os.path.join(sllidar_ros2_share_dir, 'launch', 'sllidar_c1_launch.py')
+    #     ]),
+    #     launch_arguments={
+    #         'serial_port': "/dev/ttySLC1R",
+    #         'frame_id': "SLC1R",
+    #         'topic_name': "/SLC1R_scan",
+    #     }.items()
+    # )
+    # sllidar_R_launch_delayed = TimerAction(period=3.0, actions=[sllidar_R_launch])
     
     cub_bringup_params_path = os.path.join(get_package_share_directory('cub4_bringup'),'config')
     zed_f9p_params = os.path.join(cub_bringup_params_path, 'zed_f9p.yaml')
@@ -113,16 +113,16 @@ def generate_launch_description():
         ]
     )
 
-    # LIDARのGroupAction
-    slc_L_group = GroupAction(
-        actions=[PushRosNamespace('sllidar_l'),sllidar_L_launch_delayed],
-        scoped=True
-    )
+    # # LIDARのGroupAction
+    # slc_L_group = GroupAction(
+    #     actions=[PushRosNamespace('sllidar_l'),sllidar_L_launch_delayed],
+    #     scoped=True
+    # )
 
-    slc_R_group = GroupAction(
-        actions=[PushRosNamespace('sllidar_r'),sllidar_R_launch_delayed],
-        scoped=True
-    )
+    # slc_R_group = GroupAction(
+    #     actions=[PushRosNamespace('sllidar_r'),sllidar_R_launch_delayed],
+    #     scoped=True
+    # )
     
     # Launchファイルの返り値
     return LaunchDescription([
@@ -137,8 +137,8 @@ def generate_launch_description():
         joy_linux,
 
         # 2D LiDAR
-        slc_L_group,
-        slc_R_group,
+        # slc_L_group,
+        # slc_R_group,
 
         # GNSS
         rtklib,
