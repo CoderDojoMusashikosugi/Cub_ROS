@@ -207,20 +207,22 @@ void onPpsRise() {
   pps_pending = true;
 }
 
-void waitForPpsLowAndAttachInterrupt() {
-  // Serial.println("Waiting for PPS LOW. Connect the PPS input.");
+// Non-blocking: called repeatedly from loop() until the PPS interrupt is attached.
+// An unconnected PPS input is pulled HIGH by the extension board, and attaching
+// a rising-edge interrupt while HIGH can stall. So the interrupt is attached
+// only once the pin is observed LOW; until then IMU streaming continues.
+bool pps_interrupt_attached = false;
 
-  uint32_t last_message_ms = millis();
-  while (digitalRead(PPS_PIN) == HIGH) {
-    if (millis() - last_message_ms >= 1000) {
-      last_message_ms = millis();
-      // Serial.println("Waiting for PPS LOW...");
-    }
-    delay(1);
+void tryAttachPpsInterrupt() {
+  if (pps_interrupt_attached) {
+    return;
+  }
+  if (digitalRead(PPS_PIN) == HIGH) {
+    return;
   }
 
   attachInterrupt(digitalPinToInterrupt(PPS_PIN), onPpsRise, RISING);
-  // Serial.println("PPS input ready.");
+  pps_interrupt_attached = true;
 }
 
 void waitForImuDrdyLowAndAttachInterrupt() {
@@ -501,11 +503,11 @@ void setup()
   drop_50msdata(g_devfd, SAMPLING_RATE, FIFO_THRESHOLD);
   // printf("IMU sensing initialized.\n");
 
-  // 4. Initialize GNSS PPS input (D3) and wait for PPS idle LOW
-  // (The extension board pulls an unconnected input HIGH. Registering the
-  // rising-edge interrupt while HIGH can stall, so wait for PPS idle LOW.)
+  // 4. Initialize GNSS PPS input (D3). The interrupt is attached later from
+  // loop() once the pin is seen LOW (non-blocking, so startup is not delayed
+  // while PPS is unconnected and pulled HIGH).
   pinMode(PPS_PIN, INPUT);
-  waitForPpsLowAndAttachInterrupt();
+  tryAttachPpsInterrupt();
 
   // 5. Initialize UM982 Event Comparator on D4
   beginUm982EventComparison(
@@ -523,7 +525,10 @@ void setup()
 
 void loop()
 {
-  // 1. Update GNSS clock synchronization and UM982 event comparison
+  // 1. Attach PPS interrupt as soon as PPS is detected LOW (no-op once attached)
+  tryAttachPpsInterrupt();
+
+  // Update GNSS clock synchronization and UM982 event comparison
   updateGnssClock();
   updateUm982EventComparison();
 
