@@ -44,9 +44,6 @@ def generate_launch_description():
         executable='joy_linux_node',
         parameters=[{'dev': joy_dev}],
     )
-
-    # sllidar_ros2パッケージの共有ディレクトリを取得
-    # sllidar_ros2_share_dir = FindPackageShare('sllidar_ros2').find('sllidar_ros2')
     
     # velodyneの起動
     velodyne_driver_share_dir = ament_index_python.packages.get_package_share_directory('velodyne_driver')
@@ -64,32 +61,16 @@ def generate_launch_description():
                                                       executable='velodyne_transform_node',
                                                       output='both',
                                                       parameters=[velodyne_convert_params])
+    # cub4_bringup_launchディレクトリを取得
+    cub_bringup_launch_path = os.path.join(get_package_share_directory('cub4_bringup'),'launch')
     
-    # # sllidarの起動　LとRで分ける
-    # sllidar_L_launch = IncludeLaunchDescription(
-    #     PythonLaunchDescriptionSource([
-    #         os.path.join(sllidar_ros2_share_dir, 'launch', 'sllidar_c1_launch.py')
-    #     ]),
-    #     launch_arguments={
-    #         'serial_port': "/dev/ttySLC1L",
-    #         'frame_id': "SLC1L",
-    #         'topic_name': "/SLC1L_scan",
-    #     }.items()
-    # )
-    # sllidar_L_launch_delayed = TimerAction(period=1.0, actions=[sllidar_L_launch])
-    
-    # # R側の設定
-    # sllidar_R_launch = IncludeLaunchDescription(
-    #     PythonLaunchDescriptionSource([
-    #         os.path.join(sllidar_ros2_share_dir, 'launch', 'sllidar_c1_launch.py')
-    #     ]),
-    #     launch_arguments={
-    #         'serial_port': "/dev/ttySLC1R",
-    #         'frame_id': "SLC1R",
-    #         'topic_name': "/SLC1R_scan",
-    #     }.items()
-    # )
-    # sllidar_R_launch_delayed = TimerAction(period=3.0, actions=[sllidar_R_launch])
+    # livoxの起動
+    livox_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource([
+            os.path.join(cub_bringup_launch_path, 'msg_MID360_launch.py')
+        ]),
+    )
+    livox_delayed = TimerAction(period=1.0, actions=[livox_launch])
     
     cub_bringup_params_path = os.path.join(get_package_share_directory('cub4_bringup'),'config')
     zed_f9p_params = os.path.join(cub_bringup_params_path, 'zed_f9p.yaml')
@@ -113,16 +94,12 @@ def generate_launch_description():
         ]
     )
 
-    # # LIDARのGroupAction
-    # slc_L_group = GroupAction(
-    #     actions=[PushRosNamespace('sllidar_l'),sllidar_L_launch_delayed],
-    #     scoped=True
-    # )
+    # LIDARのGroupAction
+    livox_group = GroupAction(
+        actions=[PushRosNamespace('livox'),livox_delayed],
+        scoped=True
+    )
 
-    # slc_R_group = GroupAction(
-    #     actions=[PushRosNamespace('sllidar_r'),sllidar_R_launch_delayed],
-    #     scoped=True
-    # )
     
     # Launchファイルの返り値
     return LaunchDescription([
@@ -136,9 +113,8 @@ def generate_launch_description():
         cub_commander,        
         joy_linux,
 
-        # 2D LiDAR
-        # slc_L_group,
-        # slc_R_group,
+        # Livox
+        livox_group,
 
         # GNSS
         rtklib,
