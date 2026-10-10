@@ -1,6 +1,8 @@
 #include "M5Dial.h"
 
 const unsigned long SEND_INTERVAL_MS = 100;
+const int BEEP_FREQ = 4000;        // ブザー周波数 (Hz)
+const int BEEP_DURATION_MS = 50;   // 鳴動時間 (ms)
 
 bool current_button_state = false;
 unsigned long last_send_time = 0;
@@ -53,6 +55,10 @@ void loop() {
         current_button_state = is_pressed;
         send_button_state(current_button_state);
         update_display(current_button_state);
+
+        if (current_button_state) {
+            M5Dial.Speaker.tone(BEEP_FREQ, BEEP_DURATION_MS);
+        }
     }
 
     unsigned long now = millis();

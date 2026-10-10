@@ -194,5 +194,5 @@ udevadm trigger 2>/dev/null || true
 
 echo "[INFO] Host settings installation completed. Please reboot the system to apply all changes."
 
-echo 'KERNEL=="ttyUSB*",  ATTRS{idVendor}=="0303a", ATTRS{idProduct}=="1001", SYMLINK+="ttyDIAL"' > /etc/udev/rules.d/99-m5dial.rules
+echo 'KERNEL=="ttyACM*",  ATTRS{idVendor}=="303a", ATTRS{idProduct}=="1001", SYMLINK+="ttyDIAL"' > /etc/udev/rules.d/99-m5dial.rules
 echo "reboot to apply"
