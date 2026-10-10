@@ -53,6 +53,18 @@
     </visual>
   </link>
 
+  <!-- Livox LiDAR -->
+  <link name="livox_frame">
+    <visual>
+      <geometry>
+        <box size="0.015 0.015 0.015"/>
+      </geometry>
+      <material name="blue">
+        <color rgba="0 1 0 1"/>
+      </material>
+    </visual>
+  </link>
+
   <!-- IMU -->
   <link name="imu_link">
     <visual>
@@ -117,7 +129,13 @@
   <joint name="base_to_velodyne" type="fixed">
     <parent link="base_link"/>
     <child link="velodyne"/>
-    <origin xyz="0.0 0 0.5" rpy="0 0.0361283 0"/>
+    <origin xyz="0.0 0 0.3" rpy="0 0.0361283 0"/>
+  </joint>
+
+  <joint name="base_to_livox" type="fixed">
+    <parent link="base_link"/>
+    <child link="livox_frame"/>
+    <origin xyz="0.0 0 0.6" rpy="0 0.785398 0"/>
   </joint>
 
   <joint name="base_to_imu" type="fixed">
