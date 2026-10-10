@@ -23,12 +23,12 @@ def generate_launch_description():
     )
 
     spresense_imu = Node(
-        package='cxd5602pwbimu_localizer_node',
-        executable='localizer_node',
-        name='imu_localizer_node',
+        package='cub4_bringup',
+        executable='spresense_imu_node',
+        name='spresense_imu_node',
         parameters=[{
             'serial_port': "/dev/ttyMULIMU",
-            'baud_rate': 1152000,
+            'baud_rate': 230400,
         }],
         output='screen'
     )
@@ -94,26 +94,14 @@ def generate_launch_description():
     )
     livox_delayed = TimerAction(period=1.0, actions=[livox_launch])
     
-    cub_bringup_params_path = os.path.join(get_package_share_directory('cub4_bringup'),'config')
-    zed_f9p_params = os.path.join(cub_bringup_params_path, 'zed_f9p.yaml')
-    rtklib = ExecuteProcess(
-        cmd=['str2str', '-in','ntrip://ntrip1.bizstation.jp:2101/3041F3CA','-out','serial://ttyGPS:230400'],  #Tsukuba
-        # cmd=['str2str', '-in','ntrip://ntrip1.bizstation.jp:2101/B4A00B46','-out','serial://ttyGPS:230400'],    #Yokohama
-        output='both',
-        respawn=True,
-        respawn_delay=10.0
-    )
-    ublox_gps_delayed = TimerAction( # str2strをublox_gpsより先に起動しておく必要がある。
-        period=5.0,
-        actions=[
-            Node(package='ublox_gps',
-                executable='ublox_gps_node',
-                output='both',
-                parameters=[zed_f9p_params],
-                respawn=True,
-                respawn_delay=5.0
-            ),
-        ]
+    # UM982 GNSSの起動
+    um982_params_file = os.path.join(cub_bringup_path, 'config', 'um982.yaml')
+    um982 = Node(
+        package='cub_um982',
+        executable='um982_node',
+        name='um982_node',
+        output='screen',
+        parameters = [um982_params_file],
     )
 
     # LIDARのGroupAction
@@ -139,8 +127,7 @@ def generate_launch_description():
         livox_group,
 
         # GNSS
-        rtklib,
-        ublox_gps_delayed,
+        um982,
 
         # 3D LiDAR -> commmon.launch.pyでの起動に移動
         velodyne_driver_node,
