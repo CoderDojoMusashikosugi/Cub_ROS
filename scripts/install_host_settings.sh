@@ -45,7 +45,7 @@ fi
 
 # Install required host packages
 REQUIRED_PKGS=()
-for pkg in device-tree-compiler ntpsec pps-tools; do
+for pkg in build-essential device-tree-compiler ntpsec pps-tools; do
     if ! dpkg -s "$pkg" >/dev/null 2>&1; then
         REQUIRED_PKGS+=("$pkg")
     fi
@@ -57,7 +57,7 @@ if [ ${#REQUIRED_PKGS[@]} -gt 0 ]; then
     apt-get install -y -qq "${REQUIRED_PKGS[@]}"
     echo "[INFO] Required packages installed."
 else
-    echo "[INFO] Required packages (device-tree-compiler, ntpsec, pps-tools) are already installed."
+    echo "[INFO] Required packages (build-essential, device-tree-compiler, ntpsec, pps-tools) are already installed."
 fi
 
 # setup pps input
@@ -184,10 +184,40 @@ else
     echo "[WARN] $NTP_CONF not found. Skipping NTPsec configuration."
 fi
 
+# Build and install CH341 USB-Serial kernel module (for UM982 / CH340)
+CH341_DIR="${SCRIPT_DIR}/../support_tools/ch341"
+MODULE_TARGET_DIR="/lib/modules/$(uname -r)/kernel/drivers/usb/serial"
+
+if [ -d "$CH341_DIR" ]; then
+    # Check if ch341 is already available in the current kernel
+    if ! modinfo ch341 >/dev/null 2>&1; then
+        echo "[INFO] Compiling and installing CH341 kernel module ($CH341_DIR)..."
+        make -C "$CH341_DIR" clean >/dev/null 2>&1 || true
+        if make -C "$CH341_DIR"; then
+            mkdir -p "$MODULE_TARGET_DIR"
+            cp "$CH341_DIR/ch341.ko" "$MODULE_TARGET_DIR/"
+            depmod -a
+            echo "[INFO] CH341 kernel module installed successfully."
+        else
+            echo "[ERROR] Failed to compile CH341 kernel module."
+        fi
+    else
+        echo "[INFO] CH341 kernel module is already installed."
+    fi
+
+    # Load module now and ensure it loads on boot
+    modprobe ch341 >/dev/null 2>&1 || true
+    if [ ! -f /etc/modules-load.d/ch341.conf ] || ! grep -q "^ch341" /etc/modules-load.d/ch341.conf; then
+        echo "ch341" > /etc/modules-load.d/ch341.conf
+        echo "[INFO] Configured ch341 to load automatically on boot (/etc/modules-load.d/ch341.conf)."
+    fi
+fi
+
 # udev rules for serial devices and PPS permissions
 echo 'KERNEL=="ttyUSB*",  ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6001", SYMLINK+="ttyATOM"' > /etc/udev/rules.d/99-atom.rules
 # echo 'KERNEL=="ttyACM*",  ATTRS{idVendor}=="1546", ATTRS{idProduct}=="01a9", SYMLINK+="ttyGPS"' > /etc/udev/rules.d/99-gps.rules
 echo 'KERNEL=="ttyUSB*", ENV{ID_SERIAL_SHORT}=="b69c7db1d29de8118347301338b01545", SYMLINK+="ttyMULIMU"' > /etc/udev/rules.d/99-multiIMU.rules
+echo 'KERNEL=="ttyUSB*", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="7523", MODE="0666", GROUP="dialout", SYMLINK+="ttyUM982"' > /etc/udev/rules.d/99-um982.rules
 echo 'KERNEL=="pps*", GROUP="dialout", MODE="0660"' > /etc/udev/rules.d/99-pps.rules
 udevadm control --reload-rules 2>/dev/null || true
 udevadm trigger 2>/dev/null || true

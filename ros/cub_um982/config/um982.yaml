@@ -1,0 +1,42 @@
+/**:
+  ros__parameters:
+    # ----------------------------------------------------
+    # Serial / UART Settings
+    # ----------------------------------------------------
+    port: "/dev/ttyUM982"           # Serial device path (e.g. /dev/ttyUM982, /dev/ttyUSB0)
+    baudrate: 115200                # Serial baudrate (115200, 230400, 460800, 921600)
+    serial_timeout: 1.0             # Read timeout (seconds)
+    output_rate: 10                 # Output frequency in Hz (1 - 20)
+    configure_on_start: true        # Request GPGGA, GPGGAH, HEADINGA and time logs on startup
+    enable_rmc: false               # Enable GPRMC output in addition to GPGGA and HEADINGA
+
+    # ----------------------------------------------------
+    # RTK / NTRIP Settings
+    # ----------------------------------------------------
+    enable_ntrip: true              # Set true to enable RTK correction via NTRIP
+    ntrip_host: "geortk.jp"         # NTRIP caster host/IP
+    ntrip_port: 2101                # NTRIP caster port
+    ntrip_mountpoint: "tamtam"      # Mountpoint name
+    ntrip_user: ""                  # Username
+    ntrip_password: ""              # Password
+    ntrip_gga_interval: 5.0         # GGA report interval to NTRIP caster (seconds)
+    ntrip_log_interval: 5.0         # Summary log interval in ROS logger (seconds, 0=disable)
+
+    # ----------------------------------------------------
+    # Frame and Coordinate Offsets
+    # ----------------------------------------------------
+    frame_id: "gnss_link"           # Target frame ID for primary antenna (ANT1)
+    secondary_frame_id: "gnss_secondary_link" # Target frame ID for secondary antenna (ANT2)
+    publish_secondary_fix: true     # Whether to publish secondary antenna fix to ~/fix_secondary
+    heading_offset_deg: 0.0         # Heading offset in degrees (+: clockwise compensation)
+    pitch_offset_deg: 0.0           # Pitch offset in degrees
+    default_heading_stddev_deg: 0.5 # Fallback heading standard deviation if not reported (deg)
+    default_pitch_stddev_deg: 0.5   # Fallback pitch standard deviation if not reported (deg)
+
+    # ----------------------------------------------------
+    # Diagnostics Settings (Compatible with cub_diagnostics)
+    # ----------------------------------------------------
+    hardware_id: "um982"            # Hardware ID in diagnostic messages
+    diagnostic_update_period: 1.0   # Diagnostic publishing interval (seconds)
+    diagnostic_timeout: 2.0         # Timeout threshold to report ERROR status (seconds)
+    diagnostic_status_name: "UM982 Status" # Status name for diagnostic_aggregator
