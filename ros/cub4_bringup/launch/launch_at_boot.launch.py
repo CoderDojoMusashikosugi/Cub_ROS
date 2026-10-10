@@ -7,6 +7,8 @@ from launch_ros.substitutions import FindPackageShare
 from ament_index_python.packages import get_package_share_directory
 from launch.actions import TimerAction
 from launch_ros.actions import PushRosNamespace
+from launch_ros.actions import ComposableNodeContainer
+from launch_ros.descriptions import ComposableNode
 import ament_index_python.packages
 import launch_ros.actions
 import yaml
@@ -44,14 +46,36 @@ def generate_launch_description():
         executable='joy_linux_node',
         parameters=[{'dev': joy_dev}],
     )
+
+    # cub4_bringup_launchディレクトリを取得
+    cub_bringup_path = os.path.join(get_package_share_directory('cub4_bringup'))
+    cub_bringup_launch_path = os.path.join(cub_bringup_path,'launch')
     
     # velodyneの起動
-    velodyne_driver_share_dir = ament_index_python.packages.get_package_share_directory('velodyne_driver')
-    _velodyne_driver_params_file = os.path.join(velodyne_driver_share_dir, 'config', 'VLP32C-velodyne_driver_node-params.yaml')
-    velodyne_driver_node = launch_ros.actions.Node(package='velodyne_driver',
-                                                   executable='velodyne_driver_node',
-                                                   output='both',
-                                                   parameters=[_velodyne_driver_params_file])
+    # velodyne_driver_share_dir = ament_index_python.packages.get_package_share_directory('velodyne_driver')
+    _velodyne_driver_params_file = os.path.join(cub_bringup_path, 'config', 'VLP32C-velodyne_driver_node-params.yaml')
+    # velodyne_driver_node = launch_ros.actions.Node(package='velodyne_driver',
+    #                                                executable='velodyne_driver_node',
+    #                                                output='both',
+    #                                                parameters=[_velodyne_driver_params_file])
+    with open(_velodyne_driver_params_file, 'r') as f:
+        params = yaml.safe_load(f)['velodyne_driver_node']['ros__parameters']
+    container = ComposableNodeContainer(
+            name='velodyne_driver_container',
+            namespace='',
+            package='rclcpp_components',
+            executable='component_container',
+            composable_node_descriptions=[
+                ComposableNode(
+                    package='velodyne_driver',
+                    plugin='velodyne_driver::VelodyneDriver',
+                    name='velodyne_driver_node',
+                    parameters=[params]),
+            ],
+            output='both',
+    )
+    velodyne_driver_node = LaunchDescription([container])
+
     velodyne_convert_share_dir = ament_index_python.packages.get_package_share_directory('velodyne_pointcloud')
     velodyne_convert_params_file = os.path.join(velodyne_convert_share_dir, 'config', 'VLP32C-velodyne_transform_node-params.yaml')
     with open(velodyne_convert_params_file, 'r') as f:
@@ -61,8 +85,6 @@ def generate_launch_description():
                                                       executable='velodyne_transform_node',
                                                       output='both',
                                                       parameters=[velodyne_convert_params])
-    # cub4_bringup_launchディレクトリを取得
-    cub_bringup_launch_path = os.path.join(get_package_share_directory('cub4_bringup'),'launch')
     
     # livoxの起動
     livox_launch = IncludeLaunchDescription(
