@@ -5,7 +5,7 @@
   <version>0.1.0</version>
   <description>ROS2 driver node for Unicore UM982 GNSS receiver with dual-antenna heading and NTRIP RTK</description>
   <maintainer email="cub@example.com"></maintainer>
-  <license></license>
+  <license>TODO</license>
 
   <depend>rclpy</depend>
   <depend>sensor_msgs</depend>
