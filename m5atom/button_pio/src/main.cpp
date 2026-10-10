@@ -1,28 +1,9 @@
-#include <M5Unified.h>
-#include <FastLED.h>
+#include "M5Dial.h"
 
-const int DISPLAY_SWITCH = 39;
-const int LED_DATA_PIN = 27;
-const int NUM_LEDS = 25;
-const int CENTER_LED = 12;
-const unsigned long DEBOUNCE_MS = 50;
 const unsigned long SEND_INTERVAL_MS = 100;
 
-CRGB leds[NUM_LEDS];
-
-volatile bool button_state_changed = false;
-volatile bool current_button_state = false;
-unsigned long last_button_time = 0;
+bool current_button_state = false;
 unsigned long last_send_time = 0;
-
-void IRAM_ATTR button_isr() {
-    unsigned long now = millis();
-    if (now - last_button_time > DEBOUNCE_MS) {
-        button_state_changed = true;
-        current_button_state = (digitalRead(DISPLAY_SWITCH) == LOW);
-        last_button_time = now;
-    }
-}
 
 void send_button_state(bool pressed) {
     Serial.print("BTN:");
@@ -31,30 +12,47 @@ void send_button_state(bool pressed) {
     Serial.flush();
 }
 
-void update_led(bool pressed) {
-    leds[CENTER_LED] = pressed ? CRGB::Blue : CRGB::Green;
-    FastLED.show();
+void update_display(bool pressed) {
+    if (pressed) {
+        M5Dial.Display.fillScreen(TFT_BLUE);
+        M5Dial.Display.setTextColor(TFT_WHITE, TFT_BLUE);
+        M5Dial.Display.setTextDatum(middle_center);
+        M5Dial.Display.setTextSize(3);
+        M5Dial.Display.drawString("PRESSED", M5Dial.Display.width() / 2, M5Dial.Display.height() / 2 - 20);
+        M5Dial.Display.setTextSize(2);
+        M5Dial.Display.drawString("BTN: 1", M5Dial.Display.width() / 2, M5Dial.Display.height() / 2 + 25);
+    } else {
+        M5Dial.Display.fillScreen(TFT_BLACK);
+        M5Dial.Display.setTextColor(TFT_GREEN, TFT_BLACK);
+        M5Dial.Display.setTextDatum(middle_center);
+        M5Dial.Display.setTextSize(3);
+        M5Dial.Display.drawString("READY", M5Dial.Display.width() / 2, M5Dial.Display.height() / 2 - 20);
+        M5Dial.Display.setTextSize(2);
+        M5Dial.Display.drawString("BTN: 0", M5Dial.Display.width() / 2, M5Dial.Display.height() / 2 + 25);
+    }
 }
 
 void setup() {
-    M5.begin();
+    auto cfg = M5.config();
+    M5Dial.begin(cfg, false, false);
 
     Serial.begin(115200);
 
-    pinMode(DISPLAY_SWITCH, INPUT_PULLUP);
-    attachInterrupt(digitalPinToInterrupt(DISPLAY_SWITCH), button_isr, CHANGE);
-
-    FastLED.addLeds<WS2812, LED_DATA_PIN, GRB>(leds, NUM_LEDS);
-    FastLED.setBrightness(50);
-    FastLED.clear();
-    update_led(false);
+    M5Dial.Display.setRotation(0);
+    update_display(false);
 }
 
 void loop() {
-    if (button_state_changed) {
-        button_state_changed = false;
+    M5Dial.update();
+
+    // 物理ボタン(中央プッシュボタン)またはタッチパネルの押下を判定
+    auto t = M5Dial.Touch.getDetail();
+    bool is_pressed = M5Dial.BtnA.isPressed() || t.isPressed();
+
+    if (is_pressed != current_button_state) {
+        current_button_state = is_pressed;
         send_button_state(current_button_state);
-        update_led(current_button_state);
+        update_display(current_button_state);
     }
 
     unsigned long now = millis();
