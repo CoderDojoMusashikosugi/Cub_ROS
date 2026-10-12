@@ -73,6 +73,20 @@
   - L2は自律走行時にも重要なコマンド。自律走行のコマンドを手動操縦で上書きできるため、危険な場合の操作オーバーライドに使える。ただしL2離せば元通りなのに注意。
   - DualSenseが無い場合の手動操縦には、`ros2 run teleop_twist_keyboard teleop_twist_keyboard cmd_vel:=cmd_vel_atom`等で`/cmd_vel_atom`にデータを流すと動く。
 
+### Webコンソール(cub console)で診断を見る
+- ロボットの診断(`/diagnostics_agg`)を、スマホやPCのブラウザから一覧で確認できる。異常(ERROR/WARN/STALE)のある項目が目立つように表示される。
+- 初回だけセットアップする(インターネット接続が必要)
+  - `cd ~/cub_console && ./setup.sh`
+  - `cbs cub_bringup`(launchファイルを入れるため)
+- ロボットを起動した後、別のターミナルで起動する
+  - `ros2 launch cub_bringup cub_console.launch.py`
+- ブラウザで `http://<ロボットのIPアドレス>:8080/` を開く
+  - 接続できるのはロボットと同じサブネットの機器だけ。ロボット本体からは http://localhost:8080/ で見られる。
+  - 認証は無いので、信頼できるネットワークでだけ使うこと。
+  - ロボット本体からだけ見たい場合は `host:=127.0.0.1` を付けて起動する。
+- 項目の行をタップすると詳細(値の一覧やグラフ)が開く。「コピー」でその項目の内容をテキストでコピーできる。
+- 詳しくは[docker/home/cub_console/README.md](./docker/home/cub_console/README.md)を参照。
+
 ### 地図を作成する(2D)
 - 機体を手動で初期位置に持って行く
   - 理由は後述するが、地図作成開始時にオドメトリが原点のままである場合、その後の作業が楽で大変おすすめ。
