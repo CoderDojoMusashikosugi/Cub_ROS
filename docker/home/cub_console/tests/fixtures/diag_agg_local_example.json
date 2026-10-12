@@ -1,0 +1,242 @@
+{
+ "type": "diagnostics",
+ "stamp": 0,
+ "status": [
+  {
+   "name": "/Robot/Linux",
+   "level": 0,
+   "message": "OK",
+   "hardware_id": "",
+   "values": [
+    {
+     "key": "linux_state: Linux CPU Usage",
+     "value": "CPU usage 12.5%"
+    },
+    {
+     "key": "linux_state: Linux Memory Usage",
+     "value": "Memory usage 30.7%"
+    },
+    {
+     "key": "linux_state: Linux Storage Usage",
+     "value": "/=66.5% used"
+    },
+    {
+     "key": "linux_state: Linux Swap Usage",
+     "value": "Swap usage 0.0%"
+    }
+   ]
+  },
+  {
+   "name": "/Robot/Linux/linux_state: Linux CPU Usage",
+   "level": 0,
+   "message": "CPU usage 12.5%",
+   "hardware_id": "example",
+   "values": [
+    {
+     "key": "Usage",
+     "value": "12.5%"
+    },
+    {
+     "key": "Warn threshold",
+     "value": "80.0%"
+    },
+    {
+     "key": "Error threshold",
+     "value": "95.0%"
+    }
+   ]
+  },
+  {
+   "name": "/Robot/Linux/linux_state: Linux Memory Usage",
+   "level": 0,
+   "message": "Memory usage 30.7%",
+   "hardware_id": "example",
+   "values": [
+    {
+     "key": "Usage",
+     "value": "30.7%"
+    },
+    {
+     "key": "Total",
+     "value": "7.87 GiB"
+    },
+    {
+     "key": "Used",
+     "value": "2.42 GiB"
+    },
+    {
+     "key": "Available",
+     "value": "5.45 GiB"
+    },
+    {
+     "key": "Warn threshold",
+     "value": "80.0%"
+    },
+    {
+     "key": "Error threshold",
+     "value": "95.0%"
+    }
+   ]
+  },
+  {
+   "name": "/Robot/Linux/linux_state: Linux Storage Usage",
+   "level": 0,
+   "message": "/=66.5% used",
+   "hardware_id": "example",
+   "values": [
+    {
+     "key": "/ used",
+     "value": "19.1 GiB"
+    },
+    {
+     "key": "/ available",
+     "value": "9.62 GiB"
+    },
+    {
+     "key": "/ total",
+     "value": "28.7 GiB"
+    },
+    {
+     "key": "Warn threshold",
+     "value": "80.0%"
+    },
+    {
+     "key": "Error threshold",
+     "value": "95.0%"
+    }
+   ]
+  },
+  {
+   "name": "/Robot/Linux/linux_state: Linux Swap Usage",
+   "level": 0,
+   "message": "Swap usage 0.0%",
+   "hardware_id": "example",
+   "values": [
+    {
+     "key": "Usage",
+     "value": "0.0%"
+    },
+    {
+     "key": "Total",
+     "value": "2.00 GiB"
+    },
+    {
+     "key": "Used",
+     "value": "0.00 B"
+    },
+    {
+     "key": "Free",
+     "value": "2.00 GiB"
+    },
+    {
+     "key": "Warn threshold",
+     "value": "50.0%"
+    },
+    {
+     "key": "Error threshold",
+     "value": "80.0%"
+    }
+   ]
+  },
+  {
+   "name": "/Robot/Sensors",
+   "level": 2,
+   "message": "Error",
+   "hardware_id": "",
+   "values": [
+    {
+     "key": "topic_hz_checker: TopicMonitor /odom",
+     "value": "No events recorded."
+    }
+   ]
+  },
+  {
+   "name": "/Robot/Sensors/topic_hz_checker: TopicMonitor  odom",
+   "level": 2,
+   "message": "No events recorded.",
+   "hardware_id": "example",
+   "values": [
+    {
+     "key": "Events in window",
+     "value": "0"
+    },
+    {
+     "key": "Events since startup",
+     "value": "0"
+    },
+    {
+     "key": "Duration of window (s)",
+     "value": "7.000038"
+    },
+    {
+     "key": "Actual frequency (Hz)",
+     "value": "0.000000"
+    },
+    {
+     "key": "Target frequency (Hz)",
+     "value": "20.000000"
+    },
+    {
+     "key": "Minimum acceptable frequency (Hz)",
+     "value": "16.000000"
+    },
+    {
+     "key": "Maximum acceptable frequency (Hz)",
+     "value": "24.000000"
+    },
+    {
+     "key": "Topic",
+     "value": "/odom"
+    },
+    {
+     "key": "Type",
+     "value": "nav_msgs/msg/Odometry"
+    },
+    {
+     "key": "Configured window size",
+     "value": "60"
+    },
+    {
+     "key": "Expected frequency (Hz)",
+     "value": "20.000"
+    },
+    {
+     "key": "QoS reliability",
+     "value": "best_effort"
+    },
+    {
+     "key": "QoS durability",
+     "value": "volatile"
+    },
+    {
+     "key": "QoS depth",
+     "value": "100"
+    },
+    {
+     "key": "Messages received",
+     "value": "0"
+    },
+    {
+     "key": "Last message age (s)",
+     "value": "n/a"
+    }
+   ]
+  },
+  {
+   "name": "/Robot",
+   "level": 2,
+   "message": "Error",
+   "hardware_id": "",
+   "values": [
+    {
+     "key": "Linux",
+     "value": "OK"
+    },
+    {
+     "key": "Sensors",
+     "value": "Error"
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>cub console</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header id="hdr">
+    <div class="hdr-row">
+      <h1>cub console</h1>
+      <span id="conn" class="pill" data-state="bad">接続待ち</span>
+      <span id="fresh" class="sub">未受信</span>
+      <span id="roots"></span>
+    </div>
+    <div class="hdr-row">
+      <div id="chips" role="group" aria-label="レベルで絞り込み"></div>
+      <input id="search" type="search" placeholder="検索(名前・メッセージ・値)" autocomplete="off">
+      <label class="toggle"><input id="problems-only" type="checkbox"> 問題のみ</label>
+      <button id="hidden-open" type="button" class="btn small ghost">非表示 (<span id="hidden-count">0</span>)</button>
+    </div>
+    <div id="banner" role="alert" hidden></div>
+  </header>
+
+  <main>
+    <section id="diag">
+      <div id="tree" role="tree"></div>
+      <p id="empty" class="sub" hidden></p>
+    </section>
+  </main>
+
+  <dialog id="hidden-dlg">
+    <h2>非表示にした項目</h2>
+    <p id="hidden-empty" class="sub">ありません。</p>
+    <ul id="hidden-list"></ul>
+    <div class="dlg-actions">
+      <button id="hidden-restore-all" type="button" class="btn small">すべて復元</button>
+      <button id="hidden-close" type="button" class="btn small">閉じる</button>
+    </div>
+  </dialog>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

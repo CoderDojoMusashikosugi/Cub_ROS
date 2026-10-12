@@ -1,0 +1,15 @@
+# 本アプリから操作できるプロセスのホワイトリスト。
+# cmd は文字列の配列のみ(シェルは通さない)。cwd は任意(相対パスは起動ディレクトリ基準)。
+backend: subprocess
+processes:
+  - id: demo_talker
+    label: デモ talker
+    # demo_nodes_cpp はコンテナに入っていないため、同梱の最小 talker を使う
+    # (ros-${ROS_DISTRO}-demo-nodes-cpp を入れたら ["ros2", "run", "demo_nodes_cpp", "talker"] に戻してよい)
+    cmd: ["python3", "tools/demo_talker.py"]
+  - id: diag_example
+    label: 診断サンプル(cub_diagnostics example.launch.py)
+    cmd: ["ros2", "launch", "cub_diagnostics", "example.launch.py"]
+  - id: jetson_state
+    label: Jetson 温度監視
+    cmd: ["ros2", "run", "cub_diagnostics", "jetson_state_node"]

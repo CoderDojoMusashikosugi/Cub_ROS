@@ -1,0 +1,541 @@
+# 合成データ: 実機の `ros2 topic echo /diagnostics_agg --once` 出力で置き換えること。
+# 座標はダミー値。
+header:
+  stamp:
+    sec: 1791013863
+    nanosec: 79736957
+  frame_id: ''
+status:
+- level: "\0"
+  name: '/Robot/Linux/linux_state: Linux CPU Usage'
+  message: CPU usage 47.8%
+  hardware_id: cub4
+  values:
+  - key: Usage
+    value: 47.8%
+  - key: Warn threshold
+    value: 95.0%
+  - key: Error threshold
+    value: 98.0%
+- level: "\0"
+  name: '/Robot/Linux/linux_state: Linux Memory Usage'
+  message: Memory usage 52.1%
+  hardware_id: cub4
+  values:
+  - key: Usage
+    value: 52.1%
+  - key: Total
+    value: 7.37 GiB
+  - key: Used
+    value: 3.84 GiB
+  - key: Available
+    value: 3.53 GiB
+  - key: Warn threshold
+    value: 80.0%
+  - key: Error threshold
+    value: 95.0%
+- level: "\0"
+  name: '/Robot/Linux/linux_state: Linux Swap Usage'
+  message: Swap usage 0.0%
+  hardware_id: cub4
+  values:
+  - key: Usage
+    value: 0.0%
+  - key: Total
+    value: 3.68 GiB
+  - key: Used
+    value: 0.00 B
+  - key: Free
+    value: 3.68 GiB
+  - key: Warn threshold
+    value: 50.0%
+  - key: Error threshold
+    value: 80.0%
+- level: "\0"
+  name: '/Robot/Linux/linux_state: Linux Storage Usage'
+  message: /=41.2% used
+  hardware_id: cub4
+  values:
+  - key: / used
+    value: 96.3 GiB
+  - key: / available
+    value: 137 GiB
+  - key: / total
+    value: 233 GiB
+  - key: Warn threshold
+    value: 80.0%
+  - key: Error threshold
+    value: 95.0%
+- level: "\0"
+  name: '/Robot/Linux/jetson_state: Jetson Thermal State'
+  message: Max 52.3 C (tj-thermal)
+  hardware_id: cub4
+  values:
+  - key: cpu-thermal
+    value: 50.1 C
+  - key: gpu-thermal
+    value: 48.7 C
+  - key: soc0-thermal
+    value: 49.9 C
+  - key: soc1-thermal
+    value: 51.0 C
+  - key: soc2-thermal
+    value: 50.4 C
+  - key: tj-thermal
+    value: 52.3 C
+  - key: Warn temperature
+    value: 65.0 C
+  - key: Error temperature
+    value: 80.0 C
+- level: "\x03"
+  name: '/Robot/Sensors/ublox_gps_node: fix'
+  message: 3D fix
+  hardware_id: cub4
+  values:
+  - key: Latitude [deg]
+    value: '35.000000'
+  - key: Longitude [deg]
+    value: '139.000000'
+  - key: Altitude [m]
+    value: '12.3'
+  - key: Status
+    value: '2'
+  - key: Satellites
+    value: '14'
+- level: "\x02"
+  name: /Robot/Sensors
+  message: Error
+  hardware_id: ''
+  values:
+  - key: 'topic_hz_checker: TopicMonitor /fix'
+    value: No events recorded.
+  - key: 'topic_hz_checker: TopicMonitor /imu'
+    value: Frequency too low.
+  - key: 'ublox_gps_node: fix'
+    value: Stale
+- level: "\x03"
+  name: '/Robot/Sensors/ublox_gps_node: navstatus'
+  message: Stale
+  hardware_id: cub4
+  values:
+  - key: Fix type
+    value: 3D
+  - key: hAcc [m]
+    value: '0.85'
+  - key: vAcc [m]
+    value: '1.40'
+- level: "\x03"
+  name: '/Robot/Sensors/ublox_gps_node: TMODE3'
+  message: Not configured
+  hardware_id: cub4
+  values:
+  - key: Mode
+    value: Disabled
+- level: "\x02"
+  name: '/Robot/Sensors/topic_hz_checker: TopicMonitor  fix'
+  message: No events recorded.
+  hardware_id: cub4
+  values:
+  - key: Events in window
+    value: '0'
+  - key: Events since startup
+    value: '123456'
+  - key: Duration of window (s)
+    value: '3.000012'
+  - key: Actual frequency (Hz)
+    value: '0.000000'
+  - key: Target frequency (Hz)
+    value: '1.000000'
+  - key: Minimum acceptable frequency (Hz)
+    value: '0.800000'
+  - key: Maximum acceptable frequency (Hz)
+    value: '1.200000'
+  - key: Topic
+    value: /fix
+  - key: Type
+    value: sensor_msgs/msg/NavSatFix
+  - key: Configured window size
+    value: '60'
+  - key: Expected frequency (Hz)
+    value: '1.000'
+  - key: QoS reliability
+    value: best_effort
+  - key: QoS durability
+    value: volatile
+  - key: QoS depth
+    value: '100'
+  - key: Messages received
+    value: '0'
+  - key: Last message age (s)
+    value: n/a
+- level: "\x02"
+  name: '/Robot/Sensors/topic_hz_checker: TopicMonitor  livox  lidar'
+  message: No events recorded.
+  hardware_id: cub4
+  values:
+  - key: Events in window
+    value: '0'
+  - key: Events since startup
+    value: '123456'
+  - key: Duration of window (s)
+    value: '3.000012'
+  - key: Actual frequency (Hz)
+    value: '0.000000'
+  - key: Target frequency (Hz)
+    value: '10.000000'
+  - key: Minimum acceptable frequency (Hz)
+    value: '8.000000'
+  - key: Maximum acceptable frequency (Hz)
+    value: '12.000000'
+  - key: Topic
+    value: /livox/lidar
+  - key: Type
+    value: sensor_msgs/msg/PointCloud2
+  - key: Configured window size
+    value: '60'
+  - key: Expected frequency (Hz)
+    value: '10.000'
+  - key: QoS reliability
+    value: best_effort
+  - key: QoS durability
+    value: volatile
+  - key: QoS depth
+    value: '100'
+  - key: Messages received
+    value: '0'
+  - key: Last message age (s)
+    value: n/a
+- level: "\x02"
+  name: '/Robot/Sensors/fix_status: GPS Fix Status'
+  message: No fix (status=-1)
+  hardware_id: cub4
+  values:
+  - key: Status
+    value: '-1'
+  - key: Latitude
+    value: '0.000000'
+  - key: Longitude
+    value: '0.000000'
+  - key: Altitude
+    value: '0.000000'
+- level: "\x01"
+  name: '/Robot/Sensors/topic_hz_checker: TopicMonitor  imu'
+  message: Frequency too low.
+  hardware_id: cub4
+  values:
+  - key: Events in window
+    value: '45'
+  - key: Events since startup
+    value: '123456'
+  - key: Duration of window (s)
+    value: '3.000012'
+  - key: Actual frequency (Hz)
+    value: '152.400000'
+  - key: Target frequency (Hz)
+    value: '200.000000'
+  - key: Minimum acceptable frequency (Hz)
+    value: '160.000000'
+  - key: Maximum acceptable frequency (Hz)
+    value: '240.000000'
+  - key: Topic
+    value: /imu
+  - key: Type
+    value: sensor_msgs/msg/Imu
+  - key: Configured window size
+    value: '60'
+  - key: Expected frequency (Hz)
+    value: '200.000'
+  - key: QoS reliability
+    value: best_effort
+  - key: QoS durability
+    value: volatile
+  - key: QoS depth
+    value: '100'
+  - key: Messages received
+    value: '123456'
+  - key: Last message age (s)
+    value: '0.012'
+- level: "\0"
+  name: '/Robot/Sensors/topic_hz_checker: TopicMonitor  odom'
+  message: Desired frequency met
+  hardware_id: cub4
+  values:
+  - key: Events in window
+    value: '60'
+  - key: Events since startup
+    value: '123456'
+  - key: Duration of window (s)
+    value: '3.000012'
+  - key: Actual frequency (Hz)
+    value: '20.020000'
+  - key: Target frequency (Hz)
+    value: '20.000000'
+  - key: Minimum acceptable frequency (Hz)
+    value: '16.000000'
+  - key: Maximum acceptable frequency (Hz)
+    value: '24.000000'
+  - key: Topic
+    value: /odom
+  - key: Type
+    value: nav_msgs/msg/Odometry
+  - key: Configured window size
+    value: '60'
+  - key: Expected frequency (Hz)
+    value: '20.000'
+  - key: QoS reliability
+    value: best_effort
+  - key: QoS durability
+    value: volatile
+  - key: QoS depth
+    value: '100'
+  - key: Messages received
+    value: '123456'
+  - key: Last message age (s)
+    value: '0.012'
+- level: "\0"
+  name: '/Robot/Sensors/topic_hz_checker: TopicMonitor  scan'
+  message: Desired frequency met
+  hardware_id: cub4
+  values:
+  - key: Events in window
+    value: '56'
+  - key: Events since startup
+    value: '123456'
+  - key: Duration of window (s)
+    value: '3.000012'
+  - key: Actual frequency (Hz)
+    value: '9.499818'
+  - key: Target frequency (Hz)
+    value: '10.000000'
+  - key: Minimum acceptable frequency (Hz)
+    value: '9.000000'
+  - key: Maximum acceptable frequency (Hz)
+    value: '11.000000'
+  - key: Topic
+    value: /scan
+  - key: Type
+    value: sensor_msgs/msg/LaserScan
+  - key: Configured window size
+    value: '60'
+  - key: Expected frequency (Hz)
+    value: '10.000'
+  - key: QoS reliability
+    value: best_effort
+  - key: QoS durability
+    value: volatile
+  - key: QoS depth
+    value: '100'
+  - key: Messages received
+    value: '123456'
+  - key: Last message age (s)
+    value: '0.012'
+- level: "\0"
+  name: '/Robot/Sensors/topic_hz_checker: TopicMonitor  camera  image_raw'
+  message: Desired frequency met
+  hardware_id: cub4
+  values:
+  - key: Events in window
+    value: '59'
+  - key: Events since startup
+    value: '123456'
+  - key: Duration of window (s)
+    value: '3.000012'
+  - key: Actual frequency (Hz)
+    value: '29.970000'
+  - key: Target frequency (Hz)
+    value: '30.000000'
+  - key: Minimum acceptable frequency (Hz)
+    value: '24.000000'
+  - key: Maximum acceptable frequency (Hz)
+    value: '36.000000'
+  - key: Topic
+    value: /camera/image_raw
+  - key: Type
+    value: sensor_msgs/msg/Image
+  - key: Configured window size
+    value: '60'
+  - key: Expected frequency (Hz)
+    value: '30.000'
+  - key: QoS reliability
+    value: best_effort
+  - key: QoS durability
+    value: volatile
+  - key: QoS depth
+    value: '100'
+  - key: Messages received
+    value: '123456'
+  - key: Last message age (s)
+    value: '0.012'
+- level: "\0"
+  name: '/Robot/Sensors/topic_hz_checker: TopicMonitor  camera  camera_info'
+  message: Desired frequency met
+  hardware_id: cub4
+  values:
+  - key: Events in window
+    value: '59'
+  - key: Events since startup
+    value: '123456'
+  - key: Duration of window (s)
+    value: '3.000012'
+  - key: Actual frequency (Hz)
+    value: '29.970000'
+  - key: Target frequency (Hz)
+    value: '30.000000'
+  - key: Minimum acceptable frequency (Hz)
+    value: '24.000000'
+  - key: Maximum acceptable frequency (Hz)
+    value: '36.000000'
+  - key: Topic
+    value: /camera/camera_info
+  - key: Type
+    value: sensor_msgs/msg/CameraInfo
+  - key: Configured window size
+    value: '60'
+  - key: Expected frequency (Hz)
+    value: '30.000'
+  - key: QoS reliability
+    value: best_effort
+  - key: QoS durability
+    value: volatile
+  - key: QoS depth
+    value: '100'
+  - key: Messages received
+    value: '123456'
+  - key: Last message age (s)
+    value: '0.012'
+- level: "\0"
+  name: '/Robot/Sensors/topic_hz_checker: TopicMonitor  tf'
+  message: Desired frequency met
+  hardware_id: cub4
+  values:
+  - key: Events in window
+    value: '60'
+  - key: Events since startup
+    value: '123456'
+  - key: Duration of window (s)
+    value: '3.000012'
+  - key: Actual frequency (Hz)
+    value: '50.100000'
+  - key: Target frequency (Hz)
+    value: '50.000000'
+  - key: Minimum acceptable frequency (Hz)
+    value: '40.000000'
+  - key: Maximum acceptable frequency (Hz)
+    value: '60.000000'
+  - key: Topic
+    value: /tf
+  - key: Type
+    value: tf2_msgs/msg/TFMessage
+  - key: Configured window size
+    value: '60'
+  - key: Expected frequency (Hz)
+    value: '50.000'
+  - key: QoS reliability
+    value: best_effort
+  - key: QoS durability
+    value: volatile
+  - key: QoS depth
+    value: '100'
+  - key: Messages received
+    value: '123456'
+  - key: Last message age (s)
+    value: '0.012'
+- level: "\0"
+  name: '/Robot/Sensors/topic_hz_checker: TopicMonitor  joy'
+  message: Desired frequency met
+  hardware_id: cub4
+  values:
+  - key: Events in window
+    value: '59'
+  - key: Events since startup
+    value: '123456'
+  - key: Duration of window (s)
+    value: '3.000012'
+  - key: Actual frequency (Hz)
+    value: '19.800000'
+  - key: Target frequency (Hz)
+    value: '20.000000'
+  - key: Minimum acceptable frequency (Hz)
+    value: '16.000000'
+  - key: Maximum acceptable frequency (Hz)
+    value: '24.000000'
+  - key: Topic
+    value: /joy
+  - key: Type
+    value: sensor_msgs/msg/Joy
+  - key: Configured window size
+    value: '60'
+  - key: Expected frequency (Hz)
+    value: '20.000'
+  - key: QoS reliability
+    value: best_effort
+  - key: QoS durability
+    value: volatile
+  - key: QoS depth
+    value: '100'
+  - key: Messages received
+    value: '123456'
+  - key: Last message age (s)
+    value: '0.012'
+- level: "\0"
+  name: '/Robot/Sensors/topic_hz_checker: TopicMonitor  cmd_vel'
+  message: Desired frequency met
+  hardware_id: cub4
+  values:
+  - key: Events in window
+    value: '60'
+  - key: Events since startup
+    value: '123456'
+  - key: Duration of window (s)
+    value: '3.000012'
+  - key: Actual frequency (Hz)
+    value: '20.000000'
+  - key: Target frequency (Hz)
+    value: '20.000000'
+  - key: Minimum acceptable frequency (Hz)
+    value: '16.000000'
+  - key: Maximum acceptable frequency (Hz)
+    value: '24.000000'
+  - key: Topic
+    value: /cmd_vel
+  - key: Type
+    value: geometry_msgs/msg/Twist
+  - key: Configured window size
+    value: '60'
+  - key: Expected frequency (Hz)
+    value: '20.000'
+  - key: QoS reliability
+    value: best_effort
+  - key: QoS durability
+    value: volatile
+  - key: QoS depth
+    value: '100'
+  - key: Messages received
+    value: '123456'
+  - key: Last message age (s)
+    value: '0.012'
+- level: "\0"
+  name: /Robot/Linux
+  message: OK
+  hardware_id: ''
+  values:
+  - key: 'linux_state: Linux CPU Usage'
+    value: CPU usage 47.8%
+  - key: 'linux_state: Linux Memory Usage'
+    value: Memory usage 52.1%
+  - key: 'linux_state: Linux Swap Usage'
+    value: Swap usage 0.0%
+  - key: 'linux_state: Linux Storage Usage'
+    value: /=41.2% used
+  - key: 'jetson_state: Jetson Thermal State'
+    value: Max 52.3 C (tj-thermal)
+- level: "\x02"
+  name: /Robot
+  message: Error
+  hardware_id: ''
+  values:
+  - key: Linux
+    value: OK
+  - key: Sensors
+    value: Error
+---
