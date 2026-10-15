@@ -19,84 +19,84 @@
 
   <!-- base_footprint -->
   <link name="base_footprint">
-    <visual>
-      <!-- <geometry>
+    <!-- <visual>
+      <geometry>
         <cylinder radius="0.05" length="0.01"/>
-      </geometry> -->
+      </geometry>
       <material name="gray">
         <color rgba="0.5 0.5 0.5 1"/>
       </material>
-    </visual>
+    </visual> -->
   </link>
 
   <!-- GPSリンク -->
   <link name="gnss_main_link">
-    <visual>
-      <!-- <geometry>
+    <!-- <visual>
+      <geometry>
         <cylinder radius="0.03" length="0.01"/>
-      </geometry> -->
+      </geometry>
       <material name="white">
         <color rgba="1 1 1 1"/>
       </material>
-    </visual>
+    </visual> -->
   </link>
   <link name="gnss_sub_link">
-    <visual>
-      <!-- <geometry>
+    <!-- <visual>
+      <geometry>
         <cylinder radius="0.03" length="0.01"/>
-      </geometry> -->
+      </geometry>
       <material name="white">
         <color rgba="1 1 1 1"/>
       </material>
-    </visual>
+    </visual> -->
   </link>
 
   <!-- Velodyne LiDAR -->
   <link name="velodyne">
-    <visual>
-      <!-- <geometry>
+    <!-- <visual>
+      <geometry>
         <cylinder radius="0.07" length="0.01"/>
-      </geometry> -->
+      </geometry>
       <material name="green">
         <color rgba="0 1 0 1"/>
       </material>
-    </visual>
+    </visual> -->
   </link>
 
   <!-- Livox LiDAR -->
   <link name="livox_frame">
-    <visual>
-      <!-- <geometry>
+    <!-- <visual>
+      <geometry>
         <cylinder radius="0.05" length="0.01"/>
-      </geometry> -->
+      </geometry>
       <material name="blue">
         <color rgba="0 1 0 1"/>
       </material>
-    </visual>
+    </visual> -->
   </link>
 
   <!-- IMU -->
   <link name="imu_link">
-    <visual>
-      <!-- <geometry>
+    <!-- <visual>
+      <geometry>
         <box size="0.05 0.05 0.02"/>
-      </geometry> -->
+      </geometry>
       <material name="yellow">
         <color rgba="1 1 0 1"/>
       </material>
-    </visual>
+    </visual> -->
   </link>
 
   <!-- カメラリンク -->
-  <link name="camera_link">
-    <visual>
-      <!-- <geometry>
-        <box size="0.1 0.01 0.01"/>
-      </geometry> -->
+  <link name="oak_parent_frame">
+    <!-- <visual>
+      <geometry>
+        <box size="0.002 0.01 0.01"/>
+      </geometry>
       <material name="purple">
         <color rgba="0.5 0 0.5 1"/>
       </material>
-    </visual>
+    </visual> -->
   </link>
 
   <!-- 各リンクの接続 -->
@@ -139,7 +139,7 @@
 
   <joint name="base_to_camera" type="fixed">
     <parent link="base_link"/>
-    <child link="camera_link"/>
+    <child link="oak_parent_frame"/>
     <origin xyz="-0.0589 0 0.5020" rpy="0 0.1745 0"/>
   </joint>
 
