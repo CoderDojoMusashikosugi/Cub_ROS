@@ -5,24 +5,24 @@
   <link name="base_link">
      <visual>
       <geometry>
-        <mesh filename="file://$(find cub_description)/meshes/cub4.dae" scale="1 1 1"/>
+        <mesh filename="file://$(find cub_description)/meshes/cub4-comp.obj" scale="0.1 0.1 0.1"/>
       </geometry>
-      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 1.57"/>
+      <origin xyz="0.0 0.0 0.0" rpy="1.57 0.0 1.57"/>
     </visual>
     <collision>
       <geometry>
-        <mesh filename="file://$(find cub_description)/meshes/cub4.dae" scale="1 1 1"/>
+        <mesh filename="file://$(find cub_description)/meshes/cub4-comp.obj" scale="0.1 0.1 0.1"/>
       </geometry>
-      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+      <origin xyz="0.0 0.0 0.0" rpy="1.57 0.0 1.57"/>
     </collision>
   </link>
 
   <!-- base_footprint -->
   <link name="base_footprint">
     <visual>
-      <geometry>
+      <!-- <geometry>
         <cylinder radius="0.05" length="0.01"/>
-      </geometry>
+      </geometry> -->
       <material name="gray">
         <color rgba="0.5 0.5 0.5 1"/>
       </material>
@@ -30,11 +30,21 @@
   </link>
 
   <!-- GPSリンク -->
-  <link name="gps_link">
+  <link name="gnss_main_link">
     <visual>
-      <geometry>
-        <sphere radius="0.05"/>
-      </geometry>
+      <!-- <geometry>
+        <cylinder radius="0.03" length="0.01"/>
+      </geometry> -->
+      <material name="white">
+        <color rgba="1 1 1 1"/>
+      </material>
+    </visual>
+  </link>
+  <link name="gnss_sub_link">
+    <visual>
+      <!-- <geometry>
+        <cylinder radius="0.03" length="0.01"/>
+      </geometry> -->
       <material name="white">
         <color rgba="1 1 1 1"/>
       </material>
@@ -44,9 +54,9 @@
   <!-- Velodyne LiDAR -->
   <link name="velodyne">
     <visual>
-      <geometry>
-        <cylinder radius="0.05" length="0.1"/>
-      </geometry>
+      <!-- <geometry>
+        <cylinder radius="0.07" length="0.01"/>
+      </geometry> -->
       <material name="green">
         <color rgba="0 1 0 1"/>
       </material>
@@ -56,9 +66,9 @@
   <!-- Livox LiDAR -->
   <link name="livox_frame">
     <visual>
-      <geometry>
-        <box size="0.015 0.015 0.015"/>
-      </geometry>
+      <!-- <geometry>
+        <cylinder radius="0.05" length="0.01"/>
+      </geometry> -->
       <material name="blue">
         <color rgba="0 1 0 1"/>
       </material>
@@ -68,35 +78,11 @@
   <!-- IMU -->
   <link name="imu_link">
     <visual>
-      <geometry>
+      <!-- <geometry>
         <box size="0.05 0.05 0.02"/>
-      </geometry>
+      </geometry> -->
       <material name="yellow">
         <color rgba="1 1 0 1"/>
-      </material>
-    </visual>
-  </link>
-
-  <!-- SLCL (左センサー) -->
-  <link name="SLC1L">
-    <visual>
-      <geometry>
-        <cylinder radius="0.03" length="0.02"/>
-      </geometry>
-      <material name="orange">
-        <color rgba="1 0.65 0 1"/>
-      </material>
-    </visual>
-  </link>
-
-  <!-- SLCR (右センサー) -->
-  <link name="SLC1R">
-    <visual>
-      <geometry>
-        <cylinder radius="0.03" length="0.02"/>
-      </geometry>
-      <material name="orange">
-        <color rgba="1 0.65 0 1"/>
       </material>
     </visual>
   </link>
@@ -104,9 +90,9 @@
   <!-- カメラリンク -->
   <link name="camera_link">
     <visual>
-      <geometry>
-        <box size="0.05 0.05 0.02"/>
-      </geometry>
+      <!-- <geometry>
+        <box size="0.1 0.01 0.01"/>
+      </geometry> -->
       <material name="purple">
         <color rgba="0.5 0 0.5 1"/>
       </material>
@@ -120,46 +106,41 @@
     <origin xyz="0 0 0" rpy="0 0 0"/>
   </joint>
 
-  <joint name="base_to_gps" type="fixed">
+  <!-- 底面高さ0.5537 + アンテナ中心高さ0.032 = 0.5857 -->
+  <joint name="base_to_gnss_main" type="fixed">
     <parent link="base_link"/>
-    <child link="gps_link"/>
-    <origin xyz="0.0 0 0.6" rpy="0 0 0"/>
+    <child link="gnss_main_link"/>
+    <origin xyz="-0.12 0.1 0.5857" rpy="0 0 0"/>
+  </joint>
+
+  <joint name="base_to_gnss_sub" type="fixed">
+    <parent link="base_link"/>
+    <child link="gnss_sub_link"/>
+    <origin xyz="-0.12 -0.1 0.5857" rpy="0 0 0"/>
   </joint>
 
   <joint name="base_to_velodyne" type="fixed">
     <parent link="base_link"/>
     <child link="velodyne"/>
-    <origin xyz="0.0 0 0.3" rpy="0 0.0361283 0"/>
+    <origin xyz="0.0 0 0.2492" rpy="0 0 0"/>
   </joint>
 
   <joint name="base_to_livox" type="fixed">
     <parent link="base_link"/>
     <child link="livox_frame"/>
-    <origin xyz="0.0 0 0.6" rpy="0 0.785398 0"/>
+    <origin xyz="-0.0379 0 0.5779" rpy="0 0.7854 0"/>
   </joint>
 
   <joint name="base_to_imu" type="fixed">
     <parent link="base_link"/>
     <child link="imu_link"/>
-    <origin xyz="0 0 0.48" rpy="0 0 0"/>
-  </joint>
-
-  <joint name="base_to_SLCL" type="fixed">
-    <parent link="base_link"/>
-    <child link="SLC1L"/>
-    <origin xyz="-0.05 0.1 0.2" rpy="0 0 -1.57079632679"/>
-  </joint>
-
-  <joint name="base_to_SLCR" type="fixed">
-    <parent link="base_link"/>
-    <child link="SLC1R"/>
-    <origin xyz="-0.05 -0.1 0.2" rpy="0 0 1.57079632679"/>
+    <origin xyz="-0.030 0 0.2034" rpy="3.14 0 0"/>
   </joint>
 
   <joint name="base_to_camera" type="fixed">
     <parent link="base_link"/>
     <child link="camera_link"/>
-    <origin xyz="0.0 0 0.4" rpy="0 0 0"/>
+    <origin xyz="-0.0589 0 0.5020" rpy="0 0.1745 0"/>
   </joint>
 
 </robot>
