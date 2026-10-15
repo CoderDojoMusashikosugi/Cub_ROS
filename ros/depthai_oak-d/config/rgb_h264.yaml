@@ -1,0 +1,24 @@
+# Equivalent of cub_bringup/src/oak-d_s2_record.py
+#   Camera(CAM_A) -> 1280x720 NV12 -> VideoEncoder(H264_MAIN)
+# Published as ffmpeg_image_transport_msgs/FFMPEGPacket on /<name>/rgb/...
+/**:
+  ros__parameters:
+    pipeline_gen:
+      i_pipeline_type: RGB
+      i_nn_type: none
+    driver:
+      i_enable_ir: false
+    rgb:
+      i_board_socket_id: 0        # CAM_A
+      i_width: 1280
+      i_height: 720
+      i_fps: 30.0
+      i_low_bandwidth: true
+      # Publish the H264 bitstream as-is (FFMPEGPacket on /<name>/rgb/image_raw/ffmpeg).
+      # Required for non-MJPEG profiles: the driver cannot decode H264 back to sensor_msgs/Image.
+      i_publish_compressed: true
+      # dai::VideoEncoderProperties::Profile
+      #   0: H264_BASELINE, 1: H264_HIGH, 2: H264_MAIN, 3: H265_MAIN, 4: MJPEG
+      i_low_bandwidth_profile: 2
+      i_low_bandwidth_frame_freq: 30   # keyframe interval
+      i_low_bandwidth_bitrate: 0       # 0 = auto
