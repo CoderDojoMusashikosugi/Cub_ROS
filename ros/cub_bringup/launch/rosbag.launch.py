@@ -45,7 +45,13 @@ def generate_launch_description():
         # "/velodyne_packets",
         "/velodyne_points",
         "/wheel_positions",
-        "/oak/rgb/image_raw",
+        "/oak/imu/data",                          
+        "/oak/rgb/camera_info",                                                          
+        "/oak/rgb/image_raw",                     
+        "/oak/rgb/image_raw/compressed",                                                 
+        "/oak/rgb/image_raw/compressedDepth",                                            
+        "/oak/rgb/image_raw/theora",                                                     
+        "/oak/rgb/image_raw/zstd"
     ]
     return LaunchDescription([
         # IncludeLaunchDescription(
