@@ -2,7 +2,7 @@ from launch import LaunchDescription
 from launch_ros.actions import Node
 from launch.actions import IncludeLaunchDescription, GroupAction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import PathJoinSubstitution
+from launch.substitutions import Command, FindExecutable, PathJoinSubstitution
 from launch_ros.substitutions import FindPackageShare
 from ament_index_python.packages import get_package_share_directory
 from launch.actions import TimerAction
@@ -10,6 +10,7 @@ from launch_ros.actions import PushRosNamespace
 from launch.substitutions import LaunchConfiguration
 import ament_index_python.packages
 from ament_index_python.packages import get_package_share_directory
+from launch_ros.parameter_descriptions import ParameterValue
 import launch_ros.actions
 import yaml
 import os
@@ -102,12 +103,20 @@ def generate_launch_description():
         # ),
 
         # state_publisherの起動
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                PathJoinSubstitution(
-                    [FindPackageShare("cub_description"), "launch", "display.launch.py"]
-                )
-            )
+        Node(
+            package='robot_state_publisher',
+            executable='robot_state_publisher',
+            name='robot_state_publisher',
+            output='screen',
+            parameters=[{'robot_description': ParameterValue(Command([
+                FindExecutable(name='xacro'),
+                ' ',
+                PathJoinSubstitution([
+                    FindPackageShare('cub_description'),
+                    'urdf',
+                    'cub4.urdf'
+                ])
+            ]), value_type=str)}]
         ),
 
         Node(
