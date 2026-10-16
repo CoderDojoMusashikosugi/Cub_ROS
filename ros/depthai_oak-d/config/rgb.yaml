@@ -1,0 +1,15 @@
+# CAM_A 1280x720 RGB -> sensor_msgs/Image (no video encoding)
+# Topic: /<name>/rgb/image_raw (+ /<name>/rgb/camera_info)
+/**:
+  ros__parameters:
+    pipeline_gen:
+      i_pipeline_type: RGB
+      i_nn_type: none
+    driver:
+      i_enable_ir: false
+    rgb:
+      i_board_socket_id: 0        # CAM_A
+      i_width: 1280
+      i_height: 720
+      i_fps: 30.0
+      i_low_bandwidth: false      # raw Image (no on-device encoding)
