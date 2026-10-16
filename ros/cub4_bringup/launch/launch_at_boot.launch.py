@@ -93,6 +93,17 @@ def generate_launch_description():
         ]),
     )
     livox_delayed = TimerAction(period=1.0, actions=[livox_launch])
+
+    # OAK-D camera
+    oak_d_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(
+                get_package_share_directory('depthai_oak_d'),
+                'launch',
+                'oak_d.launch.py',
+            )
+        ),
+    )
     
     # UM982 GNSSの起動
     um982_params_file = os.path.join(cub_bringup_path, 'config', 'um982.yaml')
@@ -122,6 +133,9 @@ def generate_launch_description():
         # 手動操縦
         cub_commander,        
         joy_linux,
+
+        # OAK-D camera
+        oak_d_launch,
 
         # Livox
         livox_group,
