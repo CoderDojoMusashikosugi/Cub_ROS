@@ -103,6 +103,7 @@ def generate_launch_description():
                 'oak_d.launch.py',
             )
         ),
+        launch_arguments={'mode': 'rgbd'}.items(),
     )
     
     # UM982 GNSSの起動
