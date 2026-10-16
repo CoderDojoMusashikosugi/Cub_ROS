@@ -24,56 +24,34 @@ def generate_launch_description():
     else:
         save_dir = rosbag_dir
     topic_list=[
-        "/SLC1L_scan",
-        "/SLC1R_scan",
-        "/aidalm",
-        "/aideph",
-        # "/camera/camera/aligned_depth_to_color/camera_info",
-        # "/camera/camera/aligned_depth_to_color/image_raw",
-        # "/camera/camera/color/camera_info",
-        # "/camera/camera/color/image_raw",
-        # "/camera/camera/color/metadata",
-        # "/camera/camera/depth/camera_info",
-        #"/camera/camera/depth/color/points",
-        # "/camera/camera/depth/image_rect_raw",
-        # "/camera/camera/depth/metadata",
-        # "/camera/camera/extrinsics/depth_to_color",
-        # "/camera/camera/extrinsics/depth_to_depth",
-        # "/camera/camera/rgbd",
+        # 今はlaunch at boot系のtopicしか書いてないことに注意
+        "/cmd_vel",
         "/cmd_vel_atom",
         "/diagnostics",
-        "/diagnostics_agg",
-        "/diagnostics_toplevel_state",
-        "/fix",
-        "/fix_velocity",
-        "/imu/data",
         "/imu/data_raw",
-        "/monhw",
+        "/imu/temperature",
+        "/joy",
+        "/joy/set_feedback",
+        "/livox/livox/imu",
+        "/livox/livox/lidar",
+        "/livox/livox/time_type",
         "/mros_debug_topic",
-        "/navclock",
-        "/navheading",
-        "/navpvt",
-        "/navrelposned",
-        "/navstate",
-        "/navstatus",
-        "/navsvin",
         "/parameter_events",
-        "/pose",
         "/proceed_to_next_group",
         "/rosout",
-        "/rxmrtcm",
-        "/tf",
-        "/tf_static",
-        #"/velodyne_packets",
+        "/um982_node/fix",
+        "/um982_node/fix_secondary",
+        "/um982_node/pose",
+        # "/velodyne_packets",
         "/velodyne_points",
         "/wheel_positions",
     ]
     return LaunchDescription([
-        IncludeLaunchDescription(
-            PathJoinSubstitution(
-                [FindPackageShare("cub_bringup"), "launch", "common.launch.py"]
-            ),
-        ),
+        # IncludeLaunchDescription(
+        #     PathJoinSubstitution(
+        #         [FindPackageShare("cub_bringup"), "launch", "common.launch.py"]
+        #     ),
+        # ),
 
         LogInfo(msg=f"rosbag is saving to: {save_dir}"),
 
