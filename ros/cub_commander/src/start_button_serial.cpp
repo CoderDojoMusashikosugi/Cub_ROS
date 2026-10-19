@@ -45,7 +45,7 @@ private:
   bool open_serial_port()
   {
     try {
-      serial_port_.Open("/dev/ttyATOM");
+      serial_port_.Open("/dev/ttyDIAL");
       serial_port_.SetBaudRate(LibSerial::BaudRate::BAUD_115200);
       serial_port_.SetCharacterSize(LibSerial::CharacterSize::CHAR_SIZE_8);
       serial_port_.SetFlowControl(LibSerial::FlowControl::FLOW_CONTROL_NONE);
