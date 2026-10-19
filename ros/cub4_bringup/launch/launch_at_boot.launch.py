@@ -121,7 +121,6 @@ def generate_launch_description():
         actions=[PushRosNamespace('livox'),livox_delayed],
         scoped=True
     )
-
     
     # Launchファイルの返り値
     return LaunchDescription([

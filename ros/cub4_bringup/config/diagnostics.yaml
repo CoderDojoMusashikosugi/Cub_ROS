@@ -4,9 +4,19 @@ topic_hz_checker:
     update_period: 1.0
     topics:
       fix:
-        topic: "/fix"
+        topic: "/um982_node/fix"
         type: "sensor_msgs/msg/NavSatFix"
-        expected_hz: 1.0
+        expected_hz: 10.0
+        tolerance: 0.2
+        window_size: 10
+        qos:
+          reliability: best_effort
+          durability: volatile
+          depth: 100
+      fix_secondary:
+        topic: "/um982_node/fix_secondary"
+        type: "sensor_msgs/msg/NavSatFix"
+        expected_hz: 10.0
         tolerance: 0.2
         window_size: 10
         qos:
@@ -14,7 +24,7 @@ topic_hz_checker:
           durability: volatile
           depth: 100
       imu:
-        topic: "/imu/data"
+        topic: "/imu/data_raw"
         type: "sensor_msgs/msg/Imu"
         expected_hz: 386.0
         tolerance: 0.2

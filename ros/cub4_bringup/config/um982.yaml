@@ -14,9 +14,9 @@
     # RTK / NTRIP Settings
     # ----------------------------------------------------
     enable_ntrip: true              # Set true to enable RTK correction via NTRIP
-    ntrip_host: "geortk.jp"         # NTRIP caster host/IP
+    ntrip_host: "ntrip1.bizstation.jp"         # NTRIP caster host/IP
     ntrip_port: 2101                # NTRIP caster port
-    ntrip_mountpoint: "tamtam"      # Mountpoint name
+    ntrip_mountpoint: "3041F3CA"      # Mountpoint name
     ntrip_user: ""                  # Username
     ntrip_password: ""              # Password
     ntrip_gga_interval: 5.0         # GGA report interval to NTRIP caster (seconds)
