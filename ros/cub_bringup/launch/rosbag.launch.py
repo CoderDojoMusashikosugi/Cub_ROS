@@ -45,6 +45,19 @@ def generate_launch_description():
         # "/velodyne_packets",
         "/velodyne_points",
         "/wheel_positions",
+        "/oak/imu/data",                          
+        "/oak/rgb/camera_info",
+        "/oak/rgb/image_raw",
+        # "/oak/rgb/image_raw/compressed",
+        # "/oak/rgb/image_raw/compressedDepth",
+        # "/oak/rgb/image_raw/theora",
+        # "/oak/rgb/image_raw/zstd",
+        "/oak/stereo/camera_info",
+        "/oak/stereo/image_raw",
+        # "/oak/stereo/image_raw/compressed",
+        # "/oak/stereo/image_raw/compressedDepth",
+        # "/oak/stereo/image_raw/theora",
+        # "/oak/stereo/image_raw/zstd",
     ]
     return LaunchDescription([
         # IncludeLaunchDescription(

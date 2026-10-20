@@ -1,0 +1,20 @@
+# RGB 1280x720 + Depth (aligned to RGB), both as sensor_msgs/Image. Use with: mode:=rgbd
+/**:
+  ros__parameters:
+    pipeline_gen:
+      i_pipeline_type: RGBD
+      i_nn_type: none
+    driver:
+      i_enable_ir: false
+    rgb:
+      i_board_socket_id: 0
+      i_width: 1280
+      i_height: 720
+      i_fps: 30.0
+      i_low_bandwidth: false
+    stereo:
+      i_depth_preset: DEFAULT
+      i_align_depth: true          # depth aligned to RGB
+      i_width: 1280
+      i_height: 720
+      i_low_bandwidth: false       # 16UC1 [mm]
