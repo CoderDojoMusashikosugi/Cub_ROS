@@ -122,6 +122,8 @@
   - claude code向けにはCLAUDE.mdがある。実はGEMINI.mdへのシンボリックリンク。
   - codex向けにはAGENTS.mdがある。実はGEMINI.mdへのシンボリックリンク。
 
+### Godotシミュレーターで操作を試す
+Godotベースのシミュレータで、同じ空間のロボット・通行人・コーンを複数ウインドウから操作できます。起動方法と操作は[シミュレーターのREADME](./simulator/README.md)を参照してください。
 
 ## Dockerの技術情報
 [dockerディレクトリ内のREADME.md](./docker/README.md)を参照
