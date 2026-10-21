@@ -1,0 +1,39 @@
+{
+  "source_sha256": {
+    "ros/cub_description/urdf/cub4.urdf": "e3030119c99ae5f4a1756309dab8f7715d9ea919436502685cf904d46338d769",
+    "ros/cub_description/meshes/cub4-comp.obj": "d592e6ec4eb134ce8d1f663e7f355b711e6035464e11b001bb6206a129e79320",
+    "ros/cub_description/meshes/cub4-comp.mtl": "fb5d14297c6c447641dbaab24d13ddf3ed435c678c01b496f49688ef101ebde3"
+  },
+  "urdf_visual": {
+    "scale": [
+      0.1,
+      0.1,
+      0.1
+    ],
+    "xyz": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "rpy": [
+      1.57,
+      0.0,
+      1.57
+    ]
+  },
+  "ros_to_godot": "(-y, z, -x)",
+  "triangles": 183889,
+  "vertices": 116998,
+  "bounds_m": {
+    "min": [
+      -0.12700961530208588,
+      0.00628725765272975,
+      -0.18906983733177185
+    ],
+    "max": [
+      0.12714488804340363,
+      0.6007617115974426,
+      0.18908606469631195
+    ]
+  }
+}
