@@ -45,3 +45,25 @@ size_t domain_id = 1; // ros Domain ID
 ```
 
 
+# おまけ PlatformIO環境の uv + venv での構築
+
+VSCodeが無い場合にちょっとPlatformIOでビルド・書き換えするのに uv のpyproject ファイルを ./uvproj に置きました。
+事前にuvのインストールはしておいてください。
+
+ Linux, Mac, WSL :
+ $ curl -LsSf https://astral.sh/uv/install.sh | sh
+
+$ cd uvproj
+$ uv sync
+$ . .venv/bin/activate
+
+(platformio.iniがある階層にchdirし)
+XXXXXX は platformio.ini で [env:ABCDEF] がある場合の ABCDEF です。
+
+$ pio run -e XXXXXX
+でビルド出来ます。
+$ pio run -e XXXXXX -t update
+
+詳しくはこちら
+https://docs.platformio.org/en/latest/core/userguide/cmd_run.html
+
