@@ -1183,14 +1183,7 @@ int main(int argc,char** argv)
 	std::cout << "---ekf---" << std::endl;
     rclcpp::init(argc, argv); // ノードの初期化
     auto node = std::make_shared<EKF>();
-	// now_time_ = ros::Time::now();
-	// bool is_first_ = true;
-	// rclcpp::Rate rate(node->hz_);
-	while(rclcpp::ok()){
-		// node->process();
-		// last_time_ = now_time_;
-		rclcpp::spin_some(node);
-		// rate.sleep();
-	}
+    rclcpp::spin(node);
+    rclcpp::shutdown();
 	return 0;
 }
