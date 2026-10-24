@@ -37,6 +37,8 @@ private:
     std::shared_ptr<tf2_ros::TransformBroadcaster> dynamic_br_;
     std::shared_ptr<tf2_ros::TransformBroadcaster> static_br_;
 	std::unique_ptr<tf2_ros::Buffer> tfBuffer_;
+    rclcpp::TimerBase::SharedPtr timer_;
+    bool has_received_current_pose_{false};
 
 };
 
