@@ -10,6 +10,7 @@ var center := Vector3(0, 0.7, 1)
 var look_enabled := false
 var mouse_sensitivity := 0.003
 var _drag_button := 0
+var _control_click := false
 var _rotating := false
 var _drag_anchor := Vector3.ZERO
 
@@ -88,7 +89,17 @@ func pan(direction: Vector2, delta: float) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not look_enabled:
 		return
-	if event is InputEventMouseButton:
+	if event is InputEventMagnifyGesture:
+		# A spread gesture increases magnification, so camera distance decreases.
+		if is_finite(event.factor) and event.factor > 0.0:
+			_zoom_at(event.position, 1.0 / event.factor)
+	elif event is InputEventPanGesture:
+		# macOS sends trackpad scrolling as gestures rather than wheel buttons.
+		if mode == 1 and (event.ctrl_pressed or event.meta_pressed):
+			_rotate_map(event.delta * 10.0)
+		else:
+			_zoom_at(event.position, pow(0.8, clampf(-event.delta.y, -10.0, 10.0)))
+	elif event is InputEventMouseButton:
 		if event.pressed and event.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
 			var steps: float = event.factor if event.factor > 0.0 else 1.0
 			var factor: float = pow(0.8, steps if event.button_index == MOUSE_BUTTON_WHEEL_UP else -steps)
@@ -106,6 +117,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func reset_drag() -> void:
 	_drag_button = 0
+	_control_click = false
 	_rotating = false
 
 
@@ -114,14 +126,18 @@ func _map_button(event: InputEventMouseButton) -> void:
 		if event.button_index == _drag_button:
 			reset_drag()
 		return
-	if event.button_index == MOUSE_BUTTON_LEFT and event.double_click and not event.ctrl_pressed:
+	var modified := event.ctrl_pressed or event.meta_pressed
+	if event.button_index == MOUSE_BUTTON_LEFT and event.double_click and not modified:
 		reset_drag()
 		_zoom_at(event.position, 0.5)
 		return
-	if event.button_index != MOUSE_BUTTON_LEFT and not (mode == 1 and event.button_index == MOUSE_BUTTON_MIDDLE):
+	var rotation_button := event.button_index in [MOUSE_BUTTON_RIGHT, MOUSE_BUTTON_MIDDLE]
+	if event.button_index != MOUSE_BUTTON_LEFT and not (mode == 1 and rotation_button):
 		return
 	reset_drag()
-	if mode == 1 and (event.ctrl_pressed or event.button_index == MOUSE_BUTTON_MIDDLE):
+	_control_click = event.button_index == MOUSE_BUTTON_RIGHT and event.ctrl_pressed
+	# macOS translates Control-left click into a right-button event.
+	if mode == 1 and (modified or rotation_button):
 		_rotating = true
 	else:
 		var anchor: Variant = _terrain_point(event.position)
@@ -134,19 +150,38 @@ func _map_button(event: InputEventMouseButton) -> void:
 func _map_motion(event: InputEventMouseMotion) -> void:
 	if _drag_button == 0:
 		return
-	var mask := MOUSE_BUTTON_MASK_LEFT if _drag_button == MOUSE_BUTTON_LEFT else MOUSE_BUTTON_MASK_MIDDLE
+	var mask := 1 << (_drag_button - 1)
+	# A macOS Control-click reports RIGHT on press, but LEFT during motion.
+	if _control_click:
+		mask |= MOUSE_BUTTON_MASK_LEFT
 	if not (event.button_mask & mask):
 		reset_drag()
 		return
+	var rotate := mode == 1 and (event.ctrl_pressed or event.meta_pressed
+		or (_drag_button != MOUSE_BUTTON_LEFT and not _control_click))
+	if _rotating and not rotate:
+		# Re-pick at the start of this motion so returning to pan never uses the
+		# old anchor from before rotation and never jumps across the map.
+		var anchor: Variant = _terrain_point(event.position - event.relative)
+		if anchor == null:
+			reset_drag()
+			return
+		_drag_anchor = anchor
+	_rotating = rotate
 	if _rotating:
-		yaw -= event.relative.x * mouse_sensitivity
-		pitch = clampf(pitch + event.relative.y * mouse_sensitivity, 0.25, 1.50)
+		_rotate_map(event.relative)
 	else:
 		# Hold the picked terrain point under the pointer. A fixed plane through
 		# that point avoids jumps at mesh seams, steps and the edge of the map.
 		var at: Variant = _plane_point(event.position, _drag_anchor.y)
 		if at != null:
 			center += _drag_anchor - at
+	_place_camera()
+
+
+func _rotate_map(motion: Vector2) -> void:
+	yaw -= motion.x * mouse_sensitivity
+	pitch = clampf(pitch + motion.y * mouse_sensitivity, 0.25, 1.50)
 	_place_camera()
 
 
