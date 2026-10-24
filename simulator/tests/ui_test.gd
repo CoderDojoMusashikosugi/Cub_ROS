@@ -42,11 +42,16 @@ func _run() -> void:
 		"gameplay has no visible buttons or lingering form focus")
 	_check(app.camera_rig.look_enabled, "starting play enables mouse look")
 	_check_mouse_mode(Input.MOUSE_MODE_CAPTURED, "starting play captures the cursor")
+	_test_trackpad_zoom("TPS", Vector2(480, 300))
 	var yaw: float = app.camera_rig.yaw
 	_motion(Vector2(30, -10))
 	_check(not is_equal_approx(app.camera_rig.yaw, yaw), "mouse motion rotates the TPS camera without holding a button")
 	_key(KEY_ESCAPE)
 	_check(not app.camera_rig.look_enabled, "Escape releases mouse look")
+	var released_distance: float = app.camera_rig.distance
+	_scroll(Vector2(0, -1), Vector2(480, 300))
+	_pinch(1.2, Vector2(480, 300))
+	_check(is_equal_approx(app.camera_rig.distance, released_distance), "released TPS ignores trackpad gestures")
 	_check_mouse_mode(Input.MOUSE_MODE_VISIBLE, "Escape frees the cursor for other windows")
 	yaw = app.camera_rig.yaw
 	_motion(Vector2(30, 10))
@@ -64,6 +69,9 @@ func _run() -> void:
 	_check_mouse_mode(Input.MOUSE_MODE_CAPTURED, "Tab captures the cursor again")
 	app._set_window_focus(false)
 	_check(not app.camera_rig.look_enabled, "unfocused windows stop handling mouse look")
+	_scroll(Vector2(0, -1), Vector2(480, 300))
+	_pinch(1.2, Vector2(480, 300))
+	_check(is_equal_approx(app.camera_rig.distance, released_distance), "unfocused windows ignore trackpad gestures")
 	_check_mouse_mode(Input.MOUSE_MODE_VISIBLE, "losing focus releases the cursor")
 	app._set_window_focus(true)
 	_check(app.camera_rig.look_enabled, "returning focus resumes active gameplay")
@@ -135,6 +143,7 @@ func _test_map_controls() -> void:
 		_motion(Vector2(30, 20), destination + Vector2(30, 20))
 		_check(rig.center.is_equal_approx(center), label + " stops panning when the button is released")
 		var zoom_at := camera.unproject_position(anchor)
+		_test_trackpad_zoom(label, zoom_at, anchor)
 		var distance: float = rig.distance
 		_button(MOUSE_BUTTON_WHEEL_UP, true, zoom_at)
 		_check(rig.distance < distance and camera.unproject_position(anchor).distance_to(zoom_at) < 0.2,
@@ -159,11 +168,38 @@ func _test_map_controls() -> void:
 			_motion(Vector2(20, 0), start + Vector2(20, 0), MOUSE_BUTTON_MASK_MIDDLE)
 			_button(MOUSE_BUTTON_MIDDLE, false, start + Vector2(20, 0))
 			_check(not is_equal_approx(rig.yaw, before_middle), "3D map also supports middle drag for rotation")
+			var before_command: float = rig.yaw
+			_button(MOUSE_BUTTON_LEFT, true, start, false, false, true)
+			_motion(Vector2(20, 0), start + Vector2(20, 0), MOUSE_BUTTON_MASK_LEFT, false, true)
+			_button(MOUSE_BUTTON_LEFT, false, start + Vector2(20, 0))
+			_check(not is_equal_approx(rig.yaw, before_command), "3D map supports Command-left drag")
+			for ctrl in [false, true]:
+				var before_right: float = rig.yaw
+				_button(MOUSE_BUTTON_RIGHT, true, start, ctrl)
+				_motion(Vector2(20, 0), start + Vector2(20, 0), MOUSE_BUTTON_MASK_RIGHT, ctrl)
+				_button(MOUSE_BUTTON_RIGHT, false, start + Vector2(20, 0), ctrl)
+				_check(not is_equal_approx(rig.yaw, before_right),
+					"3D map supports right drag, including native macOS Control-click (%s)" % ctrl)
+			var before_gesture: float = rig.yaw
+			var before_tilt: float = rig.pitch
+			distance = rig.distance
+			_scroll(Vector2(1, -1), start, true)
+			_check(not is_equal_approx(rig.yaw, before_gesture) and not is_equal_approx(rig.pitch, before_tilt)
+				and is_equal_approx(rig.distance, distance), "Ctrl-scroll rotates and tilts the 3D map without zooming")
+			before_gesture = rig.yaw
+			_scroll(Vector2(1, 0), start, false, true)
+			_check(not is_equal_approx(rig.yaw, before_gesture), "Command-scroll also rotates the 3D map")
 		else:
 			_check(is_equal_approx(rig.yaw, yaw) and is_equal_approx(rig.pitch, pitch)
 				and camera.projection == Camera3D.PROJECTION_ORTHOGONAL
 				and camera.global_basis.y.is_equal_approx(Vector3.FORWARD),
 				"2D map stays orthographic and north-up even with Ctrl-drag")
+			_scroll(Vector2(1, -1), start, true)
+			_button(MOUSE_BUTTON_RIGHT, true, start, true)
+			_motion(Vector2(20, 10), start + Vector2(20, 10), MOUSE_BUTTON_MASK_RIGHT, true)
+			_button(MOUSE_BUTTON_RIGHT, false, start + Vector2(20, 10), true)
+			_check(is_equal_approx(rig.yaw, yaw) and is_equal_approx(rig.pitch, pitch),
+				"2D map stays north-up with native Control-click and modified scroll")
 		start = camera.unproject_position(anchor)
 		_button(MOUSE_BUTTON_LEFT, true, start)
 		app._set_window_focus(false)
@@ -206,6 +242,88 @@ func _test_map_controls() -> void:
 	_button(MOUSE_BUTTON_WHEEL_UP, true, screen)
 	_check(camera.unproject_position(raised).distance_to(screen) < 0.2,
 		"3D map zoom preserves the pointer position on raised terrain")
+	_test_trackpad_zoom("raised 3D terrain", screen, raised)
+	_test_drag_modifiers()
+
+
+func _test_drag_modifiers() -> void:
+	var rig: Node3D = app.camera_rig
+	for kind in ["Ctrl", "Command", "macOS Control-click"]:
+		rig.center = Vector3.ZERO
+		rig.yaw = 0.55
+		rig.pitch = 0.8
+		rig.distance = 24.0
+		rig.update(0.0)
+		var ctrl: bool = kind != "Command"
+		var meta: bool = not ctrl
+		var native_click: bool = kind == "macOS Control-click"
+		var button := MOUSE_BUTTON_RIGHT if native_click else MOUSE_BUTTON_LEFT
+		var at := Vector2(480, 300)
+		# Native Control-click starts as RIGHT but motion retains the LEFT mask.
+		_button(button, true, at, ctrl if native_click else false)
+		if not native_click:
+			_motion(Vector2(10, 5), at + Vector2(10, 5), MOUSE_BUTTON_MASK_LEFT)
+			at += Vector2(10, 5)
+		var center: Vector3 = rig.center
+		var yaw: float = rig.yaw
+		_motion(Vector2(20, 10), at + Vector2(20, 10), MOUSE_BUTTON_MASK_LEFT, ctrl, meta)
+		at += Vector2(20, 10)
+		_check(not is_equal_approx(rig.yaw, yaw) and rig.center.is_equal_approx(center),
+			kind + " rotates during an existing drag without panning")
+		yaw = rig.yaw
+		var pitch: float = rig.pitch
+		# Releasing the modifier with no pointer movement must not move the map.
+		_motion(Vector2.ZERO, at, MOUSE_BUTTON_MASK_LEFT)
+		_check(rig.center.is_equal_approx(center) and not rig._rotating,
+			kind + " release switches to pan without a jump")
+		var anchor: Vector3 = rig._terrain_point(at)
+		_motion(Vector2(15, 8), at + Vector2(15, 8), MOUSE_BUTTON_MASK_LEFT)
+		at += Vector2(15, 8)
+		_check(rig.camera.unproject_position(anchor).distance_to(at) < 0.2
+			and is_equal_approx(rig.yaw, yaw) and is_equal_approx(rig.pitch, pitch),
+			kind + " resumes ground-anchored pan without rotating")
+		_motion(Vector2(20, 10), at + Vector2(20, 10), MOUSE_BUTTON_MASK_LEFT, ctrl, meta)
+		at += Vector2(20, 10)
+		_check(not is_equal_approx(rig.yaw, yaw), kind + " can be pressed again to resume rotation")
+		anchor = rig._terrain_point(at)
+		_motion(Vector2(15, 8), at + Vector2(15, 8), MOUSE_BUTTON_MASK_LEFT)
+		at += Vector2(15, 8)
+		_check(rig.camera.unproject_position(anchor).distance_to(at) < 0.2,
+			kind + " switches back to pan even when release and movement arrive together")
+		_button(button, false, at)
+		center = rig.center
+		_motion(Vector2(10, 5), at + Vector2(10, 5))
+		_check(rig._drag_button == 0 and rig.center.is_equal_approx(center), kind + " button release ends the drag")
+
+
+func _test_trackpad_zoom(label: String, at: Vector2, anchor: Variant = null) -> void:
+	var rig: Node3D = app.camera_rig
+	var distance: float = rig.distance
+	var yaw: float = rig.yaw
+	var center: Vector3 = rig.center
+	_scroll(Vector2(0, -0.5), at)
+	_check(rig.distance < distance, label + " two-finger scroll zooms in")
+	if anchor != null:
+		_check(rig.camera.unproject_position(anchor).distance_to(at) < 0.2, label + " scroll preserves the point under the cursor")
+	_scroll(Vector2(0, 0.5), at)
+	_check(is_equal_approx(rig.distance, distance), label + " reverse scroll restores zoom")
+	_scroll(Vector2(2, 0), at)
+	_check(is_equal_approx(rig.distance, distance), label + " horizontal scrolling does not zoom")
+	_pinch(1.25, at)
+	_check(rig.distance < distance, label + " spreading two fingers zooms in")
+	if anchor != null:
+		_check(rig.camera.unproject_position(anchor).distance_to(at) < 0.2, label + " pinch preserves the point under the cursor")
+	_pinch(0.8, at)
+	_check(is_equal_approx(rig.distance, distance) and is_equal_approx(rig.yaw, yaw), label + " reverse pinch restores zoom without rotating")
+	_pinch(0.0, at)
+	_check(is_equal_approx(rig.distance, distance), label + " invalid pinch factor is ignored")
+	_scroll(Vector2(0, -10000), at)
+	_check(rig.distance >= 2.0 and rig.distance <= 65.0, label + " large scroll respects zoom limits")
+	_scroll(Vector2(0, 10000), at)
+	_check(rig.distance >= 2.0 and rig.distance <= 65.0, label + " reverse large scroll respects zoom limits")
+	rig.distance = distance
+	rig.center = center
+	rig.update(0.0)
 
 
 func _frames(count: int) -> void:
@@ -226,23 +344,41 @@ func _click(button: Button) -> void:
 	await _frames(3)
 
 
-func _button(button: MouseButton, pressed: bool, at: Vector2, ctrl := false, double_click := false) -> void:
+func _button(button: MouseButton, pressed: bool, at: Vector2, ctrl := false, double_click := false, meta := false) -> void:
 	var event := InputEventMouseButton.new()
 	event.position = at
 	event.button_index = button
 	event.pressed = pressed
 	event.ctrl_pressed = ctrl
+	event.meta_pressed = meta
 	event.double_click = double_click
 	root.push_input(event, true)
 
 
-func _motion(relative: Vector2, at := Vector2(480, 300), buttons: int = 0, ctrl := false) -> void:
+func _scroll(delta: Vector2, at: Vector2, ctrl := false, meta := false) -> void:
+	var event := InputEventPanGesture.new()
+	event.position = at
+	event.delta = delta
+	event.ctrl_pressed = ctrl
+	event.meta_pressed = meta
+	root.push_input(event, true)
+
+
+func _pinch(factor: float, at: Vector2) -> void:
+	var event := InputEventMagnifyGesture.new()
+	event.position = at
+	event.factor = factor
+	root.push_input(event, true)
+
+
+func _motion(relative: Vector2, at := Vector2(480, 300), buttons: int = 0, ctrl := false, meta := false) -> void:
 	var event := InputEventMouseMotion.new()
 	event.position = at
 	event.relative = relative
 	event.screen_relative = relative
 	event.button_mask = buttons
 	event.ctrl_pressed = ctrl
+	event.meta_pressed = meta
 	root.push_input(event, true)
 
 
