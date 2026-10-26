@@ -14,12 +14,16 @@ fi
 # コンテナの状態確認に必要なユーティリティを読み込む
 source docker/internal/docker_util.sh
 
-# cub_rosサービスが起動しているか確認 (-qでコンテナIDのみ取得)
-RUNNING_CONTAINER_ID=$($docker_compose ps -q cub_ros 2>/dev/null)
+# docker_exec.shと同じサービスを確認する（macOSはVNCサービス）。
+CONTAINER_SERVICE=cub_ros
+if [ "$USE_VNC_ENV" -eq 1 ]; then
+  CONTAINER_SERVICE=cub_ros_vnc
+fi
+RUNNING_CONTAINER_ID=$($docker_compose ps --status running -q "$CONTAINER_SERVICE" 2>/dev/null)
 
 # コンテナが起動していなければ起動する
 if [ -z "$RUNNING_CONTAINER_ID" ]; then
-  echo "Container 'cub_ros' is not running. Starting it now..."
+  echo "Container '$CONTAINER_SERVICE' is not running. Starting it now..."
   ./run.sh < /dev/null
   echo "Container started."
 fi

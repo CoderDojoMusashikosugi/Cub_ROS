@@ -1,0 +1,19 @@
+topic_hz_checker:
+  ros__parameters:
+    hardware_id: cub4_godot
+    update_period: 1.0
+    topics:
+      joy:
+        topic: /joy
+        type: sensor_msgs/msg/Joy
+        expected_hz: 20.0
+        tolerance: 0.3
+        window_size: 10
+        qos: {reliability: reliable, durability: volatile, depth: 10}
+      command:
+        topic: /cmd_vel_atom
+        type: geometry_msgs/msg/Twist
+        expected_hz: 20.0
+        tolerance: 0.3
+        window_size: 10
+        qos: {reliability: reliable, durability: volatile, depth: 10}

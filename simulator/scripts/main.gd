@@ -5,8 +5,12 @@ const WorldScript = preload("res://scripts/world.gd")
 const SessionScript = preload("res://scripts/session.gd")
 const CameraScript = preload("res://scripts/camera_rig.gd")
 const HudScript = preload("res://scripts/hud.gd")
+const RosBridgeScript = preload("res://scripts/ros/ros_bridge.gd")
+const JoyInputScript = preload("res://scripts/ros/joy_input.gd")
 const CAMERA_MODES := {"tps": 0, "3d": 1, "orbit": 1, "2d": 2, "top": 2}
 
+var ros_bridge: Node
+var joy_input = JoyInputScript.new()
 var session: Node
 var world: Node3D
 var camera_rig: Node3D
@@ -46,6 +50,8 @@ func _ready() -> void:
 	session.session_reset.connect(_reset)
 	session.roster_changed.connect(_refresh_session)
 	add_child(session)
+	ros_bridge = RosBridgeScript.new()
+	add_child(ros_bridge)
 	options = parse_options(OS.get_cmdline_user_args())
 	var argument_error := validate_options(options)
 	if argument_error.is_empty():
@@ -53,6 +59,8 @@ func _ready() -> void:
 		options["name"] = str(options.get("name", "Host" if options.has("host") else ("Guest" if options.has("join") else "Player")))
 		_pending_kind = options["actor"]
 		hud.set_options(options)
+		ros_bridge.url = str(options.get("ros-url", "ws://127.0.0.1:9090"))
+		joy_input.preferred_device_id = int(options.get("joy-device", -1))
 	get_window().focus_entered.connect(func(): _set_window_focus(true))
 	get_window().focus_exited.connect(func(): _set_window_focus(false))
 	_set_window_focus(DisplayServer.get_name() == "headless" or get_window().has_focus())
@@ -84,10 +92,16 @@ func _physics_process(delta: float) -> void:
 		camera_rig.pan(pan_direction.limit_length(), delta)
 	var id: int = session.local_actor_id
 	if actors.has(id):
-		actors[id].simulate(movement, camera_rig.yaw if camera_rig.mode != 2 else 0.0, fast, delta)
+		if session.is_host:
+			var command: Vector2 = ros_bridge.command()
+			actors[id].simulate_velocity(command.x, command.y, delta)
+		else:
+			actors[id].simulate(movement, camera_rig.yaw if camera_rig.mode != 2 else 0.0, fast, delta)
 	_publish_elapsed += delta
 	if _publish_elapsed >= 0.05:
 		_publish_elapsed = fmod(_publish_elapsed, 0.05)
+		if session.is_host:
+			ros_bridge.send_joy(joy_input.sample())
 		if actors.has(id):
 			session.publish_pose(id, actors[id].position, actors[id].rotation.y, _simulation_time)
 
@@ -134,6 +148,18 @@ func _update_mouse_capture() -> void:
 
 func _exit_tree() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	if ros_bridge:
+		ros_bridge.stop()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not session.ready_to_play or not _has_focus or camera_rig.mode != 0 or not _cursor_released:
+		return
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		_cursor_released = false
+		_update_mouse_capture()
+		_update_hud()
+		get_viewport().set_input_as_handled()
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
@@ -144,13 +170,9 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	match event.physical_keycode:
 		KEY_ESCAPE:
 			if camera_rig.mode == 0:
-				_cursor_released = true
+				_cursor_released = not _cursor_released
 			else:
 				camera_rig.reset_drag()
-			_update_mouse_capture()
-		KEY_TAB:
-			if camera_rig.mode == 0:
-				_cursor_released = not _cursor_released
 			_update_mouse_capture()
 		KEY_T:
 			if session.is_host:
@@ -175,6 +197,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 
 
 func _host(address: String, port: int, nickname: String) -> void:
+	ros_bridge.url = hud.ros_url()
+	joy_input.preferred_device_id = int(options.get("joy-device", -1))
 	session.start_host(port, nickname, address)
 	_refresh_session()
 
@@ -222,6 +246,8 @@ func _receive_pose(id: int, at: Vector3, yaw: float, sample_time: float) -> void
 
 
 func _reset() -> void:
+	if ros_bridge:
+		ros_bridge.stop()
 	camera_rig.target = null
 	_target_id = 0
 	for actor: Node3D in actors.values():
@@ -250,6 +276,11 @@ func _refresh_session() -> void:
 		var focus := get_viewport().gui_get_focus_owner()
 		if focus:
 			focus.release_focus()
+	if ros_bridge:
+		if session.ready_to_play and session.is_host:
+			ros_bridge.start()
+		else:
+			ros_bridge.stop()
 	_playing = session.ready_to_play
 	_update_mouse_capture()
 	_update_hud()
@@ -279,6 +310,7 @@ func _update_hud() -> void:
 		"host": session.is_host, "kind": _pending_kind, "camera": camera_rig.mode,
 		"position": actor.position if is_instance_valid(actor) else null,
 		"yaw": rad_to_deg(actor.rotation.y) if is_instance_valid(actor) else 0.0,
+		"ros": (ros_bridge.status if ros_bridge else "ROS OFFLINE") + " | " + joy_input.device_name,
 		"fps": Engine.get_frames_per_second(), "actors": actors.size(), "cursor_free": _cursor_released})
 
 
@@ -287,6 +319,7 @@ func _register_input() -> void:
 		"move_forward": [KEY_W, KEY_UP], "move_backward": [KEY_S, KEY_DOWN],
 		"move_left": [KEY_A, KEY_LEFT], "move_right": [KEY_D, KEY_RIGHT],
 		"move_fast": [KEY_SHIFT],
+		"manual_stop": [KEY_SPACE],
 	}
 	for action: String in bindings:
 		if not InputMap.has_action(action):
@@ -322,7 +355,7 @@ static func validate_options(parsed: Dictionary) -> String:
 		return "Use either --host or --join ADDRESS."
 	if parsed.has("host") and not parsed["host"] is bool:
 		return "--host is a flag; use --bind ADDRESS to set its address."
-	for key in ["join", "bind", "port", "actor", "name", "camera", "run-seconds"]:
+	for key in ["join", "bind", "port", "actor", "name", "camera", "run-seconds", "ros-url", "joy-device"]:
 		if parsed.has(key) and parsed[key] is bool:
 			return "--%s requires a value." % key
 	if parsed.has("join") and str(parsed["join"]).strip_edges().is_empty():
@@ -339,4 +372,10 @@ static func validate_options(parsed: Dictionary) -> String:
 		var seconds := str(parsed["run-seconds"])
 		if not seconds.is_valid_float() or not is_finite(float(seconds)) or float(seconds) < 0.0:
 			return "--run-seconds must be a non-negative number (0 disables the timer)."
+	if parsed.has("ros-url") and not (str(parsed["ros-url"]).begins_with("ws://") or str(parsed["ros-url"]).begins_with("wss://")):
+		return "--ros-url must start with ws:// or wss://."
+	if parsed.has("input"):
+		return "--input has been removed; controller/keyboard selection and manual/autonomous handover are automatic."
+	if parsed.has("joy-device") and (not str(parsed["joy-device"]).is_valid_int() or int(parsed["joy-device"]) < -1):
+		return "--joy-device must be -1 (automatic selection) or a non-negative device ID to prefer."
 	return ""

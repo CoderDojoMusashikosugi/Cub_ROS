@@ -12,6 +12,7 @@ func _initialize() -> void:
 func _run() -> void:
 	app = load("res://scenes/main.tscn").instantiate()
 	root.add_child(app)
+	app.hud._ros_url.text = "ws://127.0.0.1:1"
 	await _frames(3)
 	if DisplayServer.get_name() == "headless":
 		root.notify_mouse_entered()
@@ -20,6 +21,7 @@ func _run() -> void:
 		"startup shows mouse-operated lobby without gameplay HUD")
 	_check(not app.camera_rig.look_enabled and Input.mouse_mode == Input.MOUSE_MODE_VISIBLE,
 		"lobby leaves the cursor free")
+	_check(not _has_label(app.hud._lobby, "Host input"), "lobby has no manual input-source selector")
 	app.hud._nickname.grab_focus()
 	var initial_kind: String = app._pending_kind
 	_key(KEY_T)
@@ -63,10 +65,22 @@ func _run() -> void:
 	await _frames(8)
 	Input.action_release("move_forward")
 	_check(Vector2(actor.position.x, actor.position.z).distance_to(Vector2(at.x, at.z)) < 0.01,
-		"released cursor also pauses movement input")
-	_key(KEY_TAB)
-	_check(app.camera_rig.look_enabled, "Tab resumes mouse look")
-	_check_mouse_mode(Input.MOUSE_MODE_CAPTURED, "Tab captures the cursor again")
+		"host movement still requires ROS while the cursor is released")
+	_key(KEY_ESCAPE)
+	_check(app.camera_rig.look_enabled, "pressing Escape again resumes mouse look")
+	_check_mouse_mode(Input.MOUSE_MODE_CAPTURED, "Escape recaptures the cursor")
+	_key(KEY_ESCAPE)
+	_button(MOUSE_BUTTON_RIGHT, true, Vector2(480, 300))
+	_button(MOUSE_BUTTON_RIGHT, false, Vector2(480, 300))
+	_button(MOUSE_BUTTON_LEFT, false, Vector2(480, 300))
+	_check(not app.camera_rig.look_enabled, "right click and left-button release do not resume mouse look")
+	_button(MOUSE_BUTTON_LEFT, true, Vector2(480, 300))
+	_button(MOUSE_BUTTON_LEFT, false, Vector2(480, 300))
+	_check(app.camera_rig.look_enabled, "left click on the released TPS view resumes mouse look")
+	_check_mouse_mode(Input.MOUSE_MODE_CAPTURED, "left click recaptures the cursor")
+	yaw = app.camera_rig.yaw
+	_motion(Vector2(30, 10))
+	_check(not is_equal_approx(app.camera_rig.yaw, yaw), "mouse movement rotates the camera after click-to-resume")
 	app._set_window_focus(false)
 	_check(not app.camera_rig.look_enabled, "unfocused windows stop handling mouse look")
 	_scroll(Vector2(0, -1), Vector2(480, 300))
@@ -79,7 +93,7 @@ func _run() -> void:
 	app._set_window_focus(false)
 	app._set_window_focus(true)
 	_check(not app.camera_rig.look_enabled, "manual cursor release survives a focus change")
-	_key(KEY_TAB)
+	_key(KEY_ESCAPE)
 	await _test_map_controls()
 	_key(KEY_1)
 	_check_mouse_mode(Input.MOUSE_MODE_CAPTURED, "switching from map to TPS captures the cursor")
@@ -96,7 +110,8 @@ func _run() -> void:
 	app._update_hud()
 	actor = app.actors[app.session.local_actor_id]
 	_check(app.hud._position.text.contains("X %.2f" % actor.position.x)
-		and app.hud._state.text.contains("HOST | Robot | TPS"),
+		and app.hud._state.text.contains("HOST | Robot | TPS")
+		and app.hud._state.text.contains(app.joy_input.device_name),
 		"status line shows the controlled actor's coordinates and state")
 	_check(app.hud._bar.size.y <= 30.0, "gameplay status occupies one slim bottom row")
 	_key(KEY_BACKSPACE)
@@ -220,8 +235,8 @@ func _test_map_controls() -> void:
 		var actor_start: Vector3 = actor.position
 		await _frames(8)
 		Input.action_release("move_forward")
-		_check(Vector2(actor.position.x, actor.position.z).distance_to(Vector2(actor_start.x, actor_start.z)) > 0.05,
-			label + " still accepts character movement with the visible cursor")
+		_check(Vector2(actor.position.x, actor.position.z).distance_to(Vector2(actor_start.x, actor_start.z)) < 0.01,
+			label + " host keyboard cannot bypass ROS velocity control")
 		if mode == 1:
 			center = rig.center
 			_key(KEY_3)
@@ -388,6 +403,15 @@ func _key(code: Key) -> void:
 	event.keycode = code
 	event.pressed = true
 	root.push_input(event, true)
+
+
+func _has_label(node: Node, value: String) -> bool:
+	if node is Label and node.text == value:
+		return true
+	for child in node.get_children():
+		if _has_label(child, value):
+			return true
+	return false
 
 
 func _visible_buttons(node: Node) -> Array:

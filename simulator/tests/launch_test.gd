@@ -84,7 +84,7 @@ func _spawn(id: String, arguments: PackedStringArray) -> void:
 		engine_args.append("--headless")
 	# Common Main Run Args followed by instance Launch Arguments, including a
 	# repeated separator to exercise the editor's concatenation behavior.
-	engine_args.append_array(PackedStringArray(["--", "--port=27346", "--"]))
+	engine_args.append_array(PackedStringArray(["--", "--port=27346", "--ros-url=ws://127.0.0.1:1", "--"]))
 	engine_args.append_array(arguments)
 	engine_args.append_array(PackedStringArray(["--probe-output", report_directory.path_join(id + ".json")]))
 	var pid := OS.create_process(OS.get_executable_path(), engine_args, false)

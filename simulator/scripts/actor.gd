@@ -80,8 +80,8 @@ func set_controlled(value: bool, simulate_locally := false) -> void:
 
 
 func simulate(input: Vector2, camera_yaw: float, fast: bool, delta: float) -> void:
-	_step_snap_cooldown = maxf(0.0, _step_snap_cooldown - delta)
-	floor_snap_length = 0.0 if _step_snap_cooldown > 0.0 else 0.30
+	if primary:
+		return  # The primary robot accepts only ROS velocity commands.
 	var speed: float = SPEEDS[kind] * (1.6 if fast else 1.0)
 	var horizontal := Vector3.ZERO
 	if kind == "robot":
@@ -91,6 +91,17 @@ func simulate(input: Vector2, camera_yaw: float, fast: bool, delta: float) -> vo
 		horizontal = Basis(Vector3.UP, camera_yaw) * Vector3(input.x, 0.0, -input.y) * speed
 		if horizontal.length_squared() > 0.01:
 			rotation.y = atan2(-horizontal.x, -horizontal.z)
+	_move(horizontal, delta)
+
+
+func simulate_velocity(forward: float, turn: float, delta: float) -> void:
+	rotation.y += turn * delta
+	_move(-global_basis.z * forward, delta)
+
+
+func _move(horizontal: Vector3, delta: float) -> void:
+	_step_snap_cooldown = maxf(0.0, _step_snap_cooldown - delta)
+	floor_snap_length = 0.0 if _step_snap_cooldown > 0.0 else 0.30
 	velocity.x = horizontal.x
 	velocity.z = horizontal.z
 	if is_on_floor():

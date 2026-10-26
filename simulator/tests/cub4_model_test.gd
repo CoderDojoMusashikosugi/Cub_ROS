@@ -11,6 +11,7 @@ func _initialize() -> void:
 func _run() -> void:
 	var app: Node3D = load("res://scenes/main.tscn").instantiate()
 	root.add_child(app)
+	app.ros_bridge.url = "ws://127.0.0.1:1"
 	_check(app.session.start_host(27349, "Cub4") == OK, "host starts with Cub4 as the primary robot")
 	var primary: Node3D = app.actors[1]
 	for index in range(3):
