@@ -5,9 +5,10 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import Command, FindExecutable, PathJoinSubstitution
 from launch_ros.substitutions import FindPackageShare
 from ament_index_python.packages import get_package_share_directory
-from launch.actions import TimerAction
+from launch.actions import TimerAction, DeclareLaunchArgument, OpaqueFunction
+from launch.conditions import IfCondition
 from launch_ros.actions import PushRosNamespace
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, EqualsSubstitution
 import ament_index_python.packages
 from ament_index_python.packages import get_package_share_directory
 from launch_ros.parameter_descriptions import ParameterValue
@@ -44,13 +45,25 @@ def generate_launch_description():
 
     joy_dev = "/dev/input/js0"
 
+    def select_diagnostics(context):
+        simulation = LaunchConfiguration('simulation').perform(context)
+        if simulation == 'godot':
+            path = os.path.join(get_package_share_directory('cub_simulation'), 'config', 'godot_diagnostics.yaml')
+        else:
+            path = os.path.join(get_package_share_directory('cub4_bringup'), 'config', 'diagnostics.yaml')
+        from launch.actions import SetLaunchConfiguration
+        return [SetLaunchConfiguration('common_diagnostics', path)]
+
     # Launchファイルの返り値
     return LaunchDescription([
+        DeclareLaunchArgument('simulation', default_value='none', choices=['none', 'godot']),
+        OpaqueFunction(function=select_diagnostics),
         # wheel_odometryノード
         Node(
             package='wheel_odometry',
             executable='wheel_odometry_node',
             name='wheel_odometry_node',
+            condition=IfCondition(EqualsSubstitution(LaunchConfiguration('simulation'), 'none')),
             output='screen',
             # remappings=[('odom', 'wh_odom')]
         ),
@@ -124,7 +137,7 @@ def generate_launch_description():
             executable='topic_hz_node',
             name='topic_hz_checker',
             output='screen',
-            parameters=[{'use_sim_time': use_sim_time}, diag_config],
+            parameters=[{'use_sim_time': use_sim_time}, LaunchConfiguration('common_diagnostics')],
         ),
         Node(
             package='cub_diagnostics',
@@ -144,6 +157,7 @@ def generate_launch_description():
             package='cub_diagnostics',
             executable='fix_status_node',
             name='fix_status',
+            condition=IfCondition(EqualsSubstitution(LaunchConfiguration('simulation'), 'none')),
             output='both',
             parameters=[{'use_sim_time': use_sim_time}, diag_config],
         ),
@@ -165,6 +179,7 @@ def generate_launch_description():
             package='cub_commander',
             executable='start_button_serial',
             name='start_button_minipc',
+            condition=IfCondition(EqualsSubstitution(LaunchConfiguration('simulation'), 'none')),
             output='both',
         ),
 

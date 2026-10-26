@@ -123,7 +123,7 @@ func _material(color: Color) -> StandardMaterial3D:
 func _grid() -> void:
 	var mesh := ImmediateMesh.new()
 	mesh.surface_begin(Mesh.PRIMITIVE_LINES)
-	for line in range(-24, 25, 2):
+	for line in range(-24, 25):
 		mesh.surface_add_vertex(Vector3(line, 0.005, -24))
 		mesh.surface_add_vertex(Vector3(line, 0.005, 24))
 		mesh.surface_add_vertex(Vector3(-24, 0.005, line))

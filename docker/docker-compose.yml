@@ -17,6 +17,7 @@ services:
     ports:
       - "6080:80"    # VNC表示ページ用のポート
       - "8765:8765"  # foxglobe用のポート
+      - "9090:9090"  # Godotからrosbridgeへ接続（同一PC・別PC）
     security_opt:
       - seccomp:unconfined # VNC環境用の設定
     shm_size: 512M

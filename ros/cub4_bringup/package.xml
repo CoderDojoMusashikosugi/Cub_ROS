@@ -25,6 +25,8 @@
   <exec_depend>cub_bringup</exec_depend>
   <exec_depend>depthai_oak_d</exec_depend>
 
+  <exec_depend>cub_simulation</exec_depend>
+
   <export>
     <build_type>ament_cmake</build_type>
   </export>

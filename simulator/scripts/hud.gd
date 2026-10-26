@@ -14,6 +14,7 @@ var _lobby: PanelContainer
 var _bar: PanelContainer
 var _nickname: LineEdit
 var _address: LineEdit
+var _ros_url: LineEdit
 var _port: SpinBox
 var _kind: OptionButton
 var _host_button: Button
@@ -110,6 +111,9 @@ func _build_lobby(root: Control) -> void:
 	_port.max_value = 65535
 	_port.value = 27140
 	_add_field(form, "UDP port", _port)
+	_ros_url = LineEdit.new()
+	_ros_url.text = "ws://127.0.0.1:9090"
+	_add_field(form, "Host ROS URL", _ros_url)
 	var buttons := HBoxContainer.new()
 	buttons.add_theme_constant_override("separation", 10)
 	column.add_child(buttons)
@@ -142,11 +146,16 @@ func _add_field(form: GridContainer, title: String, field: Control) -> void:
 
 
 func set_options(options: Dictionary) -> void:
+	_ros_url.text = str(options.get("ros-url", "ws://127.0.0.1:9090"))
 	_nickname.text = str(options.get("name", "Player"))
 	_address.text = str(options.get("join", options.get("bind", "127.0.0.1")))
 	_port.value = int(options.get("port", 27140))
 	var index := KINDS.find(str(options.get("actor", "robot")))
 	_kind.select(maxi(0, index))
+
+
+func ros_url() -> String:
+	return _ros_url.text.strip_edges()
 
 
 func set_status(message: String) -> void:
@@ -170,6 +179,8 @@ func update_readout(state: Dictionary) -> void:
 	var connection := "HOST" if state["host"] else "CLIENT"
 	_state.text = "%s | %s | %s%s" % [connection, str(state["kind"]).capitalize(),
 		CAMERA_NAMES[int(state["camera"])], " | CURSOR" if state["cursor_free"] else ""]
+	if state["host"]:
+		_state.text += " | " + str(state.get("ros", "ROS OFFLINE"))
 	if state["position"] is Vector3:
 		var at: Vector3 = state["position"]
 		_position.text = "X %.2f  Y %.2f  Z %.2f  |  %.0f°" % [at.x, at.y, at.z, float(state["yaw"])]

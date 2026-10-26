@@ -18,6 +18,7 @@ func _run() -> void:
 	DirAccess.make_dir_recursive_absolute(report_directory)
 	app = load("res://scenes/main.tscn").instantiate()
 	root.add_child(app)
+	app.ros_bridge.url = "ws://127.0.0.1:1"
 	_check(app.session.start_host(port, "TestHost") == OK, "host starts with the primary robot")
 	app.session.actor_added.connect(func(record: Dictionary):
 		if not spawn_positions.has(record["id"]):
@@ -55,7 +56,7 @@ func _run() -> void:
 	var host_start: Vector3 = primary_robot.position
 	await create_timer(0.6).timeout
 	Input.action_release("move_forward")
-	_check(primary_robot.position.distance_to(host_start) > 0.5, "host robot responds to input")
+	_check(Vector2(primary_robot.position.x - host_start.x, primary_robot.position.z - host_start.z).length() < 0.01, "host keyboard cannot bypass ROS velocity control")
 	await _wait_for(func(): return _actor_named("Early2") != 0 and app.session.records[_actor_named("Early2")]["kind"] == "cone", 5.0)
 	_check(_actor_named("Early2") != 0 and app.session.records[_actor_named("Early2")]["kind"] == "cone",
 		"client can change its actor type")

@@ -3,12 +3,21 @@
 # 自律走行はしない。
 from launch import LaunchDescription
 from launch_ros.actions import Node
-from launch.actions import IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
 from launch.substitutions import PathJoinSubstitution
 from launch_ros.substitutions import FindPackageShare
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
 import os
+
+
+def require_navigation(context):
+    # Godot currently provides Joy/Twist only; do not start sensor-dependent nodes.
+    simulation = LaunchConfiguration('simulation').perform(context)
+    if simulation != 'none':
+        raise ValueError(f'simulation:={simulation} currently supports velocity control only; '
+                         'odom, localization TF and scan are required before navigation/localization')
+    return []
 
 
 def generate_launch_description():
@@ -21,10 +30,13 @@ def generate_launch_description():
 
 
     return LaunchDescription([
+        DeclareLaunchArgument('simulation', default_value='none', choices=['none', 'godot']),
+        OpaqueFunction(function=require_navigation),
         IncludeLaunchDescription(
             PathJoinSubstitution(
                 [FindPackageShare("cub_bringup"), "launch", "common.launch.py"]
             ),
+            launch_arguments={'simulation': LaunchConfiguration('simulation')}.items(),
         ),
 
         IncludeLaunchDescription(
