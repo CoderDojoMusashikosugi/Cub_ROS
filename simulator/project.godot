@@ -26,10 +26,6 @@ window/vsync/vsync_mode=0
 window/size/min_width=640
 window/size/min_height=420
 
-[input_devices]
-
-joypads/ignore_joypad_on_unfocused_application=false
-
 [rendering]
 
 renderer/rendering_method="gl_compatibility"
