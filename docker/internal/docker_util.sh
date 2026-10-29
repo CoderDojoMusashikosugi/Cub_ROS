@@ -45,7 +45,10 @@ if [ -f /etc/nv_tegra_release ] || uname -r | grep -qi tegra; then
     IS_JETSON=1
 fi
 
-RUNTIME_NVIDIA=`docker info 2>/dev/null | grep nvidia || true`
+# 未設定時だけ自動判定する。空文字を指定した場合はNVIDIA連携を無効にする。
+if [ "${RUNTIME_NVIDIA+x}" != "x" ]; then
+    RUNTIME_NVIDIA=`docker info 2>/dev/null | grep nvidia || true`
+fi
 if [ "$IS_WSL2" -eq 0 ] && [ -n "$RUNTIME_NVIDIA" ]; then # GPU利用可能な環境の場合（WSL2を除く）
     if [ "$IS_JETSON" -eq 1 ]; then
         docker_compose=$docker_compose" -f docker/internal/docker-compose-nvidia-jetson.yml" # Jetson向け (runtime: nvidia)
