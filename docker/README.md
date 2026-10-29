@@ -94,6 +94,13 @@
   - ROSのコードを編集したければ、`ros`ディレクトリ内のパッケージを編集すれば良い。
 
 ## 使い方
+### NVIDIA連携を一時的に無効にして起動したい
+- `RUNTIME_NVIDIA= ./run.sh` で、NVIDIA GPUの割り当てを無効にして起動できる。CUDAを必要とするノードは利用できない。
+- `RUNTIME_NVIDIA` は未設定の場合だけ自動判定する。空文字で無効、空文字以外で有効になる（WSL2では常にNVIDIA用設定を追加しない）。
+- NVIDIA用のCompose設定を追加しない方式のため、Dockerの既定runtimeが `runc` の環境を想定している。
+- 既存コンテナがある場合は、先に `./stop.sh` で削除してから起動する（起動に失敗したコンテナも対象）。ホストにマウントされたファイルは残る。
+- ドライバ復旧後は、`RUNTIME_NVIDIA= ./stop.sh` の後に通常の `./run.sh` でGPU有効のコンテナを作り直す。
+
 ### ROSBAGの保存先を変えたい
 - デフォルトでは、コンテナ内の`~/rosbag`は、ホストの`./docker/home/rosbag`にマウントされている。
 - これを例えば`~/rosbag`に設定したければ、target.envに`ROSBAG_MOUNT_DIR="/home/ここにユーザー名/rosbag/"`を追記して./stop.sh&&./run.sh。
