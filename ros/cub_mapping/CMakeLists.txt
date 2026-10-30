@@ -216,7 +216,7 @@ install(DIRECTORY include/
 pluginlib_export_plugin_description_file(rviz_common plugins_description.xml)
 
 # Install launch files, params, and rviz config
-install(DIRECTORY launch params rviz
+install(DIRECTORY launch params rviz doc
   DESTINATION share/${PROJECT_NAME}
 )
 
@@ -238,6 +238,31 @@ ament_export_dependencies(
 )
 
 # Testing
+option(CUB_MAPPING_BUILD_GNSS "Build the GLIM RTK GNSS extension" ON)
+if(CUB_MAPPING_BUILD_GNSS)
+  find_package(glim REQUIRED)
+  find_path(GEOGRAPHICLIB_INCLUDE_DIR GeographicLib/LocalCartesian.hpp REQUIRED)
+  find_library(GEOGRAPHICLIB_LIBRARY GeographicLib REQUIRED)
+  add_library(cub_mapping_gnss SHARED src/glim_gnss.cpp src/gnss_factor.cpp)
+  set_target_properties(cub_mapping_gnss PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
+  target_include_directories(cub_mapping_gnss PRIVATE ${GEOGRAPHICLIB_INCLUDE_DIR})
+  ament_target_dependencies(cub_mapping_gnss rclcpp sensor_msgs)
+  target_link_libraries(cub_mapping_gnss glim::glim ${GEOGRAPHICLIB_LIBRARY})
+  install(TARGETS cub_mapping_gnss LIBRARY DESTINATION lib)
+  add_executable(check_gnss_dump src/check_gnss_dump.cpp)
+  set_target_properties(check_gnss_dump PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
+  target_link_libraries(check_gnss_dump cub_mapping_gnss glim::glim)
+  install(TARGETS check_gnss_dump DESTINATION lib/${PROJECT_NAME})
+  if(BUILD_TESTING)
+    find_package(ament_cmake_gtest REQUIRED)
+    ament_add_gtest(test_gnss test/test_gnss.cpp)
+    set_target_properties(test_gnss PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
+    target_link_libraries(test_gnss cub_mapping_gnss glim::glim ${GEOGRAPHICLIB_LIBRARY})
+    ament_target_dependencies(test_gnss rclcpp sensor_msgs)
+    target_compile_definitions(test_gnss PRIVATE GNSS_CONFIG_PATH="${CMAKE_CURRENT_SOURCE_DIR}/../cub4_bringup/config/glim_params_velodyne/config_cub_gnss.json")
+  endif()
+endif()
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   ament_lint_auto_find_test_dependencies()

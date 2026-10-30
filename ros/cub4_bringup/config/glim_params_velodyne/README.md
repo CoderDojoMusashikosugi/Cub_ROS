@@ -3,7 +3,8 @@
 `rosbag2_2026_10_17-15_09_06_no_images` 向け。GLIM/GLIM ROS2 のコンテナ内にある設定を基に、使用する設定一式をこのディレクトリに保存しています。
 
 - 入力: `/velodyne_points` (`velodyne`) と `/imu/data_raw` (`imu_link`)。
-- Livox、OAK、GNSS、車輪オドメトリは使用しません。画像入力先は bag に存在しない `/glim/unused_image` です。
+- Livox、OAK、車輪オドメトリは使用しません。画像入力先は bag に存在しない `/glim/unused_image` です。
+- launchでは既定でサブアンテナRTK FIXを統合します。先頭60秒でENUへ初期整合した後、指定区間を再処理します。従来のGNSSなし処理は `enable_gnss:=false` で実行できます。[GNSS設定と出力](../../../cub_mapping/doc/glim_gnss.md)を参照してください。
 - GPU版オドメトリ・グローバルマッピングを使用します。CUDA対応のGLIMとNVIDIA GPUが必要です。
 - GUIを起動せず、bagを直接読み込みます。処理後に残りの最適化を待ち、GLIMのdumpを保存して終了します。
 
@@ -41,7 +42,7 @@ Velodyneの `time` フィールドはFLOAT32の相対秒で、先頭点はheader
 - 8 GB GPUで長時間bagを処理するため、サブマップの点数を制限し、グローバル最適化では点群の20%を使用します。保存する地図にはサブマップの全点を使用します。
 - 描画なし。`config_viewer.json` は保存後のoffline viewer用に含めています。
 
-## 実行確認
+## GNSS導入前の実行確認
 
 対象bag全体を約11分で処理し、正常終了と保存を確認しました。
 443サブマップ、20,925軌跡フレーム、約2.27 km、保存点群8,860,000点です。
