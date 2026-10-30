@@ -2,7 +2,7 @@
 gps_updater:
   ros__parameters:
     # Topic names
-    gps_topic_name: "/fix"                    # GPS受信機からのNavSatFixトピック
+    gps_topic_name: "/um982_node/fix_secondary"          # GPS受信機からのNavSatFixトピック (UM982)
     gps_pose_topic_name: "/gps_pose"          # 出力するPoseWithCovarianceトピック
     initialpose_topic_name: "/initialpose"    # RVizからの初期位置設定
     

@@ -5,13 +5,15 @@
 EKF::EKF() : Node("EKF")
 {
 	this->declare_parameter<std::string>("ndt_pose_topic_name", "/test/ndt_pose");
-    this->declare_parameter<std::string>("imu_topic_name", "/bno055/imu");
+    this->declare_parameter<std::string>("imu_topic_name", "/imu/data_raw");
     this->declare_parameter<std::string>("odom_topic_name", "/odom");
     this->declare_parameter<std::string>("ekf_pose_topic_name", "/test/ekf_pose");
     this->declare_parameter<std::string>("map_frame_id", "map");
     this->declare_parameter<std::string>("odom_frame_id", "odom");
     this->declare_parameter<std::string>("base_link_frame_id", "base_link");
     this->declare_parameter<bool>("is_odom_tf", false);
+    this->declare_parameter<bool>("use_imu_tf", true);
+    this->declare_parameter<double>("imu_yaw_sign", -1.0);
     this->declare_parameter<bool>("GPS_MEASUREMENT_ENABLE", false);
     this->declare_parameter<bool>("NDT_MEASUREMENT_ENABLE", false);
     this->declare_parameter<bool>("gps_respawn_enable", false);
@@ -34,6 +36,8 @@ EKF::EKF() : Node("EKF")
 	this->declare_parameter<double>("TH_POSE_COVARIANCE", 1.0);
 	this->declare_parameter<double>("TH_DIRECTION_COVARIANCE", 1.0);
 	this->declare_parameter<std::string>("gps_pose_topic_name", "/gps_pose");
+	this->declare_parameter<std::string>("navsat_topic_name", "/um982_node/fix");
+	this->declare_parameter<bool>("require_rtk_fix_for_respawn", true);
 	this->declare_parameter<double>("SIGMA_GPS", 3.0);
 	this->declare_parameter<double>("EKF_HZ", 30.0);
 	this->declare_parameter<std::string>("initialpose_topic_name", "/initialpose");
@@ -58,6 +62,8 @@ EKF::EKF() : Node("EKF")
     this->get_parameter("odom_frame_id", odom_frame_id_);
     this->get_parameter("base_link_frame_id", base_link_frame_id_);
     this->get_parameter("is_odom_tf", is_odom_tf_);
+    this->get_parameter("use_imu_tf", use_imu_tf_);
+    this->get_parameter("imu_yaw_sign", imu_yaw_sign_);
     this->get_parameter("GPS_MEASUREMENT_ENABLE", gps_measurement_enable_);
     this->get_parameter("NDT_MEASUREMENT_ENABLE", ndt_measurement_enable_);
     this->get_parameter("gps_respawn_enable", gps_respawn_enable_);
@@ -81,6 +87,8 @@ EKF::EKF() : Node("EKF")
 	this->get_parameter("TH_POSE_COVARIANCE", th_pose_covariance_);
 	this->get_parameter("TH_DIRECTION_COVARIANCE", th_direction_covariance_);
 	this->get_parameter("gps_pose_topic_name", gps_pose_topic_name_);
+	this->get_parameter("navsat_topic_name", navsat_topic_name_);
+	this->get_parameter("require_rtk_fix_for_respawn", require_rtk_fix_for_respawn_);
 	this->get_parameter("SIGMA_GPS", SIGMA_GPS_);
 	this->get_parameter("EKF_HZ", ekf_hz_);
     this->get_parameter("initialpose_topic_name", initialpose_topic_name_);
@@ -109,6 +117,9 @@ EKF::EKF() : Node("EKF")
 	gps_pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>(
 		gps_pose_topic_name_, rclcpp::QoS(1).reliable(),
 		std::bind(&EKF::gps_pose_callback, this, std::placeholders::_1));
+	navsat_sub_ = this->create_subscription<sensor_msgs::msg::NavSatFix>(
+		navsat_topic_name_, rclcpp::SensorDataQoS(),
+		std::bind(&EKF::navsat_callback, this, std::placeholders::_1));
     initialpose_sub_ = this->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>(
         initialpose_topic_name_,rclcpp::QoS(1).reliable(),
         std::bind(&EKF::initialpose_callback, this, std::placeholders::_1));
@@ -119,6 +130,9 @@ EKF::EKF() : Node("EKF")
 	// 	"/ekf_pose/trajectory", rclcpp::QoS(1).reliable());
 
 	auto clock = this->get_clock();
+
+	tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
+	tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 
 	initialize(INIT_X_, INIT_Y_, INIT_Z_, INIT_ROLL_, INIT_PITCH_, INIT_YAW_);
 	is_measurement_.data = false;
@@ -326,17 +340,18 @@ void EKF::odom_callback(const nav_msgs::msg::Odometry::ConstSharedPtr msg)
 	has_received_odom_ = true;
 	time_publish_ = msg->header.stamp;
 	now_time_odom_ = msg->header.stamp;
-	try{
-		rclcpp::Duration duration = now_time_odom_ - last_time_odom_;
-		dt_ = duration.seconds();
-	}catch(std::runtime_error& ex) {
-		RCLCPP_ERROR(this->get_logger(), "Exception: [%s]", ex.what());
-	}
 	if(is_first_odom_){
 		dt_ = 0.0;
 		is_first_odom_ = false;
 	}
 	else{
+		try{
+			rclcpp::Duration duration = now_time_odom_ - last_time_odom_;
+			dt_ = duration.seconds();
+		}catch(std::runtime_error& ex) {
+			RCLCPP_ERROR(this->get_logger(), "Exception: [%s]", ex.what());
+			dt_ = 0.0;
+		}
 		motion_update_by_odom(dt_);
 		publish_ekf_pose();
 	}
@@ -444,24 +459,106 @@ void EKF::motion_update_by_odom(double dt)
     }
 }
 
+bool EKF::transform_imu_data(const sensor_msgs::msg::Imu& imu_in, Eigen::Vector3d& omega_base, Eigen::Vector3d& acc_base)
+{
+    Eigen::Vector3d omega_sensor(imu_in.angular_velocity.x, imu_in.angular_velocity.y, imu_in.angular_velocity.z);
+    Eigen::Vector3d acc_sensor(imu_in.linear_acceleration.x, imu_in.linear_acceleration.y, imu_in.linear_acceleration.z);
+
+    if (!use_imu_tf_) {
+        omega_base = omega_sensor;
+        omega_base.z() *= imu_yaw_sign_;
+        acc_base = acc_sensor;
+        return true;
+    }
+
+    const std::string& sensor_frame = imu_in.header.frame_id;
+    if (sensor_frame.empty() || sensor_frame == base_link_frame_id_) {
+        omega_base = omega_sensor;
+        omega_base.z() *= imu_yaw_sign_;
+        acc_base = acc_sensor;
+        return true;
+    }
+
+    try {
+        // base_link <- sensor_frame の変換を取得（静的TFのためTimePointZeroで最新を取得）
+        geometry_msgs::msg::TransformStamped tf_stamped = tf_buffer_->lookupTransform(
+            base_link_frame_id_, sensor_frame, tf2::TimePointZero);
+
+        Eigen::Quaterniond q(
+            tf_stamped.transform.rotation.w,
+            tf_stamped.transform.rotation.x,
+            tf_stamped.transform.rotation.y,
+            tf_stamped.transform.rotation.z);
+
+        imu_to_base_rot_ = q.toRotationMatrix();
+
+        if (!has_imu_tf_) {
+            has_imu_tf_ = true;
+            tf2::Quaternion tf2_q(
+                tf_stamped.transform.rotation.x,
+                tf_stamped.transform.rotation.y,
+                tf_stamped.transform.rotation.z,
+                tf_stamped.transform.rotation.w);
+            double roll, pitch, yaw;
+            tf2::Matrix3x3(tf2_q).getRPY(roll, pitch, yaw);
+            RCLCPP_INFO(this->get_logger(),
+                "✓ IMU TF transform connected: [%s] -> [%s] (rpy: %.1f, %.1f, %.1f deg)",
+                sensor_frame.c_str(), base_link_frame_id_.c_str(),
+                roll * 180.0 / M_PI, pitch * 180.0 / M_PI, yaw * 180.0 / M_PI);
+        }
+
+        omega_base = imu_to_base_rot_ * omega_sensor;
+        acc_base = imu_to_base_rot_ * acc_sensor;
+        return true;
+    } catch (const tf2::TransformException& ex) {
+        if (has_imu_tf_) {
+            omega_base = imu_to_base_rot_ * omega_sensor;
+            acc_base = imu_to_base_rot_ * acc_sensor;
+            return true;
+        }
+        // TFがまだ取得できない場合でも、IMUを破棄せずimu_yaw_signによるフォールバックを適用して積算を継続
+        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
+            "IMU TF transform ([%s] -> [%s]) not available yet: %s. "
+            "Using fallback: applying imu_yaw_sign=%.1f to angular_velocity.z to keep EKF active.",
+            sensor_frame.c_str(), base_link_frame_id_.c_str(), ex.what(), imu_yaw_sign_);
+        omega_base = omega_sensor;
+        omega_base.z() *= imu_yaw_sign_;
+        acc_base = acc_sensor;
+        return true;
+    }
+}
+
 void EKF::imu_callback(const sensor_msgs::msg::Imu::ConstSharedPtr msg)
 {
 	imu_ = *msg;
+
+	Eigen::Vector3d omega_base, acc_base;
+	if (!transform_imu_data(*msg, omega_base, acc_base)) {
+		// TFがまだ取得できない間は誤った軸で積算しないようスキップ
+		return;
+	}
+	imu_.angular_velocity.x = omega_base.x();
+	imu_.angular_velocity.y = omega_base.y();
+	imu_.angular_velocity.z = omega_base.z();
+	imu_.linear_acceleration.x = acc_base.x();
+	imu_.linear_acceleration.y = acc_base.y();
+	imu_.linear_acceleration.z = acc_base.z();
+
 	has_received_imu_ = true;
 	time_publish_ = msg->header.stamp;
 	now_time_imu_ = msg->header.stamp;
-	try{
-		rclcpp::Duration duration = now_time_imu_ - last_time_imu_;
-		dt_ = duration.seconds();
-	}catch(std::runtime_error& ex) {
-		// ROS_ERROR("Exception: [%s]", ex.what());
-		RCLCPP_ERROR(this->get_logger(), "Exception: [%s]", ex.what());
-	}
 	if(is_first_imu_){
 		dt_ = 0.0;
 		is_first_imu_ = false;
 	}
 	else{
+		try{
+			rclcpp::Duration duration = now_time_imu_ - last_time_imu_;
+			dt_ = duration.seconds();
+		}catch(std::runtime_error& ex) {
+			RCLCPP_ERROR(this->get_logger(), "Exception: [%s]", ex.what());
+			dt_ = 0.0;
+		}
 		motion_update_by_imu(dt_);
 		publish_ekf_pose();
 	}
@@ -686,8 +783,11 @@ bool EKF::check_ekf_covariance(geometry_msgs::msg::PoseStamped ekf_pose)
 void EKF::publish_ekf_pose()
 {
 	ekf_pose_.header.frame_id = map_frame_id_;
-    ekf_pose_.header.stamp = this->get_clock()->now();
-	// ekf_pose_.header.stamp = time_publish_; 
+	if (time_publish_.nanoseconds() > 0) {
+		ekf_pose_.header.stamp = time_publish_;
+	} else {
+		ekf_pose_.header.stamp = this->get_clock()->now();
+	}
 	if(std::isnan(X_(0) || std::isnan(X_(1)))){
 		std::cout << "ekf_pose val NAN!!!"<< std::endl;
 		return;
@@ -774,6 +874,21 @@ double EKF::calc_yaw_from_quat(geometry_msgs::msg::Quaternion q)
  */
 bool EKF::is_gps_fix_quality(const geometry_msgs::msg::PoseWithCovarianceStamped& gps_pose)
 {
+    // RTK-FIXステータスチェック（/fixトピックを受信している場合）
+    if(require_rtk_fix_for_respawn_) {
+        if(has_received_navsat_) {
+            double elapsed = (this->now() - last_navsat_time_).seconds();
+            if(elapsed > 2.0) {
+                std::cout << "[GPS RESPAWN BLOCKED] NavSatFix data is stale (" << elapsed << " s > 2.0 s)" << std::endl;
+                return false;
+            }
+            if(!is_rtk_fixed_) {
+                std::cout << "[GPS RESPAWN BLOCKED] GNSS is not RTK-FIX" << std::endl;
+                return false;
+            }
+        }
+    }
+
     // 共分散が有効かチェック
     double sigma_x = std::sqrt(gps_pose.pose.covariance[0]);
     double sigma_y = std::sqrt(gps_pose.pose.covariance[7]);
@@ -791,11 +906,11 @@ bool EKF::is_gps_fix_quality(const geometry_msgs::msg::PoseWithCovarianceStamped
     // 水平標準偏差を計算
     double horizontal_sigma = std::sqrt(sigma_x * sigma_x + sigma_y * sigma_y);
     
-    // 高精度判定（RTK-FIX想定: < 1.0m）
+    // 高精度判定（RTK-FIX想定: < gps_high_confidence_threshold_）
     bool is_high_precision = (horizontal_sigma < gps_high_confidence_threshold_);
     
     if(is_high_precision) {
-        std::cout << "✓ GPS HIGH PRECISION: σ_h=" << std::fixed << std::setprecision(3) 
+        std::cout << "✓ GPS HIGH PRECISION (RTK-FIX): σ_h=" << std::fixed << std::setprecision(3) 
                   << horizontal_sigma << " m (threshold: " << gps_high_confidence_threshold_ 
                   << " m)" << std::endl;
     }
@@ -1050,6 +1165,7 @@ void EKF::gps_pose_callback(const geometry_msgs::msg::PoseWithCovarianceStamped:
             "Auto-initializing EKF from GPS: x=%.3f, y=%.3f, z=%.3f", x, y, z);
         
         initialize(x, y, z, INIT_ROLL_, INIT_PITCH_, INIT_YAW_);
+        ndt_pose_.pose.position.z = z;
         first_callback_ = false;
     }
     
@@ -1172,6 +1288,14 @@ void EKF::measurement_update_gps()
               << X_(0) << ", y=" << X_(1) << std::endl;
     
     has_received_gps_ = false;
+}
+
+void EKF::navsat_callback(const sensor_msgs::msg::NavSatFix::ConstSharedPtr msg)
+{
+    has_received_navsat_ = true;
+    last_navsat_time_ = this->now();
+    // STATUS_GBAS_FIX (2) は RTK-FIX に対応 (cub_um982 等)
+    is_rtk_fixed_ = (msg->status.status >= sensor_msgs::msg::NavSatStatus::STATUS_GBAS_FIX);
 }
 
 void EKF::process()

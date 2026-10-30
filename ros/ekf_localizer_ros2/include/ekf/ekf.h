@@ -3,10 +3,13 @@
 #include <rclcpp/rclcpp.hpp>
 #include <nav_msgs/msg/odometry.hpp>
 #include <sensor_msgs/msg/imu.hpp>
+#include <sensor_msgs/msg/nav_sat_fix.hpp>
+#include <sensor_msgs/msg/nav_sat_status.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <tf2_ros/transform_broadcaster.h>
 #include <tf2_ros/transform_listener.h>
+#include <tf2_ros/buffer.h>
 #include <std_msgs/msg/bool.hpp>
 #include "nav_msgs/msg/path.hpp"
 
@@ -27,6 +30,7 @@ private:
 	void odom_callback(const nav_msgs::msg::Odometry::ConstSharedPtr msg);
 	void imu_callback(const sensor_msgs::msg::Imu::ConstSharedPtr msg);
 	void gps_pose_callback(const geometry_msgs::msg::PoseWithCovarianceStamped::ConstSharedPtr msg);
+	void navsat_callback(const sensor_msgs::msg::NavSatFix::ConstSharedPtr msg);
 	void initialpose_callback(const geometry_msgs::msg::PoseWithCovarianceStamped::ConstSharedPtr msg);
 	
 	void initialize(double x,double y,double z,double roll,double pitch,double yaw);
@@ -37,6 +41,7 @@ private:
 	void motion_update_6DoF(double dt);
 	void motion_update(double dt);
 	void motion_update_by_imu(double dt);
+	bool transform_imu_data(const sensor_msgs::msg::Imu& imu_in, Eigen::Vector3d& omega_base, Eigen::Vector3d& acc_base);
 	void motion_update_by_odom(double dt);
 	void measurement_update_3DoF();
 	
@@ -59,6 +64,7 @@ private:
 	void update_odometry_reference(double dx, double dy);
 
 	rclcpp::Subscription<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr gps_pose_sub_;
+	rclcpp::Subscription<sensor_msgs::msg::NavSatFix>::SharedPtr navsat_sub_;
 	rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr ndt_pose_sub_;
 	rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_sub_;
 	rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
@@ -68,8 +74,14 @@ private:
 	rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub_;
 
 	std::shared_ptr<tf2_ros::TransformBroadcaster> broadcaster_;
-	std::shared_ptr<tf2_ros::TransformListener> listener_;
-	std::shared_ptr<tf2::BufferCore> buffer_ = std::make_shared<tf2::BufferCore>();
+	std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
+	std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
+
+	bool use_imu_tf_ = true;
+	bool has_imu_tf_ = false;
+	double imu_yaw_sign_ = -1.0;
+	bool imu_tf_warned_ = false;
+	Eigen::Matrix3d imu_to_base_rot_ = Eigen::Matrix3d::Identity();
 
 	nav_msgs::msg::Odometry odom_;
 	nav_msgs::msg::Odometry last_odom_pose;
@@ -96,6 +108,7 @@ private:
 	std::string odom_frame_id_;
 	std::string base_link_frame_id_;
 	std::string gps_pose_topic_name_;
+	std::string navsat_topic_name_;
 	std::string initialpose_topic_name_;
 	std::string measurement_topic_name_;
 
@@ -144,6 +157,10 @@ private:
 	double gps_respawn_max_distance_;          // リスポーン実行の最大許容距離 [m]
 	bool gps_respawn_in_progress_;             // リスポーン実行中フラグ
 	bool gps_respawn_enable_;
+	bool require_rtk_fix_for_respawn_ = true;  // RTK-FIX受信時のみリスポーンを許可
+	bool has_received_navsat_ = false;
+	bool is_rtk_fixed_ = false;
+	rclcpp::Time last_navsat_time_;
 
 	int STATE_SIZE_;
 	Eigen::VectorXd X_;

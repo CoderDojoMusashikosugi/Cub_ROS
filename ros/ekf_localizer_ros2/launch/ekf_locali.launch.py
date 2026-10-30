@@ -1,13 +1,20 @@
 import os
 from launch import LaunchDescription
-from launch_ros.actions import Node
+from launch_ros.actions import Node, SetParameter
 from ament_index_python.packages import get_package_share_directory
-from launch.actions import IncludeLaunchDescription
-from launch.substitutions import PathJoinSubstitution
+from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument
+from launch.substitutions import PathJoinSubstitution, LaunchConfiguration
 from launch_ros.substitutions import FindPackageShare
 from launch.actions import TimerAction
 
 def generate_launch_description():
+    use_sim_time = LaunchConfiguration('use_sim_time')
+    declare_use_sim_time = DeclareLaunchArgument(
+        'use_sim_time',
+        default_value='false',
+        description='Use simulation (Gazebo / rosbag) clock if true'
+    )
+
     # パラメータファイルのパスを取得
     params_ekf = os.path.join(
         get_package_share_directory('ekf_localizer'),  # パッケージ名
@@ -33,6 +40,8 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
+        declare_use_sim_time,
+        SetParameter(name='use_sim_time', value=use_sim_time),
         # IncludeLaunchDescription(
         #     PathJoinSubstitution(
         #         [FindPackageShare("cub_visualization"), "launch", "rviz.launch.py"]
@@ -44,7 +53,7 @@ def generate_launch_description():
             executable='ekf_localizer_node',
             name='ekf_localizer_node',
             parameters=[params_ekf],
-            remappings=[('/bno055/imu', '/imu/data'),
+            remappings=[('/bno055/imu', '/imu/data_raw'),
                                 ],
             # output='screen',  # 標準出力を表示するように設定
         ),
