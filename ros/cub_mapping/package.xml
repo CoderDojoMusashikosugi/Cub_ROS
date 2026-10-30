@@ -21,6 +21,11 @@
   <depend>tf2</depend>
   <depend>tf2_ros</depend>
   <depend>tf2_geometry_msgs</depend>
+  <depend>glim</depend>
+  <depend>gtsam</depend>
+  <depend>libgeographiclib-dev</depend>
+  <build_depend>libmetis-dev</build_depend>
+  <depend>nlohmann-json-dev</depend>
 
   <!-- RViz2 Plugin Dependencies -->
   <depend>rviz_common</depend>
@@ -48,6 +53,7 @@
   <!-- Testing -->
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
+  <test_depend>ament_cmake_gtest</test_depend>
 
   <export>
     <build_type>ament_cmake</build_type>
