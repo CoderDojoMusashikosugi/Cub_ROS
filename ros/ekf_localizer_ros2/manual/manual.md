@@ -26,26 +26,28 @@
 
 ### **ekf_localizer_node**
 - **役割**: センサ情報を統合して最終的な位置推定を行う中核ノード
-- **入力**: IMU、オドメトリ、NDT位置、GPS位置
+- **入力**: IMU (`/imu/data_raw`)、オドメトリ (`/odom`)、NDT位置 (`/test/ndt_pose`)、GPS位置 (`/gps_pose`)、GNSSステータス (`/um982_node/fix`)
 - **出力**: 推定位置 (`/test/ekf_pose`)
 - **処理内容**:
-  - 動作更新: IMU/オドメトリから位置を予測
+  - 動作更新: TF準拠（TF未受信時は `imu_yaw_sign` で安全フォールバック）で `base_link` 系に変換した IMU 角速度およびオドメトリから位置・姿勢を予測
   - 観測更新: NDT/GPSの測定値で位置を補正
+  - RTK-FIX限定リスポーン: RTK高精度測位時のみGPS位置へ自動復旧
 
 ### **map_matcher_node**
 - **役割**: LiDAR点群と地図をマッチングして位置を推定
-- **入力**: LiDAR点群、EKF位置、点群地図(PCD)
+- **入力**: LiDAR点群 (`/velodyne_points`)、EKF位置 (`/test/ekf_pose`)、点群地図(PCD)
 - **出力**: NDT推定位置 (`/test/ndt_pose`)
 - **処理内容**:
-  - NDT(Normal Distributions Transform)アルゴリズムで点群マッチング
+  - fast_gicp / NDTCuda アルゴリズムで点群マッチング
+  - ジャンプガード機能: 初期推定値からの過大飛び出し（並進>1.0m、回転>30°）を自動棄却
 
 ### **gps_updater_node**
-- **役割**: GPS座標をローカル座標系に変換
-- **入力**: GPS信号 (`/fix`)
+- **役割**: GPS座標をローカル直交座標系（map系）に変換
+- **入力**: GPS信号 (`/um982_node/fix`)
 - **出力**: ローカル座標のGPS位置 (`/gps_pose`)
 - **処理内容**:
-  - GPS品質チェック（衛星数、測位精度）
-  - 緯度経度をメートル単位の座標に変換
+  - GPS品質・共分散チェック
+  - 緯度経度・高度を局所平面直交座標系（メートル単位）に変換
 
 ### **tf_cub_node**
 - **役割**: 座標変換の配信
@@ -82,10 +84,11 @@ INIT_YAW: 0.0    # 初期方位 [rad]
 
 ```yaml
 # gps_updater.yaml
-use_manual_origin: false  # 自動設定の場合
-# use_manual_origin: true   # 手動設定の場合
-# gps_origin_lat: 35.6812   # 緯度
-# gps_origin_lon: 139.7671  # 経度
+gps_topic_name: "/um982_node/fix"
+use_manual_origin: true   # 手動設定の場合
+gps_origin_lat: 36.082628231   # 緯度
+gps_origin_lon: 140.076144739  # 経度
+gps_origin_alt: 67.078         # 高度
 ```
 
 ### 3.4 起動

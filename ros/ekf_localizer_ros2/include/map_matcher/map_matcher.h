@@ -31,6 +31,7 @@
 #include <Eigen/Dense>
 // #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <fast_gicp/ndt/ndt_cuda.hpp>
+#include "cuda/pointcloud_preprocessor.cuh"
 #include <optional>
 #include <chrono>
 #include <memory>
@@ -85,6 +86,7 @@ private:
 	Eigen::Vector3d local_map_center_ = Eigen::Vector3d::Zero();
 	bool has_local_map_ = false;
 	std::unique_ptr<fast_gicp::NDTCuda<PointType, PointType>> ndt_;
+	std::unique_ptr<ekf_localizer::cuda::PointCloudPreprocessorCUDA> gpu_preprocessor_;
 	// PointCloudTypePtr map_pcl_callback_;
 
 	sensor_msgs::msg::PointCloud2 pc_;
@@ -115,11 +117,16 @@ private:
 	double VOXEL_SIZE_MAP_;
 	double LIMIT_RANGE_;
 	double LIMIT_RANGE_HEIGHT_;
+	double MIN_RANGE_;
+	double MIN_HEIGHT_;
+	bool USE_GROUND_FILTER_;
 	double LOCAL_MAP_UPDATE_DISTANCE_;
 	double TRANS_EPSILON_;
 	double STEP_SIZE_;
 	double RESOLUTION_;
 	double MATCHING_SCORE_TH_;
+	double MAX_TRANSLATION_JUMP_;
+	double MAX_ROTATION_JUMP_DEG_;
 	double MAP_OFFSET_X_;
 	double MAP_OFFSET_Y_;
 	double MAP_OFFSET_Z_;

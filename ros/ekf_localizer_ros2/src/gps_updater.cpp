@@ -6,7 +6,7 @@
 GpsUpdater::GpsUpdater() : Node("GpsUpdater")
 {
     // Parameters declaration
-    this->declare_parameter<std::string>("gps_topic_name", "/fix");
+    this->declare_parameter<std::string>("gps_topic_name", "/um982_node/fix_secondary");
     this->declare_parameter<std::string>("gps_pose_topic_name", "/gps_pose");
     this->declare_parameter<std::string>("map_frame_id", "map");
     this->declare_parameter<double>("gps_origin_lat", 0.0);

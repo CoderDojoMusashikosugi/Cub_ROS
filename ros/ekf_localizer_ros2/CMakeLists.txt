@@ -1,9 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 project(ekf_localizer)
 
-# add_compile_options(-std=c++14 -Wall)
-# add_compile_options(-O2)
-
 if(NOT CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 17)
 endif()
@@ -17,6 +14,10 @@ endif()
 # package.xmlのdependをチェックして自動的にfind_packageしてくれる
 
 # find dependencies
+find_package(CUDA REQUIRED)
+include_directories(${CUDA_INCLUDE_DIRS})
+set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -O3 -arch=sm_87 --expt-relaxed-constexpr")
+
 find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_auto REQUIRED)
 find_package(rclcpp REQUIRED)
@@ -88,6 +89,10 @@ ament_auto_package(
 
 
 
+cuda_add_library(pointcloud_preprocessor_cuda STATIC
+  src/cuda/pointcloud_preprocessor.cu
+)
+
 add_executable(map_matcher_node 
   src/map_matcher.cpp
 )
@@ -111,6 +116,8 @@ ament_target_dependencies(map_matcher_node
 )
 
 target_link_libraries(map_matcher_node
+  pointcloud_preprocessor_cuda
+  ${CUDA_LIBRARIES}
   ${PCL_LIBRARIES}
   ${YAML_CPP_LIBRARIES}
   ${std_msgs_LIBRARIES}

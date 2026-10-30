@@ -1,112 +1,141 @@
 # ekf_localizer_ros2
 
-## Overview
-- ...
+LiDAR（NDT / fast_gicp）、IMU、車輪オドメトリ、および高精度 GNSS（RTK-GPS）を拡張カルマンフィルタ（EKF）により統合する自己位置推定パッケージです。
 
 ## Environment
-- ROS2 humble
-- ...
+- ROS 2 Jazzy / Humble
+- CUDA & GPU環境（fast_gicp / NDTCuda）
+- GeographicLib
 
-### NDT topics
-#### Subscirber
-- /velodyne_points(sensor_msgs/msg/PointCloud2)
-#### Publisher
-- /map_out(sensor_msgs/msg/PointCloud2)
-- /test/ndt_pose(geometry_msgs/msg/PoseStamped)
-- /ndt_pc(sensor_msgs/msg/PointCloud2)
-### EKF topics
-#### Subscirber
-- /odom(nav_msgs/msg/Odometry)
-- /bno055/imu(sensor_msgs/msg/IMU)
-- /test/ndt_pose(geometry_msgs/msg/PoseStamped)
-#### Publisher
-- /test/ekf_pose(geometry_msgs/msg/PoseStamped)
+---
 
-### GPS updater topics
-#### Subscirber
-- /fix(sensor_msgs::msg::NavSatFix)
+## Topic Interface
+
+### map_matcher_node (NDT 点群マッチング)
+#### Subscriber
+- `/velodyne_points` (`sensor_msgs/msg/PointCloud2`): LiDAR点群データ
+- `/test/ekf_pose` (`geometry_msgs/msg/PoseStamped`): NDT探索の初期推定値（init_guess）
 #### Publisher
-- /gps_pose(geometry_msgs::msg::PoseWithCovarianceStamped)
+- `/map_out` (`sensor_msgs/msg/PointCloud2`): 読み込んだ点群地図
+- `/test/ndt_pose` (`geometry_msgs/msg/PoseStamped`): NDT推定位置（ジャンプガード通過後のみ）
+- `/ndt_pc` (`sensor_msgs/msg/PointCloud2`): マッチング後点群
+
+### ekf_localizer_node (拡張カルマンフィルタ)
+#### Subscriber
+- `/odom` (`nav_msgs/msg/Odometry`): 車輪オドメトリ
+- `/imu/data_raw` (`sensor_msgs/msg/Imu`): IMUデータ（TFにより自動でbase_link系へ変換）
+- `/test/ndt_pose` (`geometry_msgs/msg/PoseStamped`): NDT位置測定値
+- `/gps_pose` (`geometry_msgs/msg/PoseWithCovarianceStamped`): 局所平面直交座標系（map系）に変換されたGPS位置
+- `/um982_node/fix` (`sensor_msgs/msg/NavSatFix`): RTK-FIXステータス検証用トピック
+- `/initialpose` (`geometry_msgs/msg/PoseWithCovarianceStamped`): RViz等からの初期位置指定
+#### Publisher
+- `/test/ekf_pose` (`geometry_msgs/msg/PoseStamped`): 推定自己位置（map系）
+
+### gps_updater_node (GNSS 座標変換)
+#### Subscriber
+- `/um982_node/fix` (`sensor_msgs/msg/NavSatFix`): GNSS 受信機データ（UM982等）
+- `/initialpose` (`geometry_msgs/msg/PoseWithCovarianceStamped`): 原点リセット用
+#### Publisher
+- `/gps_pose` (`geometry_msgs/msg/PoseWithCovarianceStamped`): mapフレームでの位置
+
+---
+
+## 主要な安全・安定化機能
+
+### 1. NDT ジャンプガード機能 (`map_matcher.cpp`)
+幾何特徴が薄い場所や旋回時に Levenberg-Marquardt（LM）最適化が局所解に飛び出した場合、初期推定値（`init_guess`）からの乖離量をチェックし、異常値を EKF に渡す前に水際で破棄します。
+- `MAX_TRANSLATION_JUMP`: 許容並進変位（デフォルト: `1.0` [m]）
+- `MAX_ROTATION_JUMP_DEG`: 許容回転変位（デフォルト: `30.0` [deg]）
+- `MATCHING_SCORE_TH`: フィットネススコア上限（`0.25`）
+
+### 2. URDF (TF) 準拠の IMU 座標変換 & フォールバック機能 (`ekf.cpp`)
+IMU が上下逆さま（`cub4.urdf` の `rpy="3.14 0 0"`）や任意の角度でマウントされている場合でも、`base_link` $\leftarrow$ `imu_link` の TF 変換を取得して角速度・加速度ベクトルを自動で `base_link` 座標系に回転変換します。
+- `use_imu_tf: true`: TF による変換を有効化。
+- `imu_yaw_sign: -1.0`: TF がまだ受信できていない場合（rosbag 再生時等）の安全フォールバック、または `use_imu_tf: false` 時の直接符号倍率。TF が未受信でも EKF の角速度積算が停止（フリーズ）せず動作を継続します。
+- `ekf_locali.launch.py` には `robot_state_publisher` が内包されており、単体起動や rosbag 再生時でも `cub4.urdf` に基づく TF が自動配信されます。
+
+### 3. RTK-FIX 限定 GPS リスポーン機能 (`ekf.cpp`)
+NDT の途絶時やドリフト時に、真に高精度な RTK-FIX 状態であるときのみ GPS 座標へのリスポーン（位置復旧）を許可します。
+- `require_rtk_fix_for_respawn: true`: `/um982_node/fix` のステータスが `STATUS_GBAS_FIX`（RTK-FIX）であることを要求
+- `gps_high_confidence_threshold: 0.1` [m]: RTK-Float や単独測位のブレによる誤テレポートを遮断
+
+---
 
 ## Install and Build
-``` bash
+
+```bash
 sudo apt update
 sudo apt install libgeographic-dev geographiclib-tools
-# clone repository
-git clone https://github.com/UNI-shibuya-taku/ekf_localizer_ros2.git
 
-# build
+# ビルド
 cd ~/colcon_ws
-colcon build
+colcon build --packages-select ekf_localizer
+source install/setup.bash
 ```
 
-## How to use
+---
 
-### Configuration
+## Configuration
 
-1. Edit the ekf.yaml files:
-   ```bash
-   cd ekf_localizer_ros2/config
-   vim ekf.yaml
+### 1. `ekf.yaml`
+```yaml
+ekf_localizer_node:
+  ros__parameters:
+    base_link_frame_id: "base_link"
+    map_frame_id: "map"
+    odom_frame_id: "odom"
 
-    # map原点と実際のスタート位置に合わせて調整する(x,y,z,yaw)
+    # IMU設定 (TFによる自動変換 & フォールバック)
+    use_imu_tf: true
+    imu_yaw_sign: -1.0                   # TF未受信時またはuse_imu_tf: false時のヨー角速度符号反転
+    imu_topic_name: "/imu/data_raw"
+
+    # GNSS設定 (RTK-FIX限定リスポーン)
+    navsat_topic_name: "/um982_node/fix"
+    require_rtk_fix_for_respawn: true
+    gps_high_confidence_threshold: 0.1   # [m] RTK-FIX (数cm) のみ許可
+    gps_respawn_enable: true             # リスポーン機能の有効化
+    gps_respawn_distance_threshold: 3.0  # [m] 乖離閾値
+
     # 初期位置設定
     INIT_X: 0.0
     INIT_Y: 0.0
-    INIT_Z: 0.0 
+    INIT_Z: 0.0
     INIT_YAW: 0.0
+```
 
-    # NDTによる推定位置が今までのEKFの推定位置から閾値以上離れていたらNDTの更新を行わない
-    TH_MAHALANOBIS: 3.0
+### 2. `map_matcher.yaml`
+```yaml
+map_matcher_node:
+  ros__parameters:
+    pcd_file_path: "/home/cub/maps/map_tc25_gnss_0_2.pcd"
 
-    # EKFの推定の分散が閾値を超えたら時観測更新を行う
-    TH_COVARIANCE: 1.0 # 変更不要
-    TH_POSE_COVARIANCE: 0.4 # 位置の分散の閾値
-    TH_DIRECTION_COVARIANCE: 0.2 # 方位の分散の閾値
-    GPS_MEASUREMENT_ENABLE: true # true: GPSによる観測更新を行う false: 行わない
-   ```
+    # NDT最適化・ジャンプガード
+    MATCHING_SCORE_TH: 0.25
+    STEP_SIZE: 0.05
+    TRANS_EPSILON: 0.01
+    MAX_TRANSLATION_JUMP: 1.0     # [m]
+    MAX_ROTATION_JUMP_DEG: 30.0   # [deg]
+```
 
-1. Edit the map_matcher.yaml files:
-   ```bash
-   cd ekf_localizer_ros2/config
-   vim map_matcher.yaml
+### 3. `gps_updater.yaml`
+```yaml
+gps_updater:
+  ros__parameters:
+    gps_topic_name: "/um982_node/fix"
+    gps_pose_topic_name: "/gps_pose"
+    map_frame_id: "map"
 
-    # pcdフォルダにmapデータを格納した後、mapデータのpathをmap_matcher.yamlに記載する
-    pcd_file_path: /home/cub/colcon_ws/src/cub/ekf_localizer/pcd/mapkakunin_seg.pcd
-    # NDTのボクセルサイズ(マシンスペックに合わせて調整)
-    VOXEL_SIZE: 0.3
-    VOXEL_SIZE_MAP: 0.2
-   ```
+    use_manual_origin: true
+    gps_origin_lat: 36.082628231
+    gps_origin_lon: 140.076144739
+    gps_origin_alt: 67.078
+```
 
-2. Edit the launch file to update the file paths:
-   ```bash
-   cd ekf_localizer_ros2
-   vim ekf.yaml
-   vim ekf_locali.launch.py
-   ```
+---
 
-   ```python
-   # EKFパラメータ
-    params_ekf = os.path.join(
-        get_package_share_directory('ekf_localizer'),  # パッケージ名
-        'config',  # ディレクトリ名
-        'ekf',  # サブディレクトリ
-        # 'ekf.yaml'  # ファイル名
-        'ekf.yaml'  # ①EKFのyamlファイルを指定
-    )
-    # スキャンマッチングのパラメータ
-    params_map_matcher = os.path.join(
-        get_package_share_directory('ekf_localizer'),  # パッケージ名
-        'config',  # ディレクトリ名
-        'map_matcher',  # サブディレクトリ
-        # 'map_matcher.yaml'  # ファイル名
-        'map.yaml'  # ②スキャンマッチングのファイルを指定
-    )
-   ```
+## Launch
 
-
-### RUN
-``` bash
-# run
+```bash
 ros2 launch ekf_localizer ekf_locali.launch.py
 ```

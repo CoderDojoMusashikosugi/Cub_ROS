@@ -21,12 +21,17 @@ MapMatcher::MapMatcher() : Node("MapMatcher")
 	this->declare_parameter<double>("VOXEL_SIZE_MAP", {0.2});
 	this->declare_parameter<double>("LIMIT_RANGE", {20.0});
 	this->declare_parameter<double>("LIMIT_RANGE_HEIGHT", {20.0});
+	this->declare_parameter<double>("MIN_RANGE", {0.8});
+	this->declare_parameter<double>("MIN_HEIGHT", {-0.15});
+	this->declare_parameter<bool>("USE_GROUND_FILTER", {true});
 	this->declare_parameter<double>("LOCAL_MAP_UPDATE_DISTANCE", {5.0});
 	this->declare_parameter<double>("TRANS_EPSILON", {0.001});
 	this->declare_parameter<double>("STEP_SIZE", {0.1});
 	this->declare_parameter<double>("RESOLUTION", {0.5});
 	this->declare_parameter<double>("MAX_ITERATION", {35.0});
 	this->declare_parameter<double>("MATCHING_SCORE_TH", {0.1});
+	this->declare_parameter<double>("MAX_TRANSLATION_JUMP", {1.0});
+	this->declare_parameter<double>("MAX_ROTATION_JUMP_DEG", {30.0});
 	this->declare_parameter<double>("MAP_OFFSET_X", {0.0});
 	this->declare_parameter<double>("MAP_OFFSET_Y", {0.0});
 	this->declare_parameter<double>("MAP_OFFSET_Z", {0.0});
@@ -49,12 +54,17 @@ MapMatcher::MapMatcher() : Node("MapMatcher")
 	this->get_parameter("VOXEL_SIZE_MAP", VOXEL_SIZE_MAP_);
 	this->get_parameter("LIMIT_RANGE", LIMIT_RANGE_);
 	this->get_parameter("LIMIT_RANGE_HEIGHT", LIMIT_RANGE_HEIGHT_);
+	this->get_parameter("MIN_RANGE", MIN_RANGE_);
+	this->get_parameter("MIN_HEIGHT", MIN_HEIGHT_);
+	this->get_parameter("USE_GROUND_FILTER", USE_GROUND_FILTER_);
 	this->get_parameter("LOCAL_MAP_UPDATE_DISTANCE", LOCAL_MAP_UPDATE_DISTANCE_);
 	this->get_parameter("TRANS_EPSILON", TRANS_EPSILON_);
 	this->get_parameter("STEP_SIZE", STEP_SIZE_);
 	this->get_parameter("RESOLUTION", RESOLUTION_);
 	this->get_parameter("MAX_ITERATION", MAX_ITERATION_);
 	this->get_parameter("MATCHING_SCORE_TH", MATCHING_SCORE_TH_);
+	this->get_parameter("MAX_TRANSLATION_JUMP", MAX_TRANSLATION_JUMP_);
+	this->get_parameter("MAX_ROTATION_JUMP_DEG", MAX_ROTATION_JUMP_DEG_);
 	this->get_parameter("MAP_OFFSET_X", MAP_OFFSET_X_);
 	this->get_parameter("MAP_OFFSET_Y", MAP_OFFSET_Y_);
 	this->get_parameter("MAP_OFFSET_Z", MAP_OFFSET_Z_);
@@ -97,6 +107,8 @@ MapMatcher::MapMatcher() : Node("MapMatcher")
 	ndt_->setResolution(RESOLUTION_);
 	ndt_->setMaximumIterations(static_cast<int>(MAX_ITERATION_));
 	ndt_->setNeighborSearchMethod(fast_gicp::NeighborSearchMethod::DIRECT7);
+
+	gpu_preprocessor_ = std::make_unique<ekf_localizer::cuda::PointCloudPreprocessorCUDA>();
 }
 
 MapMatcher::~MapMatcher(){}
@@ -104,34 +116,37 @@ MapMatcher::~MapMatcher(){}
 
 void MapMatcher::pc_callback(const sensor_msgs::msg::PointCloud2::ConstSharedPtr& msg)
 {
-
 	if(has_read_map_ && has_received_ekf_pose_){
 		pc_time_ = msg->header.stamp;
 		pc_ = *msg;
-		PointCloudTypePtr raw_current_pcl(new PointCloudType);
-		pcl::fromROSMsg(*msg, *raw_current_pcl);
+		PointCloudType raw_current_pcl;
+		pcl::fromROSMsg(*msg, raw_current_pcl);
 
-		// downsampling
-		if(VOXEL_SIZE_ > 0) downsample_pcl(raw_current_pcl, current_pcl_, VOXEL_SIZE_);
-		else current_pcl_ = raw_current_pcl;
-		current_pcl_->is_dense = false;
-		current_pcl_->width = current_pcl_->size();
 		// offset
+		Eigen::Matrix4f transform = Eigen::Matrix4f::Identity();
 		if(is_pcl_offset_){
 			geometry_msgs::msg::TransformStamped transform_stamped;
 			try{
-				// lookupTransform("変換のベースとなる座標系","変更したい対象の座標系",変更したい時間(過去データを扱う場合は注意が必要))
-				// transform_stamped = tfBuffer_->lookupTransform("base_link", msg->header.frame_id, msg->header.stamp); //座標系の変換 
 				transform_stamped = tfBuffer_->lookupTransform("base_link", msg->header.frame_id, tf2::TimePointZero);
 			}
 			catch(tf2::TransformException& ex){
-				// ROS_WARN("%s", ex.what());
 				return;
 			}	
-			Eigen::Matrix4f transform = tf2::transformToEigen(transform_stamped.transform).matrix().cast<float>();
-			pcl::transformPointCloud(*current_pcl_, *current_pcl_, transform);
+			transform = tf2::transformToEigen(transform_stamped.transform).matrix().cast<float>();
 		}
-		// has_received_pc_ = true;
+
+		// GPU前処理: 範囲フィルタ(LIMIT_RANGE)、自車体・地面カット(MIN_RANGE, MIN_HEIGHT)、座標変換(TF)、ボクセルグリッド(VOXEL_SIZE)をGPUで一括実行
+		float min_h = USE_GROUND_FILTER_ ? static_cast<float>(MIN_HEIGHT_) : -999.0f;
+		float min_r = static_cast<float>(MIN_RANGE_);
+		gpu_preprocessor_->process(
+			raw_current_pcl,
+			transform,
+			static_cast<float>(LIMIT_RANGE_),
+			static_cast<float>(LIMIT_RANGE_HEIGHT_),
+			static_cast<float>(VOXEL_SIZE_),
+			*current_pcl_,
+			min_r,
+			min_h);
 
 		matching(map_pcl_, current_pcl_);
 		has_received_ekf_pose_ = false;
@@ -228,22 +243,14 @@ void MapMatcher::downsample_pcl(pcl::PointCloud<pcl::PointXYZI>::Ptr input_pcl,p
 
 void MapMatcher::matching(pcl::PointCloud<pcl::PointXYZI>::Ptr map_pcl,pcl::PointCloud<pcl::PointXYZI>::Ptr local_pcl)
 {
-	// passthrough
-	PointCloudTypePtr current_local_pcl(new PointCloudType);
 	// 地図の切り出しは、前回の切り出し中心から一定距離動いた時だけ行う
 	update_local_map_if_needed(ekf_pose_.pose.position.x, ekf_pose_.pose.position.y, ekf_pose_.pose.position.z);
-	set_pcl(current_pcl_,current_local_pcl,0.0,0.0,0.0);
-	// std::cout << "cur_local_pcl_ size: " << current_local_pcl->points.size() << std::endl;
 
-	if(!map_local_pcl_ || map_local_pcl_->points.empty() || current_local_pcl->points.empty()){
+	if(!map_local_pcl_ || map_local_pcl_->points.empty() || local_pcl->points.empty()){
 		if(!map_local_pcl_ || map_local_pcl_->points.empty()) std::cout << "map_local_pcl is empty" << std::endl;
-		if(current_local_pcl->points.empty()) std::cout << "current_local_pcl is empty" << std::endl;
+		if(local_pcl->points.empty()) std::cout << "current_local_pcl is empty" << std::endl;
 		return;
 	}
-	// if(current_local_pcl->points.size() > map_local_pcl->points.size()){
-	// 	std::cout << "local clouds > map clouds" << std::endl;
-	// 	return;
-	// }
 
 	// initialize
 	Eigen::AngleAxisf init_rotation(msg_to_quat_eigen(ekf_pose_.pose.orientation));
@@ -253,10 +260,9 @@ void MapMatcher::matching(pcl::PointCloud<pcl::PointXYZI>::Ptr map_pcl,pcl::Poin
 
 	// align
 	PointCloudTypePtr ndt_pcl(new PointCloudType);
-	// pclomp::NormalDistributionsTransform<pcl::PointXYZI, pcl::PointXYZI> ndt;
 	// NDTCudaはコンストラクタで生成済み。ターゲットはupdate_local_map_if_needed()で更新時のみ設定される
 	fast_gicp::NDTCuda<pcl::PointXYZI, pcl::PointXYZI>& ndt = *ndt_;
-	ndt.setInputSource(current_local_pcl);
+	ndt.setInputSource(local_pcl);
 	// ndt.setNumThreads(std::thread::hardware_concurrency()/2);
   	// ndt.setNeighborhoodSearchMethod(pclomp::DIRECT7);
 	// NDTCuda uses CUDA for acceleration, no need for thread settings
@@ -285,6 +291,25 @@ void MapMatcher::matching(pcl::PointCloud<pcl::PointXYZI>::Ptr map_pcl,pcl::Poin
 			std::cout << "Translation is Zero " << std::endl;
 			return;
 		}
+
+		// ジャンプガード（init_guessからの乖離チェック）
+		Eigen::Vector3f init_pos = init_guess.block<3, 1>(0, 3);
+		Eigen::Vector3f ndt_pos = translation.block<3, 1>(0, 3);
+		double trans_diff = (ndt_pos - init_pos).norm();
+
+		Eigen::Matrix3f init_rot = init_guess.block<3, 3>(0, 0);
+		Eigen::Matrix3f ndt_rot = translation.block<3, 3>(0, 0);
+		Eigen::Matrix3f rel_rot = init_rot.transpose() * ndt_rot;
+		Eigen::AngleAxisf rel_angle_axis(rel_rot);
+		double rot_diff_deg = std::abs(rel_angle_axis.angle()) * 180.0 / M_PI;
+
+		if(trans_diff > MAX_TRANSLATION_JUMP_ || rot_diff_deg > MAX_ROTATION_JUMP_DEG_){
+			std::cout << "[WARN] NDT Jump rejected! Trans diff: " << trans_diff
+			          << " m (limit: " << MAX_TRANSLATION_JUMP_ << " m), Rot diff: "
+			          << rot_diff_deg << " deg (limit: " << MAX_ROTATION_JUMP_DEG_ << " deg)" << std::endl;
+			return;
+		}
+
 		Eigen::Quaternionf quaternion(Eigen::Matrix3f(translation.block(0,0,3,3)));
 		quaternion.normalize();
 

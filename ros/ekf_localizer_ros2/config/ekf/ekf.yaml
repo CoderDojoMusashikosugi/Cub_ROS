@@ -14,6 +14,9 @@ ekf_localizer_node:
     odom_frame_id: "odom"
     base_link_frame_id: "base_link"
     
+    use_imu_tf: true                  # true: URDF(TF)に基づきIMUの軸をbase_link座標系に変換 (TF未受信時はimu_yaw_signでフォールバック)
+    imu_yaw_sign: -1.0                # TF未受信時、またはuse_imu_tf: false時のヨー角速度の符号倍率 (-1.0: 反転, 1.0: そのまま)
+    imu_topic_name: "/imu/data_raw"   # Spresense IMUトピック
     GPS_MEASUREMENT_ENABLE: true      # GPS測定更新を有効化
     NDT_MEASUREMENT_ENABLE: true      # NDT測定更新を有効化
     is_odom_tf: false
@@ -22,13 +25,13 @@ ekf_localizer_node:
     gps_respawn_enable: true  # true: 有効, false: 無効
     
     # EKF Initial pose
-    INIT_X: 0.0
-    INIT_Y: 0.0
+    INIT_X: 62.2
+    INIT_Y: 28.9
     INIT_Z: 0.0
     INIT_ROLL: 0.0
     INIT_PITCH: 0.0
-    INIT_YAW: 0.0
-    INIT_SIGMA: 0.001
+    INIT_YAW: 3.01
+    INIT_SIGMA: 0.2
     
     # Sensor noise parameters
     SIGMA_IMU: 0.01
@@ -43,7 +46,7 @@ ekf_localizer_node:
     MOTION_NOISE_OO: 0.01
     
     # Mahalanobis distance and covariance thresholds
-    TH_MAHALANOBIS: 1.2
+    TH_MAHALANOBIS: 5.0
     TH_COVARIANCE: 1.0
     TH_POSE_COVARIANCE: 1.0
     TH_DIRECTION_COVARIANCE: 0.5
@@ -57,11 +60,12 @@ ekf_localizer_node:
     # ========================================
     # GPS高精度リスポーン機能のパラメータ
     # ========================================
+    navsat_topic_name: "/um982_node/fix"
+    require_rtk_fix_for_respawn: false   # true: RTK-FIX受信時のみリスポーンを許可
     
     # GPS高精度判定の閾値
-    # RTK-FIXなど高精度GPSの場合は1.0m以下に設定
-    # 通常のGPS（単独測位）の場合は5.0m程度に設定
-    gps_high_confidence_threshold: 1.0  # [m] 水平標準偏差がこの値未満で高精度と判定
+    # RTK-FIXの場合は0.1m以下に設定（RTK-Floatや単独測位のブレを確実に排除）
+    gps_high_confidence_threshold: 0.1  # [m] 水平標準偏差がこの値未満で高精度と判定
     
     # リスポーン判定に必要な連続高品質GPS受信回数
     # この回数連続で高精度GPSを受信したらリスポーンを実行

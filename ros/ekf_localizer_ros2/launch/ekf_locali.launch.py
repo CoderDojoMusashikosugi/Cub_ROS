@@ -44,7 +44,7 @@ def generate_launch_description():
             executable='ekf_localizer_node',
             name='ekf_localizer_node',
             parameters=[params_ekf],
-            remappings=[('/bno055/imu', '/imu/data'),
+            remappings=[('/bno055/imu', '/imu/data_raw'),
                                 ],
             # output='screen',  # 標準出力を表示するように設定
         ),

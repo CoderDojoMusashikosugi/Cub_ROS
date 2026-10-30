@@ -20,6 +20,11 @@ map_matcher_node:
     # 値の距離以内の点群を処理する(m)
     LIMIT_RANGE: 25.0
     LIMIT_RANGE_HEIGHT: 30.0
+    # 自車体点群カット（base_link中心からの水平最小距離 m）
+    MIN_RANGE: 1.0
+    # 地面除去フィルタ（base_link基準でMIN_HEIGHT未満の点群を除去）
+    USE_GROUND_FILTER: false
+    MIN_HEIGHT: -0.15
     # 前回地図を切り出した位置からこの距離(m)以上動いたら地図を切り出し直す
     # 切り出し範囲は LIMIT_RANGE + この値 になる
     LOCAL_MAP_UPDATE_DISTANCE: 5.0
@@ -32,9 +37,13 @@ map_matcher_node:
     # Matching Parameters # 基本ノータッチで大丈夫です
     TRANS_EPSILON: 0.001
     STEP_SIZE: 0.1
-    # RESOLUTION: 0.1
+    # RESOLUTION: NDTのボクセル解像度 (0.5m: シャープなエッジで高精度, 1.0m: 大まかなマッチング)
     RESOLUTION: 1.5
     MAX_ITERATION: 30.0 # 最適化計算を最大何回繰り返すか
+
+    # ジャンプガード（init_guessからの最大許容乖離量）
+    MAX_TRANSLATION_JUMP: 10.0     # [m] 並進方向の許容乖離量
+    MAX_ROTATION_JUMP_DEG: 90.0   # [deg] 回転方向の許容乖離量
 
 
     # Map Offset
