@@ -1,0 +1,34 @@
+{
+  "glim_ros": {
+    "enable_local_mapping": true,
+    "enable_global_mapping": true,
+    "keep_raw_points": false,
+    "imu_time_offset": 0.0,
+    "points_time_offset": 0.0,
+    "acc_scale": 9.80665,
+    "imu_frame_id": "livox_imu",
+    "lidar_frame_id": "livox_frame",
+    "base_frame_id": "livox_imu",
+    "odom_frame_id": "odom",
+    "map_frame_id": "map",
+    "publish_imu2lidar": true,
+    "tf_time_offset": 1e-06,
+    "extension_modules": [
+      "libmemory_monitor.so"
+    ],
+    "imu_topic": "/livox/livox/imu",
+    "points_topic": "/livox/livox/lidar",
+    "image_topic": "/glim/unused_image",
+    "imu_qos": {
+      "profile": "sensor_data",
+      "depth": 1000
+    },
+    "points_qos": {
+      "profile": "sensor_data"
+    },
+    "image_qos": {
+      "profile": "sensor_data"
+    },
+    "playback_speed": 100.0
+  }
+}

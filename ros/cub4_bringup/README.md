@@ -1,10 +1,25 @@
 # cub4_bringup
 
+## MID360 + 内蔵IMUのrosbagからGLIM地図を生成
+
+設定一式は[`config/glim_params_mid360`](config/glim_params_mid360/README.md)です。
+MID360の点群と内蔵IMU、サブアンテナのRTK FIXを使用します。
+GNSS原点・ジオイド補正・二段階処理はVelodyne版と共通です。
+
+```bash
+./docker/run_in_container.sh 'cbs cub4_bringup'
+./docker/run_in_container.sh 'ros2 launch cub4_bringup glim_mid360.launch.py rosbag:=/home/cub/rosbag2_2026_10_17-15_09_06_no_images'
+```
+
+出力は`~/maps/<bag名>_glim_mid360_<日時>/`です。先頭180秒だけ確認する場合は
+`playback_duration:=180`、GNSSを使わない場合は`enable_gnss:=false`を追加してください。
+
 ## Velodyne + IMU の rosbag から GLIM 地図を生成
 
 CUDA対応の `glim_ros` と MCAP storage plugin を導入したコンテナで実行します。
 設定は [`config/glim_params_velodyne`](config/glim_params_velodyne/README.md) にあります。
-`/velodyne_points` と `/imu/data_raw` のみを読み込み、Livoxは使用しません。
+点群とIMUは`/velodyne_points` と `/imu/data_raw`を使用します。
+既定ではサブアンテナRTK FIXも統合し、`enable_gnss:=false`で無効化できます。
 
 ホストのプロジェクトルートから:
 
