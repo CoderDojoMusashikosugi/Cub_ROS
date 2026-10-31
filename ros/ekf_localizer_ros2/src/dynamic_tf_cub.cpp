@@ -5,8 +5,13 @@ DynamicTfCub::DynamicTfCub() : Node("DynamicTFCub")
     declare_parameter<std::string>("odom_frame_id", "odom");
     declare_parameter<std::string>("map_frame_id", "map");
     declare_parameter<bool>("odom_tf_enable", false);  // true: map->odom->base_link, false: map->base_link
+    declare_parameter<double>("tf_rate", 50.0);
 
     odom_tf_enable_ = this->get_parameter("odom_tf_enable").as_bool();
+    double tf_rate = this->get_parameter("tf_rate").as_double();
+    if (tf_rate <= 0.0) {
+        tf_rate = 50.0;
+    }
 
     /*subscriber*/
     // sub_current_pose = nh.subscribe("/ekf_pose", 10, &DynamicTfCub::current_pose_callback, this);
@@ -28,6 +33,11 @@ DynamicTfCub::DynamicTfCub() : Node("DynamicTFCub")
     // dynamic_br_ = std::make_shared<tf2_ros::TransformBroadcaster>(*tfBuffer_);
     dynamic_br_ = std::make_shared<tf2_ros::TransformBroadcaster>(this);
 
+    auto period = std::chrono::duration<double>(1.0 / tf_rate);
+    timer_ = this->create_wall_timer(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(period),
+        std::bind(&DynamicTfCub::process, this));
+
     RCLCPP_INFO(this->get_logger(), "done setting TF");
 }
 DynamicTfCub::~DynamicTfCub(){}
@@ -35,6 +45,7 @@ void DynamicTfCub::current_pose_callback(const geometry_msgs::msg::PoseStamped::
 {
     // RCLCPP_INFO(this->get_logger(), "Received EKF Pose");
     current_pose = *msg;
+    has_received_current_pose_ = true;
     
     // pub_static_tf();
 }
@@ -116,6 +127,9 @@ void DynamicTfCub::pub_dynamic_tf()
 
 void DynamicTfCub::process()
 {
+    if (!has_received_current_pose_) {
+        return;
+    }
     if (odom_tf_enable_) {
         pub_dynamic_tf();  // map -> odom
     } else {
@@ -128,11 +142,7 @@ int main (int argc,char **argv)
     // ros::init(argc, argv, "dynamic_tf_cub");
     rclcpp::init(argc, argv); // ノードの初期化
     auto node = std::make_shared<DynamicTfCub>();
-    // DynamicTfCub dynamic_tf_cub;
-	while(rclcpp::ok()){
-        node->process();
-		rclcpp::spin_some(node);
-	}
-    // rclcpp::spin(node);
+    rclcpp::spin(node);
+    rclcpp::shutdown();
     return 0;
 }

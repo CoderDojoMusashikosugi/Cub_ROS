@@ -31,8 +31,9 @@
 #include <Eigen/Dense>
 // #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <fast_gicp/ndt/ndt_cuda.hpp>
-#include <pclomp/ndt_omp.h>
 #include <optional>
+#include <chrono>
+#include <memory>
 
 
 class MapMatcher : public rclcpp::Node
@@ -56,6 +57,8 @@ private:
  	void init_map();
 
 	void set_pcl(pcl::PointCloud<pcl::PointXYZI>::Ptr input_pcl, pcl::PointCloud<pcl::PointXYZI>::Ptr& output_pcl, double x, double y, double z);
+	void crop_local_map(const PointCloudTypePtr& input_pcl, PointCloudTypePtr& output_pcl, double x, double y, double z, double range_xy, double range_z);
+	bool update_local_map_if_needed(double x, double y, double z);
 	void downsample_pcl(pcl::PointCloud<pcl::PointXYZI>::Ptr input_pcl, pcl::PointCloud<pcl::PointXYZI>::Ptr& output_pcl, double voxel_size);
 	void matching(pcl::PointCloud<pcl::PointXYZI>::Ptr map_pcl, pcl::PointCloud<pcl::PointXYZI>::Ptr local_pcl);
 
@@ -76,6 +79,12 @@ private:
     std::shared_ptr<tf2_ros::TransformListener> tfListener_;
 	PointCloudTypePtr map_pcl_;
 	PointCloudTypePtr current_pcl_;
+
+	// 切り出し済みのローカル地図とNDTCuda(毎フレーム作り直さないようメンバで保持)
+	PointCloudTypePtr map_local_pcl_;
+	Eigen::Vector3d local_map_center_ = Eigen::Vector3d::Zero();
+	bool has_local_map_ = false;
+	std::unique_ptr<fast_gicp::NDTCuda<PointType, PointType>> ndt_;
 	// PointCloudTypePtr map_pcl_callback_;
 
 	sensor_msgs::msg::PointCloud2 pc_;
@@ -106,6 +115,7 @@ private:
 	double VOXEL_SIZE_MAP_;
 	double LIMIT_RANGE_;
 	double LIMIT_RANGE_HEIGHT_;
+	double LOCAL_MAP_UPDATE_DISTANCE_;
 	double TRANS_EPSILON_;
 	double STEP_SIZE_;
 	double RESOLUTION_;
