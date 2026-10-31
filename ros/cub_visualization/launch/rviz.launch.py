@@ -1,5 +1,5 @@
 from launch import LaunchDescription
-from launch_ros.actions import Node
+from launch_ros.actions import Node, SetParameter
 from launch.actions import ExecuteProcess
 from launch.actions import RegisterEventHandler
 from launch.event_handlers import OnShutdown
@@ -18,11 +18,21 @@ def kill_rviz2(event, context):
 def generate_launch_description():
     rviz_config_file = PathJoinSubstitution([FindPackageShare('cub_visualization'), 'config', 'cub.rviz'])
 
+    use_sim_time = LaunchConfiguration('use_sim_time')
+    declare_use_sim_time = DeclareLaunchArgument(
+        'use_sim_time',
+        default_value='false',
+        description='Use simulation (Gazebo / rosbag) clock if true'
+    )
+
     return LaunchDescription([
+        declare_use_sim_time,
+        SetParameter(name='use_sim_time', value=use_sim_time),
         Node( # rviz2 ローカル起動用
             package='rviz2',
             executable='rviz2',
             arguments=['-d', rviz_config_file],
+            parameters=[{'use_sim_time': use_sim_time}],
             output='screen',
         ),
     ])
