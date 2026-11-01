@@ -1,0 +1,35 @@
+{
+  "configurations": [
+    {
+      "browse": {
+        "databaseFilename": "${default}",
+        "limitSymbolsToIncludedHeaders": false
+      },
+      "includePath": [
+        "/home/cub/colcon_ws/install/ekf_localizer/include/**",
+        "/home/cub/colcon_ws/install/ndt_omp/include/**",
+        "/home/cub/colcon_ws/install/livox_ros_driver2/include/**",
+        "/home/cub/colcon_ws/install/fast_gicp/include/**",
+        "/home/cub/colcon_ws/install/cub_mapping/include/**",
+        "/home/cub/colcon_ws/install/cub_behavior_tree/include/**",
+        "/prebuilt_ws/install/micro_ros_agent/include/**",
+        "/prebuilt_ws/install/micro_ros_msgs/include/**",
+        "/opt/ros/jazzy/include/**",
+        "/home/cub/colcon_ws/src/cub/cub_behavior_tree/include/**",
+        "/home/cub/colcon_ws/src/cub/cub_bringup/include/**",
+        "/home/cub/colcon_ws/src/cub/cub_commander/include/**",
+        "/home/cub/colcon_ws/src/cub/cub_mapping/include/**",
+        "/home/cub/colcon_ws/src/cub/ekf_localizer_ros2/include/**",
+        "/home/cub/colcon_ws/src/cub/fast_gicp/include/**",
+        "/home/cub/colcon_ws/src/cub/ndt_omp/include/**",
+        "/usr/include/**"
+      ],
+      "name": "ROS",
+      "intelliSenseMode": "gcc-arm64",
+      "compilerPath": "/usr/bin/gcc",
+      "cStandard": "gnu11",
+      "cppStandard": "c++14"
+    }
+  ],
+  "version": 4
+}

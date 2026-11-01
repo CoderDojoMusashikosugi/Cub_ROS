@@ -15,11 +15,20 @@ import yaml
 import os
 
 def generate_launch_description():
-    micro_ros_agent = Node(
+    micro_ros_agent_wheel = Node(
         package='micro_ros_agent',
         executable='micro_ros_agent',
-        name='micro_ros_agent',
+        name='micro_ros_agent_wheel',
         arguments=["serial", "--dev", "/dev/ttyATOM", "-b", "115200", "-v6"]
+    )
+
+    # M5Dial: USB NCM上のUDPで接続。シリアル用Agentとは別プロセス。
+    micro_ros_agent_dial = Node(
+        package='micro_ros_agent',
+        executable='micro_ros_agent',
+        name='micro_ros_agent_dial',
+        arguments=["udp4", "--port", "8888", "-v4"],
+        output='screen',
     )
 
     spresense_imu = Node(
@@ -125,25 +134,28 @@ def generate_launch_description():
     # Launchファイルの返り値
     return LaunchDescription([
         # タイヤ
-        micro_ros_agent,
+        micro_ros_agent_wheel,
         
+        # M5Dial
+        micro_ros_agent_dial,
+
         # spresense IMUノード
         spresense_imu,
         
         # 手動操縦
-        cub_commander,        
-        joy_linux,
+        # cub_commander,        
+        # joy_linux,
 
         # OAK-D camera
-        oak_d_launch,
+        # oak_d_launch,
 
         # Livox
-        livox_group,
+        # livox_group,
 
         # GNSS
         um982,
 
         # 3D LiDAR -> commmon.launch.pyでの起動に移動
-        velodyne_driver_node,
-        velodyne_transform_node,
+        # velodyne_driver_node,
+        # velodyne_transform_node,
     ])

@@ -1,0 +1,32 @@
+{
+    "python.autoComplete.extraPaths": [
+        "/home/cub/colcon_ws/install/perception/lib/python3.12/site-packages",
+        "/home/cub/colcon_ws/install/livox_ros_driver2/lib/python3.12/site-packages",
+        "/home/cub/colcon_ws/build/cub_um982",
+        "/home/cub/colcon_ws/install/cub_um982/lib/python3.12/site-packages",
+        "/home/cub/colcon_ws/install/cub_mapping/lib/python3.12/site-packages",
+        "/home/cub/colcon_ws/install/cub_behavior_tree/lib/python3.12/site-packages",
+        "/prebuilt_ws/install/micro_ros_msgs/lib/python3.12/site-packages",
+        "/opt/ros/jazzy/opt/gz_sim_vendor/lib/python",
+        "/opt/ros/jazzy/opt/sdformat_vendor/lib/python",
+        "/opt/ros/jazzy/opt/gz_transport_vendor/lib/python",
+        "/opt/ros/jazzy/opt/gz_msgs_vendor/lib/python",
+        "/opt/ros/jazzy/opt/gz_math_vendor/lib/python",
+        "/opt/ros/jazzy/lib/python3.12/site-packages"
+    ],
+    "python.analysis.extraPaths": [
+        "/home/cub/colcon_ws/install/perception/lib/python3.12/site-packages",
+        "/home/cub/colcon_ws/install/livox_ros_driver2/lib/python3.12/site-packages",
+        "/home/cub/colcon_ws/build/cub_um982",
+        "/home/cub/colcon_ws/install/cub_um982/lib/python3.12/site-packages",
+        "/home/cub/colcon_ws/install/cub_mapping/lib/python3.12/site-packages",
+        "/home/cub/colcon_ws/install/cub_behavior_tree/lib/python3.12/site-packages",
+        "/prebuilt_ws/install/micro_ros_msgs/lib/python3.12/site-packages",
+        "/opt/ros/jazzy/opt/gz_sim_vendor/lib/python",
+        "/opt/ros/jazzy/opt/sdformat_vendor/lib/python",
+        "/opt/ros/jazzy/opt/gz_transport_vendor/lib/python",
+        "/opt/ros/jazzy/opt/gz_msgs_vendor/lib/python",
+        "/opt/ros/jazzy/opt/gz_math_vendor/lib/python",
+        "/opt/ros/jazzy/lib/python3.12/site-packages"
+    ]
+}
