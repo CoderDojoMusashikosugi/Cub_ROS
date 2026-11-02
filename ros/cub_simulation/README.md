@@ -3,8 +3,7 @@
 `simulation:=none`（既定）は実機、`simulation:=godot`はGodot接続を選びます。
 
 ```bash
-# ホストで実行。ros2コマンドはコンテナ内。
-./docker/run_in_container.sh ros2 launch cub_bringup simulation.launch.py simulation:=godot
+ros2 launch cub_bringup simulation.launch.py simulation:=godot
 ```
 
 このlaunchは実機の`launch_at_boot.launch.py`の代わりに起動します。`common.launch.py`は必要な場合だけ別途`simulation:=godot`を付けて起動します。実機起動は従来のlaunchを使います。`simulation:=none`のsimulation launchは案内を出して終了し、実機ドライバーを勝手に起動しません。
@@ -38,14 +37,38 @@ Node(
 
 ノードを追加・削除するときは、そのlaunch内で起動条件を決めるだけです。別のYAMLにノード一覧を追記する必要はありません。新しいシミュレーターに対応するときは、該当launchの`simulation`引数の`choices`と、必要なノードの条件・接続設定を更新します。現在の対応値は`none`と`godot`で、未知の値はROS launchの引数検証で拒否します。
 
+### 共通ノード（URDF / robot_state_publisher 等）の起動
+
 `common.launch.py simulation:=none`は従来の`CUB_TARGET`を使い、`godot`はCub4を選びます。`use_sim_time`は独立した時計の選択で、今回のGodot接続は`false`です。
 
-`localization.launch.py simulation:=godot`は実機用EKFの代わりに`odom_to_tf`で`odom -> base_link`を出し、`map -> odom`の静的TFと合わせて`map -> odom -> base_link -> velodyne`を構成します。`navigation.launch.py simulation:=godot`は実機と同じく`map:=<path>`引数で地図ファイルを受け取り、Godotの`/scan`と`/odom`を使ってNav2を動かします。Godot空間に対応する地図は`cub_simulation/maps/cub_playground_v1/map.yaml`にあります。
+```bash
+# 実機
+ros2 launch cub_bringup common.launch.py simulation:=none
+
+# Godotシミュレーション (Cub4)
+ros2 launch cub_bringup common.launch.py simulation:=godot
+```
+
+### 自己位置推定の起動
+
+`localization.launch.py simulation:=godot`は実機用EKFの代わりに`odom_to_tf`で`odom -> base_link`を出し、`map -> odom`の静的TFと合わせて`map -> odom -> base_link -> velodyne`を構成します（内部で`common.launch.py`も起動されます）。
+
+```bash
+ros2 launch cub_bringup localization.launch.py simulation:=godot
+```
+
+### 自律移動 (Nav2) の起動
+
+`navigation.launch.py simulation:=godot`は実機と同じく`map:=<path>`引数で地図ファイルを受け取り、Godotの`/scan`と`/odom`を使ってNav2を動かします。Godot空間に対応する地図は`cub_simulation/maps/cub_playground_v1/map.yaml`にあります（内部で`localization.launch.py`も起動されます）。
+
+```bash
+ros2 launch cub_bringup navigation.launch.py simulation:=godot map:=/home/cub/colcon_ws/src/cub/cub_simulation/maps/cub_playground_v1/map.yaml
+```
 
 ## テスト
 
 ```bash
-./docker/run_in_container.sh 'python3 -m pytest /home/cub/colcon_ws/src/cub/cub_simulation/test -q'
+python3 -m pytest /home/cub/colcon_ws/src/cub/cub_simulation/test -q
 ```
 
 実launchのノードごとの条件判定・コミット済みC++ commanderの速度生成、手動ゼロ指令、手動解除後の自律指令受け付け、Joyの1秒途絶での自律復帰、自律指令の3秒途絶での停止を検証します。commanderのテストはROS_DOMAIN_ID=172を使い、作成したプロセスを終了時に片付けます。
