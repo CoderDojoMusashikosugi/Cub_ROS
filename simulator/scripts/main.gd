@@ -7,10 +7,14 @@ const CameraScript = preload("res://scripts/camera_rig.gd")
 const HudScript = preload("res://scripts/hud.gd")
 const RosBridgeScript = preload("res://scripts/ros/ros_bridge.gd")
 const JoyInputScript = preload("res://scripts/ros/joy_input.gd")
+const LidarScript = preload("res://scripts/ros/lidar.gd")
+const OdomScript = preload("res://scripts/ros/odom.gd")
 const CAMERA_MODES := {"tps": 0, "3d": 1, "orbit": 1, "2d": 2, "top": 2}
 
 var ros_bridge: Node
 var joy_input = JoyInputScript.new()
+var lidar = LidarScript.new()
+var odom = OdomScript.new()
 var session: Node
 var world: Node3D
 var camera_rig: Node3D
@@ -19,6 +23,7 @@ var actors: Dictionary = {}
 var options: Dictionary = {}
 var _has_focus := true
 var _publish_elapsed := 0.0
+var _scan_elapsed := 0.0
 var _simulation_time := 0.0
 var _hud_elapsed := 0.0
 var _target_id := 0
@@ -102,8 +107,15 @@ func _physics_process(delta: float) -> void:
 		_publish_elapsed = fmod(_publish_elapsed, 0.05)
 		if session.is_host:
 			ros_bridge.send_joy(joy_input.sample())
+			if actors.has(1):
+				ros_bridge.send_odom(odom.sample(actors[1]))
 		if actors.has(id):
 			session.publish_pose(id, actors[id].position, actors[id].rotation.y, _simulation_time)
+	if session.is_host and actors.has(1):
+		_scan_elapsed += delta
+		if _scan_elapsed >= lidar.SCAN_INTERVAL:
+			_scan_elapsed = fmod(_scan_elapsed, lidar.SCAN_INTERVAL)
+			ros_bridge.send_scan(lidar.sample(actors[1], actors))
 
 
 func _process(delta: float) -> void:
@@ -255,7 +267,10 @@ func _reset() -> void:
 		actor.queue_free()
 	actors.clear()
 	_publish_elapsed = 0.0
+	_scan_elapsed = 0.0
 	_simulation_time = 0.0
+	lidar.last_scan = {}
+	odom.last_odom = {}
 	_refresh_session()
 
 

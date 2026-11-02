@@ -217,7 +217,7 @@ public:
 
   static BT::PortsList providedPorts()
   {
-    return {
+    return providedBasicPorts({
       BT::InputPort<geometry_msgs::msg::PoseStamped>("goal", "Navigation goal pose"),
       BT::InputPort<std::string>("scan_topic", std::string("/scan"), "LaserScan topic"),
       BT::InputPort<double>("max_offset_deg", 25.0, "Allowed heading offset (deg) from goal direction"),
@@ -226,7 +226,7 @@ public:
       BT::InputPort<std::string>("robot_frame", std::string("base_link"), "Robot base TF frame"),
       BT::InputPort<double>("standoff_distance", 0.5, "Distance to stay in front of the detected object (m)"),
       BT::OutputPort<geometry_msgs::msg::PoseStamped>("target", "Selected target pose in map frame")
-    };
+    });
   }
 
   void on_tick() override

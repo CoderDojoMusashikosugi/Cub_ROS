@@ -12,6 +12,8 @@
 ## インターフェース
 
 - Godot → `/joy` (`sensor_msgs/msg/Joy`)：既存Linux DualSenseの8軸・14ボタン形式、20 Hz。入力元は接続した認識済みコントローラー、未接続時はキーボードへ自動切り替え。WASD/SpaceまたはコントローラーのL1/L2が押されている間だけ手動、無操作時は自律指令を使用。フォーカス喪失による手動停止は行いません。
+- Godot → `/scan` (`sensor_msgs/msg/LaserScan`)：ホストで計算する360度・360本・10 Hzの簡易2D LiDAR。位置と`frame_id`は`cub4.urdf`の`base_to_velodyne`（`velodyne`、`base_link`から高さ0.2492 m）を使用。壁・箱・他のロボット・通行人・コーンのセンサー用形状を検出し、床・坂道・階段・凹凸地形を除外します。
+- Godot → `/odom` (`nav_msgs/msg/Odometry`)：主ロボットのシミュレータ座標（Godot空間の真値姿勢・速度）をROS座標系（`odom -> base_link`）へ変換して20 Hzで配信。`header.stamp`は省略し、ROS側のrosbridgeがROS時刻を補完します。
 - `/joy` → `cub_commander` → `/cmd_vel_atom` (`geometry_msgs/msg/Twist`) → Godot。
 - 自律ノードは既存と同じ`/cmd_vel`へ送信。Godotは`linear.x`と`angular.z`だけを運動に使います。既存の`angular.y`の操作元フラグを回転へ適用しません。
 - Godot URLの既定値は`ws://127.0.0.1:9090`。launchの`address`・`port`で待ち受けを変更できます。VNCのポート公開を変える場合はCompose側も合わせます。
@@ -38,7 +40,7 @@ Node(
 
 `common.launch.py simulation:=none`は従来の`CUB_TARGET`を使い、`godot`はCub4を選びます。`use_sim_time`は独立した時計の選択で、今回のGodot接続は`false`です。
 
-Godotは今回Joy/Twistのみを提供し、`/odom`・`/scan`・自己位置TFはまだ提供しません。実機の自己位置推定を入力不足のまま起動しないよう、localization/navigationのlaunch内で`simulation`を確認し、`godot`を明示的に拒否します。
+`localization.launch.py simulation:=godot`は実機用EKFの代わりに`odom_to_tf`で`odom -> base_link`を出し、`map -> odom`の静的TFと合わせて`map -> odom -> base_link -> velodyne`を構成します。`navigation.launch.py simulation:=godot`は実機と同じく`map:=<path>`引数で地図ファイルを受け取り、Godotの`/scan`と`/odom`を使ってNav2を動かします。Godot空間に対応する地図は`cub_simulation/maps/cub_playground_v1/map.yaml`にあります。
 
 ## テスト
 
@@ -48,10 +50,11 @@ Godotは今回Joy/Twistのみを提供し、`/odom`・`/scan`・自己位置TF�
 
 実launchのノードごとの条件判定・コミット済みC++ commanderの速度生成、手動ゼロ指令、手動解除後の自律指令受け付け、Joyの1秒途絶での自律復帰、自律指令の3秒途絶での停止を検証します。commanderのテストはROS_DOMAIN_ID=172を使い、作成したプロセスを終了時に片付けます。
 
-Godot側のJoy変換・入力機器の自動選択・ROS未接続時の停止のテスト:
+Godot側のJoy変換・入力機器の自動選択・ROS未接続時の停止・簡易LiDARのテスト:
 
 ```bash
 /Applications/Godot.app/Contents/MacOS/Godot --headless --path simulator --script res://tests/ros_control_test.gd
+/Applications/Godot.app/Contents/MacOS/Godot --headless --path simulator --script res://tests/lidar_test.gd
 ```
 
 実際の往復接続は、sim用launch起動後、上記コマンドの末尾へ`-- --integration --ros-url ws://127.0.0.1:9090`を追加します。W/Aの移動、Spaceによる手動停止とWASD優先、無操作時の自律復帰、フォーカス・カーソル解放に依存しない中継、切断・再接続を確認します。コントローラーの接続状態・SDL入力は模擬して自動選択と自律・手動の切り替えを検証します。物理コントローラーのUSB/Bluetooth接続は別途実機で確認してください。

@@ -2,6 +2,9 @@ extends Node3D
 ## All instances build the same tiny static map. Later replace its mesh resources.
 
 const MAP_ID := "cub_playground_v1"
+const TERRAIN_LAYER := 1
+const LIDAR_LAYER := 4
+const FLOOR_MAX_ANGLE := deg_to_rad(46.0)
 
 
 func _ready() -> void:
@@ -20,7 +23,7 @@ func _ready() -> void:
 	sun.light_energy = 0.75
 	sun.shadow_enabled = false
 	add_child(sun)
-	box(Vector3(50, 0.3, 50), Vector3(0, -0.15, 0), Color("c6d2d3"))
+	box(Vector3(50, 0.3, 50), Vector3(0, -0.15, 0), Color("c6d2d3"), true, false)
 	_grid()
 	for x in [-25.0, 25.0]:
 		box(Vector3(0.3, 1.1, 50), Vector3(x, 0.55, 0), Color("7a91a1"))
@@ -35,11 +38,11 @@ func _ready() -> void:
 		Vector3(-10, 0, 0), Vector3(-6, 1.2, -8), Vector3(-10, 1.2, -8),
 	])
 	terrain_mesh(ramp, Color("83b9b2"))
-	box(Vector3(4, 1.2, 3), Vector3(-8, 0.6, -9.5), Color("83b9b2"))
+	box(Vector3(4, 1.2, 3), Vector3(-8, 0.6, -9.5), Color("83b9b2"), true, false)
 	for step in range(8):
 		var height := float(step + 1) * 0.15
-		box(Vector3(3.0, height, 0.6), Vector3(6, height / 2, -float(step) * 0.6 - 0.3), Color("b6c9d4"))
-	box(Vector3(3, 1.2, 2), Vector3(6, 0.6, -5.8), Color("b6c9d4"))
+		box(Vector3(3.0, height, 0.6), Vector3(6, height / 2, -float(step) * 0.6 - 0.3), Color("b6c9d4"), true, false)
+	box(Vector3(3, 1.2, 2), Vector3(6, 0.6, -5.8), Color("b6c9d4"), true, false)
 	_rough_mesh()
 	box(Vector3(2, 1.0, 2), Vector3(11, 0.5, -7), Color("af8878"))
 	_label("RAMP", Vector3(-8, 1.7, -10.5))
@@ -48,10 +51,10 @@ func _ready() -> void:
 	_label("CUB / SHARED PLAYGROUND", Vector3(0, 0.03, 9), true)
 
 
-func box(size: Vector3, at: Vector3, color: Color, solid := true) -> StaticBody3D:
+func box(size: Vector3, at: Vector3, color: Color, solid := true, lidar := true) -> StaticBody3D:
 	var body := StaticBody3D.new()
 	body.position = at
-	body.collision_layer = 1 if solid else 0
+	body.collision_layer = (TERRAIN_LAYER if solid else 0) | (LIDAR_LAYER if solid and lidar else 0)
 	body.collision_mask = 0
 	var shape := BoxShape3D.new()
 	shape.size = size
@@ -82,7 +85,7 @@ func terrain_mesh(vertices: PackedVector3Array, color: Color) -> StaticBody3D:
 	picture.material_override = _material(color)
 	picture.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	var body := StaticBody3D.new()
-	body.collision_layer = 1
+	body.collision_layer = TERRAIN_LAYER
 	body.collision_mask = 0
 	var shape := ConcavePolygonShape3D.new()
 	shape.set_faces(vertices)
@@ -90,9 +93,40 @@ func terrain_mesh(vertices: PackedVector3Array, color: Color) -> StaticBody3D:
 	var collision := CollisionShape3D.new()
 	collision.shape = shape
 	body.add_child(collision)
+	var wall_faces := extract_wall_faces(vertices)
+	if not wall_faces.is_empty():
+		var wall_body := StaticBody3D.new()
+		wall_body.name = "LidarWall"
+		wall_body.collision_layer = LIDAR_LAYER
+		wall_body.collision_mask = 0
+		var wall_shape := ConcavePolygonShape3D.new()
+		wall_shape.set_faces(wall_faces)
+		wall_shape.backface_collision = true
+		var wall_collision := CollisionShape3D.new()
+		wall_collision.shape = wall_shape
+		wall_body.add_child(wall_collision)
+		body.add_child(wall_body)
 	body.add_child(picture)
 	add_child(body)
 	return body
+
+
+static func extract_wall_faces(vertices: PackedVector3Array, max_floor_angle := FLOOR_MAX_ANGLE) -> PackedVector3Array:
+	var walls := PackedVector3Array()
+	var min_floor_up := cos(max_floor_angle)
+	var count := vertices.size() - (vertices.size() % 3)
+	for index in range(0, count, 3):
+		var a := vertices[index]
+		var b := vertices[index + 1]
+		var c := vertices[index + 2]
+		var cross := (b - a).cross(c - a)
+		if cross.length_squared() < 1e-10:
+			continue
+		if absf(cross.normalized().y) < min_floor_up:
+			walls.append(a)
+			walls.append(b)
+			walls.append(c)
+	return walls
 
 
 func _rough_mesh() -> void:

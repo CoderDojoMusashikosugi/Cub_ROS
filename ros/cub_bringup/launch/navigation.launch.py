@@ -11,15 +11,6 @@ from launch.substitutions import LaunchConfiguration
 import os
 
 
-def require_navigation(context):
-    # Godot currently provides Joy/Twist only; do not start sensor-dependent nodes.
-    simulation = LaunchConfiguration('simulation').perform(context)
-    if simulation != 'none':
-        raise ValueError(f'simulation:={simulation} currently supports velocity control only; '
-                         'odom, localization TF and scan are required before navigation/localization')
-    return []
-
-
 def generate_launch_description():
     cub_target = os.getenv('CUB_TARGET', 'cub4')
     print("launch target:", cub_target)
@@ -30,7 +21,6 @@ def generate_launch_description():
 
     return LaunchDescription([
         DeclareLaunchArgument('simulation', default_value='none', choices=['none', 'godot']),
-        OpaqueFunction(function=require_navigation),
         IncludeLaunchDescription(
             PathJoinSubstitution(
                 [FindPackageShare("cub_bringup"), "launch", "localization.launch.py"] # ここでlocalizationを起動
@@ -46,7 +36,8 @@ def generate_launch_description():
                 [FindPackageShare("cub_navigation"), "launch", "cub_navigation.launch.py"]
             ),
             launch_arguments=[
-                ('map', map_dir)
+                ('map', map_dir),
+                ('simulation', LaunchConfiguration('simulation'))
             ],
         ),
     ])

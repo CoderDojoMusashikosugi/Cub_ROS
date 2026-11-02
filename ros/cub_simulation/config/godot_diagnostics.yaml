@@ -17,3 +17,17 @@ topic_hz_checker:
         tolerance: 0.3
         window_size: 10
         qos: {reliability: reliable, durability: volatile, depth: 10}
+      odom:
+        topic: /odom
+        type: nav_msgs/msg/Odometry
+        expected_hz: 20.0
+        tolerance: 0.3
+        window_size: 10
+        qos: {reliability: reliable, durability: volatile, depth: 10}
+      scan:
+        topic: /scan
+        type: sensor_msgs/msg/LaserScan
+        expected_hz: 10.0
+        tolerance: 0.3
+        window_size: 10
+        qos: {reliability: reliable, durability: volatile, depth: 10}

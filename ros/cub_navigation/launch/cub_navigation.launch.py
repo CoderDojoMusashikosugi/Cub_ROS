@@ -21,6 +21,7 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.actions import IncludeLaunchDescription
+from launch.actions import OpaqueFunction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
@@ -30,16 +31,8 @@ from launch.conditions import IfCondition
 # TURTLEBOT3_MODEL = os.environ['TURTLEBOT3_MODEL']
 
 
-def generate_launch_description():
-    use_sim_time = LaunchConfiguration('use_sim_time', default='false')
-
-    # ここの地図は経路計画専用
-    # 白紙地図なら /home/cub/colcon_ws/src/cub/cub_navigation/maps/empty/map.yaml を使うと良い
-    map_dir = LaunchConfiguration(
-        'map',
-        default="/home/cub/maps/kakunin-1004/kakunin-1004-modified.yaml") # cub_bringup navigation.launch.pyで呼び出し時に上書きされる。デフォルト値設定はそちらに。
-
-    cub_target = os.getenv('CUB_TARGET', 'cub4')
+def select_default_params(simulation: str) -> str:
+    cub_target = 'cub4' if simulation == 'godot' else os.getenv('CUB_TARGET', 'cub4')
     if cub_target == 'cub4':
         param_file_name = 'cub4_nav2.yaml'
     elif cub_target == 'mcub' or cub_target == 'mcub_direct':
@@ -48,39 +41,27 @@ def generate_launch_description():
         param_file_name = 'spidar.yaml'
     else:
         param_file_name = 'cub4_nav2.yaml'
+    return os.path.join(
+        get_package_share_directory('cub_navigation'),
+        'param',
+        param_file_name)
 
-    param_dir = LaunchConfiguration(
-        'params_file',
-        default=os.path.join(
-            get_package_share_directory('cub_navigation'),
-            'param',
-            param_file_name))
+
+def launch_setup(context):
+    simulation = LaunchConfiguration('simulation').perform(context)
+    use_sim_time = LaunchConfiguration('use_sim_time')
+    map_dir = LaunchConfiguration('map')
+    waypoints_file = LaunchConfiguration('waypoints')
+    params_arg = LaunchConfiguration('params_file').perform(context)
+    param_dir = params_arg if params_arg else select_default_params(simulation)
     cub_navigation_launch_dir = os.path.join(get_package_share_directory('cub_navigation'), 'launch')
-
-    collison_monitor_launch_file_dir = os.path.join(get_package_share_directory('nav2_collision_monitor'), 'launch')
-
 
     rviz_config_dir = os.path.join(
         get_package_share_directory('cub_navigation'),
         'param',
         'nav2_rviz_view.rviz')
 
-    return LaunchDescription([
-        DeclareLaunchArgument(
-            'map',
-            default_value=map_dir,
-            description='Full path to map file to load'),
-
-        DeclareLaunchArgument(
-            'params_file',
-            default_value=param_dir,
-            description='Full path to param file to load'),
-
-        DeclareLaunchArgument(
-            'use_sim_time',
-            default_value='false',
-            description='Use simulation (Gazebo) clock if true'),
-
+    return [
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource([cub_navigation_launch_dir, '/nav2_bringup_launch.py']),
             launch_arguments={
@@ -93,7 +74,7 @@ def generate_launch_description():
         Node(
             package='cub_behavior_tree',
             executable='waypoint_navigator',
-            arguments=["/home/cub/colcon_ws/src/cub/cub_behavior_tree/routes/furo_waypoints.yaml"]
+            arguments=[waypoints_file]
             # arguments=["/home/cub/colcon_ws/src/cub/cub_behavior_tree/routes/2d_waypoints.yaml"]
         ),
         Node(
@@ -109,13 +90,47 @@ def generate_launch_description():
             arguments=['-d', rviz_config_dir],
             parameters=[{'use_sim_time': use_sim_time}],
             output='screen'),
-        # IncludeLaunchDescription(
-        #     PythonLaunchDescriptionSource([collison_monitor_launch_file_dir, '/collision_monitor_node.launch.py']),
-        #     launch_arguments=[
-        #         ('use_sim_time', use_sim_time),
-        #     ],
-        # ),
-        
-        # TimerAction(period=5.0, actions=[IncludeLaunchDescription(
-        #     PythonLaunchDescriptionSource([cub_navigation_launch_dir, '/cub_costmapfilter.launch.py']),)]),
+    ]
+
+
+def generate_launch_description():
+    use_sim_time = LaunchConfiguration('use_sim_time', default='false')
+
+    # ここの地図は経路計画専用
+    # 白紙地図なら /home/cub/colcon_ws/src/cub/cub_navigation/maps/empty/map.yaml を使うと良い
+    map_dir = LaunchConfiguration(
+        'map',
+        default="/home/cub/maps/kakunin-1004/kakunin-1004-modified.yaml") # cub_bringup navigation.launch.pyで呼び出し時に上書きされる。デフォルト値設定はそちらに。
+
+    waypoints_dir = LaunchConfiguration(
+        'waypoints',
+        default="/home/cub/colcon_ws/src/cub/cub_behavior_tree/routes/furo_waypoints.yaml")
+
+    return LaunchDescription([
+        DeclareLaunchArgument(
+            'simulation',
+            default_value='none',
+            choices=['none', 'godot']),
+
+        DeclareLaunchArgument(
+            'map',
+            default_value=map_dir,
+            description='Full path to map file to load'),
+
+        DeclareLaunchArgument(
+            'params_file',
+            default_value='',
+            description='Full path to param file to load'),
+
+        DeclareLaunchArgument(
+            'waypoints',
+            default_value=waypoints_dir,
+            description='Full path to waypoints yaml file to load'),
+
+        DeclareLaunchArgument(
+            'use_sim_time',
+            default_value='false',
+            description='Use simulation (Gazebo) clock if true'),
+
+        OpaqueFunction(function=launch_setup),
     ])

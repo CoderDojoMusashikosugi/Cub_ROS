@@ -2,8 +2,11 @@ extends CharacterBody3D
 ## Only the controlling app simulates this body. Remote bodies display snapshots.
 
 const TERRAIN_LAYER := 1
+const LIDAR_LAYER := 4
 const STEP_HEIGHT := 0.24
 const SPEEDS := {"robot": 2.5, "pedestrian": 3.0, "cone": 2.0}
+const SENSOR_RADII := {"robot": 0.28, "pedestrian": 0.23, "cone": 0.24}
+const SENSOR_HEIGHTS := {"robot": 0.9, "pedestrian": 1.7, "cone": 0.9}
 const PoseBufferScript = preload("res://scripts/pose_buffer.gd")
 const Cub4Scene = preload("res://assets/cub4/cub4.glb")
 
@@ -16,10 +19,13 @@ var controlled := false
 var simulated := false
 var target_position := Vector3.ZERO
 var target_yaw := 0.0
+var angular_velocity := 0.0
 var body_height := 0.9
 var received_updates := 0
 var _visual: Node3D
 var _shape: CollisionShape3D
+var _sensor_body: StaticBody3D
+var _sensor_shape: CollisionShape3D
 var _caption: Label3D
 var _color := Color("3d85c6")
 var _display_height := 0.0
@@ -54,6 +60,21 @@ func configure(record: Dictionary, local_control: bool) -> void:
 	_shape.shape = capsule
 	_shape.position.y = body_height * 0.5
 	add_child(_shape)
+	_sensor_body = StaticBody3D.new()
+	_sensor_body.name = "SensorBody"
+	_sensor_body.top_level = true
+	_sensor_body.collision_layer = LIDAR_LAYER
+	_sensor_body.collision_mask = 0
+	_sensor_shape = CollisionShape3D.new()
+	var cylinder := CylinderShape3D.new()
+	var sensor_height: float = SENSOR_HEIGHTS.get(kind, 0.9)
+	cylinder.radius = SENSOR_RADII.get(kind, 0.28)
+	cylinder.height = sensor_height
+	_sensor_shape.shape = cylinder
+	_sensor_shape.position.y = sensor_height * 0.5
+	_sensor_body.add_child(_sensor_shape)
+	add_child(_sensor_body)
+	sync_sensor_pose()
 	_visual = Node3D.new()
 	add_child(_visual)
 	_build_visual()
@@ -75,6 +96,7 @@ func set_controlled(value: bool, simulate_locally := false) -> void:
 	simulated = value or simulate_locally
 	collision_mask = TERRAIN_LAYER if simulated else 0
 	velocity = Vector3.ZERO
+	angular_velocity = 0.0
 	if _caption:
 		_caption.text = "%s%s%s" % [nickname, " / CUB" if primary else "", " [YOU]" if value else ""]
 
@@ -85,9 +107,11 @@ func simulate(input: Vector2, camera_yaw: float, fast: bool, delta: float) -> vo
 	var speed: float = SPEEDS[kind] * (1.6 if fast else 1.0)
 	var horizontal := Vector3.ZERO
 	if kind == "robot":
-		rotation.y -= input.x * 1.9 * delta
+		angular_velocity = -input.x * 1.9
+		rotation.y += angular_velocity * delta
 		horizontal = -global_basis.z * input.y * speed
 	else:
+		angular_velocity = 0.0
 		horizontal = Basis(Vector3.UP, camera_yaw) * Vector3(input.x, 0.0, -input.y) * speed
 		if horizontal.length_squared() > 0.01:
 			rotation.y = atan2(-horizontal.x, -horizontal.z)
@@ -95,6 +119,7 @@ func simulate(input: Vector2, camera_yaw: float, fast: bool, delta: float) -> vo
 
 
 func simulate_velocity(forward: float, turn: float, delta: float) -> void:
+	angular_velocity = turn
 	rotation.y += turn * delta
 	_move(-global_basis.z * forward, delta)
 
@@ -118,6 +143,9 @@ func _move(horizontal: Vector3, delta: float) -> void:
 	# Smooth only the picture; simulation and network state keep the actual height.
 	_display_height = move_toward(_display_height, 0.0, delta * 2.5)
 	_visual.position.y = _display_height
+	target_position = position
+	target_yaw = rotation.y
+	sync_sensor_pose()
 
 
 func _try_step(motion: Vector3) -> void:
@@ -164,6 +192,28 @@ func receive_pose(new_position: Vector3, new_yaw: float, sample_time: float) -> 
 	received_updates += 1
 	if not simulated:
 		_poses.push(new_position, new_yaw, sample_time)
+	sync_sensor_pose()
+
+
+func sync_sensor_pose() -> void:
+	if not _sensor_body:
+		return
+	var sensor_position := position if (simulated or received_updates == 0) else target_position
+	var sensor_yaw := rotation.y if (simulated or received_updates == 0) else target_yaw
+	var transform := Transform3D(Basis(Vector3.UP, sensor_yaw), sensor_position)
+	if _sensor_body.is_inside_tree():
+		_sensor_body.global_transform = transform
+	else:
+		_sensor_body.transform = transform
+	PhysicsServer3D.body_set_state(_sensor_body.get_rid(), PhysicsServer3D.BODY_STATE_TRANSFORM, transform)
+
+
+func sensor_rid() -> RID:
+	return _sensor_body.get_rid() if _sensor_body else RID()
+
+
+func _enter_tree() -> void:
+	sync_sensor_pose()
 
 
 func interpolate_remote(delta: float) -> void:

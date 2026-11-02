@@ -1,6 +1,6 @@
 # Godotシミュレーター実装計画
 
-作成日: 2026-10-16。操作・オンライン対応の初期実装を`simulator/`へ追加済み。指定のWindows版Godot 4.7.2で、画面付きの1ホスト＋3クライアントによる通信と、坂・段差・凹凸の走破を検証した。Joyと速度指令のROS往復を実装済み。主ロボットは常にROS速度指令だけで移動する。オドメトリ・TF・センサー・Nav2接続は未実装。起動と操作は[シミュレーターのREADME](../simulator/README.md)を参照。
+作成日: 2026-10-16。操作・オンライン対応の初期実装を`simulator/`へ追加済み。指定のWindows版Godot 4.7.2で、画面付きの1ホスト＋3クライアントによる通信と、坂・段差・凹凸の走破を検証した。Joyと速度指令のROS往復、および簡易LiDAR（`/scan`）のROS配信を実装済み。主ロボットは常にROS速度指令だけで移動する。オドメトリ・動的TF・Nav2接続は未実装。起動と操作は[シミュレーターのREADME](../simulator/README.md)を参照。
 
 ## 目的と確定した要件
 
@@ -160,7 +160,7 @@ rosbridgeはJSONとWebSocketによるROS操作を提供し、Godotにも標準�
 | ROS → ホスト | `/cmd_vel_atom` (`geometry_msgs/msg/Twist`) | commanderが出力する主ロボットの前進速度・旋回速度を適用（実装済み） |
 | ホスト → ROS | `/joy` (`sensor_msgs/msg/Joy`) | WASD／コントローラーを既存DualSense形式へ変換（実装済み） |
 | ホスト → ROS | `/odom` (`nav_msgs/msg/Odometry`) | 高さを含む主ロボットの正解位置と実際の移動速度から生成。姿勢はyawのみ |
-| ホスト → ROS | `/scan` (`sensor_msgs/msg/LaserScan`) | ホストだけで計算する簡易2D LiDAR |
+| ホスト → ROS | `/scan` (`sensor_msgs/msg/LaserScan`) | ホストだけで計算する簡易2D LiDAR（実装済み） |
 | ホスト → ROS | `/tf` の `odom → base_link` | `/odom`と同じ姿勢・時刻を使う |
 | ROS内 | `map → odom` | 初期版では恒等変換として1か所から配信 |
 | ROS内 | `base_link`以下の固定TF | `robot_state_publisher`と既存URDFを使う |

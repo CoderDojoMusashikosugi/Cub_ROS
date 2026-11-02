@@ -59,7 +59,7 @@ launch引数`simulation`は`none`が既定で実機用の動作を維持しま�
 
 Godot指定ではCub4のcommonを選び、wheel odometry・実機の再開ボタン・オドメトリクリア・GNSS状態監視を停止します。機体の既定設定`CUB_TARGET`自体は変更しません。`cub4_bringup`が機体設定による`COLCON_IGNORE`対象の場合は、commonの使用前にそのパッケージを有効にしてビルドしてください。距離ログ・URDFの固定TF・システム診断は継続し、トピック監視はJoyと速度指令に切り替えます。
 
-今回はJoy/Twistの往復のみです。Godotからの`/odom`・LiDAR・自己位置TF・`/clock`は未実装です。この段階の`navigation.launch.py`／`localization.launch.py simulation:=godot`は、必要なセンサーを待ち続ける代わりに理由を示して起動を拒否します。`simulation`とROS時刻の`use_sim_time`は別で、現在は実時間（`false`）です。
+Joy/Twistの往復、簡易LiDAR（`/scan`）、およびシミュレータ座標に基づく真値オドメトリ（`/odom`、20 Hz）を配信します。簡易LiDARの位置と`frame_id`は`ros/cub_description/urdf/cub4.urdf`の`base_to_velodyne`（`velodyne`、`base_link`から高さ0.2492 m）を参照し、10 Hz・360本で壁・箱・他のロボット・通行人・コーンのセンサー用形状を測距して`/scan`へ配信します。床・坂道・階段・凹凸地形はLiDAR検出から除外し、床と壁が一体の三角形メッシュでは面の法線から壁面だけを抽出します。`navigation.launch.py simulation:=godot map:=/home/cub/colcon_ws/src/cub/cub_simulation/maps/cub_playground_v1/map.yaml`で実機と同様に地図パスを引数で渡してNav2自律移動を実行できます（内部の`localization.launch.py`では`odom_to_tf`で`odom -> base_link`を配信します）。`simulation`とROS時刻の`use_sim_time`は別で、現在は実時間（`false`）です。
 
 ## Godotエディタから役割を指定して起動する
 
@@ -171,6 +171,7 @@ $godot = 'C:\Users\tomok\workspace\Godot_v4.7.2-stable_win64.exe\Godot_v4.7.2-st
 & $godot --headless --path .\simulator --script res://tests/launch_test.gd
 & $godot --headless --path .\simulator --script res://tests/smoothing_test.gd
 & $godot --headless --path .\simulator --script res://tests/cub4_model_test.gd
+& $godot --headless --path .\simulator --script res://tests/lidar_test.gd
 ```
 
 地形の検証は坂の上り下り、実形状の階段、凹凸、壁、頭上の障害物、キャラクター同士の重なりを確認します。通信の検証はホスト＋3クライアントを別プロセスで起動し、移動同期、途中参加時の現在位置、クライアントの種類変更、ホストの主ロボット固定、クライアント切断、ホスト終了を確認します。テストが作成したプロセスは終了時に片付けます。

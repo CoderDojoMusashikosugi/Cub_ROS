@@ -7,21 +7,13 @@ from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, Opaq
 from launch.substitutions import PathJoinSubstitution
 from launch_ros.substitutions import FindPackageShare
 from launch.conditions import IfCondition
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, EqualsSubstitution
 import os
 
 
-def require_navigation(context):
-    # Godot currently provides Joy/Twist only; do not start sensor-dependent nodes.
+def launch_setup(context):
     simulation = LaunchConfiguration('simulation').perform(context)
-    if simulation != 'none':
-        raise ValueError(f'simulation:={simulation} currently supports velocity control only; '
-                         'odom, localization TF and scan are required before navigation/localization')
-    return []
-
-
-def generate_launch_description():
-    cub_target = os.getenv('CUB_TARGET', 'cub4')
+    cub_target = 'cub4' if simulation == 'godot' else os.getenv('CUB_TARGET', 'cub4')
     print("launch target:", cub_target)
 
     use_sim_time = LaunchConfiguration('use_sim_time')
@@ -60,7 +52,13 @@ def generate_launch_description():
                 ('map_localization', map_dir),
                 ('use_sim_time', use_sim_time)
             ],
-            condition=IfCondition("true" if cub_target == 'cub4' else "false")
+            condition=IfCondition("true" if (cub_target == 'cub4' and simulation == 'none') else "false")
+        ),
+        Node(
+            package='cub_bringup',
+            executable='odom_to_tf',
+            name='odom_to_tf',
+            condition=IfCondition(EqualsSubstitution(LaunchConfiguration('simulation'), 'godot'))
         ),
         Node(
             package='tf2_ros',
@@ -116,5 +114,11 @@ def generate_launch_description():
         #         [FindPackageShare("cub_navigation"), "launch", "gnss_as_localization.launch.py"]
         #     ),
         # ),
+    ]
 
+
+def generate_launch_description():
+    return LaunchDescription([
+        DeclareLaunchArgument('simulation', default_value='none', choices=['none', 'godot']),
+        OpaqueFunction(function=launch_setup),
     ])

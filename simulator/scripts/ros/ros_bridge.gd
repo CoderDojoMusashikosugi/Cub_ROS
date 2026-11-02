@@ -10,6 +10,8 @@ var status := "ROS OFFLINE"
 var linear := 0.0
 var angular := 0.0
 var received_commands := 0
+var sent_scans := 0
+var sent_odoms := 0
 var _socket := WebSocketPeer.new()
 var _active := false
 var _retry_at := 0
@@ -62,6 +64,8 @@ func _process(_delta: float) -> void:
 			_announced = true
 			_clear_command()
 			_send({"op": "advertise", "topic": "/joy", "type": "sensor_msgs/msg/Joy", "queue_size": 1})
+			_send({"op": "advertise", "topic": "/odom", "type": "nav_msgs/msg/Odometry", "queue_size": 1})
+			_send({"op": "advertise", "topic": "/scan", "type": "sensor_msgs/msg/LaserScan", "queue_size": 1})
 			_send({"op": "subscribe", "topic": "/cmd_vel_atom", "type": "geometry_msgs/msg/Twist", "queue_length": 1})
 			# Start with all buttons released; normal input polling resumes next tick.
 			_send({"op": "publish", "topic": "/joy", "msg":
@@ -83,9 +87,25 @@ func _process(_delta: float) -> void:
 func send_joy(message: Dictionary) -> void:
 	if connected:
 		# Do not queue old control samples behind an obstructed connection.
-		if _socket.get_current_outbound_buffered_amount() > 0:
+		if _socket.get_current_outbound_buffered_amount() > 65536:
 			return
 		_send({"op": "publish", "topic": "/joy", "msg": message})
+
+
+func send_scan(message: Dictionary) -> void:
+	if connected and not message.is_empty():
+		if _socket.get_current_outbound_buffered_amount() > 65536:
+			return
+		_send({"op": "publish", "topic": "/scan", "msg": message})
+		sent_scans += 1
+
+
+func send_odom(message: Dictionary) -> void:
+	if connected and not message.is_empty():
+		if _socket.get_current_outbound_buffered_amount() > 65536:
+			return
+		_send({"op": "publish", "topic": "/odom", "msg": message})
+		sent_odoms += 1
 
 
 func _send(message: Dictionary) -> void:

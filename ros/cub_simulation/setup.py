@@ -8,6 +8,7 @@ setup(
         ('share/cub_simulation', ['package.xml']),
         ('share/cub_simulation/launch', glob('launch/*.launch.py')),
         ('share/cub_simulation/config', glob('config/*.yaml')),
+        ('share/cub_simulation/maps/cub_playground_v1', glob('maps/cub_playground_v1/*')),
     ],
     install_requires=['setuptools'], zip_safe=True,
     maintainer='cub', maintainer_email='cub@todo.todo',

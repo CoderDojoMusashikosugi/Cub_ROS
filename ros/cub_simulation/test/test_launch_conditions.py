@@ -46,12 +46,19 @@ def test_common_routes_hardware_target_and_godot_cub4(monkeypatch, name, route, 
     assert not any(key.startswith('simulation_') for key in context.launch_configurations)
 
 
-@pytest.mark.parametrize('file', ['navigation.launch.py', 'localization.launch.py'])
-def test_sensor_dependent_launch_rejects_velocity_only_godot(file):
-    module = load_launch('cub_bringup/launch/' + file)
-    assert module.require_navigation(context_for('none')) == []
-    with pytest.raises(ValueError, match='velocity control only'):
-        module.require_navigation(context_for('godot'))
+@pytest.mark.parametrize('name,ekf,odom_tf', [('none', True, False), ('godot', False, True)])
+def test_localization_switches_ekf_and_odom_to_tf_for_godot(monkeypatch, name, ekf, odom_tf):
+    monkeypatch.setenv('CUB_TARGET', 'cub4')
+    module = load_launch('cub_bringup/launch/localization.launch.py')
+    context = context_for(name)
+    actions = module.launch_setup(context)
+    includes = [a for a in actions if isinstance(a, IncludeLaunchDescription)]
+    nodes = [a for a in actions if isinstance(a, Node)]
+    # includes[0] is common.launch.py (unconditional), includes[1] is ekf_locali.launch.py
+    assert includes[1].condition.evaluate(context) == ekf
+    # nodes[0] is odom_to_tf, nodes[1] is static_transform_publisher (map -> odom)
+    assert nodes[0].condition.evaluate(context) == odom_tf
+    assert nodes[1].condition.evaluate(context) is True
 
 
 def test_simulation_bringup_only_starts_godot_nodes_for_godot():
@@ -66,6 +73,8 @@ def test_simulation_bringup_only_starts_godot_nodes_for_godot():
 @pytest.mark.parametrize('file', [
     'cub_bringup/launch/common.launch.py',
     'cub4_bringup/launch/common.launch.py',
+    'cub_bringup/launch/localization.launch.py',
+    'cub_bringup/launch/navigation.launch.py',
     'cub_bringup/launch/simulation.launch.py',
     'cub_simulation/launch/bringup.launch.py',
 ])
@@ -78,3 +87,30 @@ def test_default_and_unknown_simulation_arguments(file):
     assert context.launch_configurations['simulation'] == 'none'
     with pytest.raises(RuntimeError, match='not valid'):
         argument.execute(context_for('typo'))
+
+
+def test_godot_diagnostics_and_urdf_lidar_match():
+    import json
+    import xml.etree.ElementTree as ET
+    import yaml
+
+    diagnostics = yaml.safe_load((ROOT / 'cub_simulation/config/godot_diagnostics.yaml').read_text())
+    topics = diagnostics['topic_hz_checker']['ros__parameters']['topics']
+    assert topics['odom']['topic'] == '/odom'
+    assert topics['odom']['type'] == 'nav_msgs/msg/Odometry'
+    assert topics['odom']['expected_hz'] == 20.0
+    assert topics['scan']['topic'] == '/scan'
+    assert topics['scan']['type'] == 'sensor_msgs/msg/LaserScan'
+    assert topics['scan']['expected_hz'] == 10.0
+
+    urdf = ET.parse(ROOT / 'cub_description/urdf/cub4.urdf')
+    velodyne_joint = next(j for j in urdf.findall('./joint') if j.find('child').get('link') == 'velodyne')
+    assert velodyne_joint.find('parent').get('link') == 'base_link'
+    xyz = [float(v) for v in velodyne_joint.find('origin').get('xyz').split()]
+    assert xyz == pytest.approx([0.0, 0.0, 0.2492])
+
+    cub4_meta_path = ROOT.parent / 'simulator/assets/cub4/cub4.json'
+    if cub4_meta_path.exists():
+        cub4_meta = json.loads(cub4_meta_path.read_text())
+        assert cub4_meta['urdf_lidar']['frame_id'] == 'velodyne'
+        assert cub4_meta['urdf_lidar']['xyz'] == pytest.approx(xyz)

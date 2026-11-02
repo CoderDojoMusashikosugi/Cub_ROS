@@ -58,8 +58,28 @@ def little_endian(values):
     return values.tobytes()
 
 
+def read_lidar(tree):
+    for joint in tree.findall("./joint"):
+        child = joint.find("child")
+        parent = joint.find("parent")
+        if child is not None and child.get("link") == "velodyne":
+            origin = joint.find("origin")
+            xyz = tuple(map(float, origin.get("xyz", "0 0 0").split())) if origin is not None else (0.0, 0.0, 0.0)
+            rpy = tuple(map(float, origin.get("rpy", "0 0 0").split())) if origin is not None else (0.0, 0.0, 0.0)
+            return {
+                "joint": joint.get("name", "base_to_velodyne"),
+                "parent": parent.get("link", "base_link") if parent is not None else "base_link",
+                "frame_id": "velodyne",
+                "xyz": xyz,
+                "rpy": rpy,
+                "godot_offset": ros_to_godot(xyz),
+            }
+    raise ValueError("Expected Cub4's base_to_velodyne joint in the URDF")
+
+
 def build():
-    visuals = ET.parse(URDF).findall("./link/visual")
+    tree = ET.parse(URDF)
+    visuals = tree.findall("./link/visual")
     if len(visuals) != 1:
         raise ValueError("Expected Cub4's single base_link visual; review the asset builder if the URDF changes")
     visual = visuals[0]
@@ -117,6 +137,7 @@ def build():
     metadata = {
         "source_sha256": {str(path.relative_to(ROOT)): sha256(path.read_bytes()).hexdigest() for path in (URDF, source, material_path)},
         "urdf_visual": {"scale": scale, "xyz": xyz, "rpy": rpy},
+        "urdf_lidar": read_lidar(tree),
         "ros_to_godot": "(-y, z, -x)",
         "triangles": len(indices) // 3,
         "vertices": len(unique),

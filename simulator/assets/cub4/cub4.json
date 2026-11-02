@@ -21,6 +21,26 @@
       1.57
     ]
   },
+  "urdf_lidar": {
+    "joint": "base_to_velodyne",
+    "parent": "base_link",
+    "frame_id": "velodyne",
+    "xyz": [
+      0.0,
+      0.0,
+      0.2492
+    ],
+    "rpy": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "godot_offset": [
+      0.0,
+      0.2492,
+      0.0
+    ]
+  },
   "ros_to_godot": "(-y, z, -x)",
   "triangles": 183889,
   "vertices": 116998,
