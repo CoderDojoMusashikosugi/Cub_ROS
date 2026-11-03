@@ -538,6 +538,26 @@ ros2 topic echo /terrain_occupancy_grid --once
 
 ### RViz2での可視化
 
+### 手動地図修正用 Intensity 重ね合わせ画像の生成
+
+生成した 2D 地図（PGM）を手動で編集する際、白線やマンホール、舗装境界を識別しやすくするために、**PCD 点群の反射強度（Intensity）を 2D 地図と完全に同一サイズ・解像度で射影した透過カラー画像（RGBA PNG）** を生成できます。
+既定の点群には動体除去済みの `maps/mid360_cleaned/clean_map.pcd` が使用されます。
+
+```bash
+# 基本実行（--pcd 省略時は clean_map.pcd を自動使用）
+ros2 run cub_mapping pcd_to_intensity_image --yaml /home/cub/maps/terrain_analysis_output/1017_02/map.yaml
+```
+
+- **主なオプション**:
+  - `--pcd <path>`: 入力PCD（デフォルト: `/home/cub/maps/mid360_cleaned/clean_map.pcd`）
+  - `--yaml <path>`: 対象の 2D 地図の `map.yaml`（必須）
+  - `--colormap <name>`: `turbo` (デフォルト), `viridis`, `jet`, `gray`
+  - `--min_z <val>`, `--max_z <val>`: Z方向の高さ制限（例: 地面付近だけに限定する場合）
+  - `--percentile_clip <val>`: 高反射ノイズを除去する上限パーセンタイル（デフォルト: 99.0%）
+  - `--output, -o <path>`: 出力画像パス（デフォルト: `map.yaml` と同じディレクトリに `map_intensity.png`）
+
+GIMP や画像編集ツールで下レイヤーに `map.pgm`、上レイヤーに `map_intensity.png`（不透明度 50% など）を重ねることで、白線や縁石の位置を確認しながら正確に地図を修正できます。
+
 RViz2で以下のディスプレイを追加すると、結果を確認できます：
 
 1. **Map** (`/terrain_occupancy_grid`): 障害物マップ

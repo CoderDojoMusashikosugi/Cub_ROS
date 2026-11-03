@@ -195,8 +195,22 @@ target_link_libraries(waypoint_manager_node
 add_executable(export_clean_map src/export_clean_map.cpp)
 set_target_properties(export_clean_map PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
 target_link_libraries(export_clean_map ${PCL_LIBRARIES})
+
+add_executable(pcd_to_intensity_image src/pcd_to_intensity_image.cpp)
+set_target_properties(pcd_to_intensity_image PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
+target_include_directories(pcd_to_intensity_image PUBLIC
+  ${PCL_INCLUDE_DIRS}
+  ${OpenCV_INCLUDE_DIRS}
+)
+target_link_libraries(pcd_to_intensity_image
+  ${PCL_LIBRARIES}
+  ${OpenCV_LIBS}
+  yaml-cpp
+)
+
 install(TARGETS
   export_clean_map
+  pcd_to_intensity_image
   map_converter_node
   terrain_analysis_node
   waypoint_manager_node
