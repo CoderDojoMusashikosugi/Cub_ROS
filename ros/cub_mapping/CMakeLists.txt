@@ -192,7 +192,11 @@ target_link_libraries(waypoint_manager_node
 )
 
 # Install node executables
+add_executable(export_clean_map src/export_clean_map.cpp)
+set_target_properties(export_clean_map PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
+target_link_libraries(export_clean_map ${PCL_LIBRARIES})
 install(TARGETS
+  export_clean_map
   map_converter_node
   terrain_analysis_node
   waypoint_manager_node
@@ -241,6 +245,10 @@ ament_export_dependencies(
 option(CUB_MAPPING_BUILD_GNSS "Build the GLIM RTK GNSS extension" ON)
 if(CUB_MAPPING_BUILD_GNSS)
   find_package(glim REQUIRED)
+  add_library(cub_mapping_save_frames SHARED src/glim_save_frames.cpp)
+  set_target_properties(cub_mapping_save_frames PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
+  target_link_libraries(cub_mapping_save_frames glim::glim)
+  install(TARGETS cub_mapping_save_frames LIBRARY DESTINATION lib)
   find_path(GEOGRAPHICLIB_INCLUDE_DIR GeographicLib/LocalCartesian.hpp REQUIRED)
   find_library(GEOGRAPHICLIB_LIBRARY GeographicLib REQUIRED)
   add_library(cub_mapping_gnss SHARED src/glim_gnss.cpp src/gnss_factor.cpp)
@@ -255,6 +263,10 @@ if(CUB_MAPPING_BUILD_GNSS)
   install(TARGETS check_gnss_dump DESTINATION lib/${PROJECT_NAME})
   if(BUILD_TESTING)
     find_package(ament_cmake_gtest REQUIRED)
+    ament_add_gtest(test_save_frames test/test_save_frames.cpp)
+    set_target_properties(test_save_frames PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
+    target_link_libraries(test_save_frames glim::glim)
+    add_dependencies(test_save_frames cub_mapping_save_frames)
     ament_add_gtest(test_gnss test/test_gnss.cpp)
     set_target_properties(test_gnss PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
     target_link_libraries(test_gnss cub_mapping_gnss glim::glim ${GEOGRAPHICLIB_LIBRARY})

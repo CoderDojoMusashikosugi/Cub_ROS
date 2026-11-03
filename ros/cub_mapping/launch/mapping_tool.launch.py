@@ -29,13 +29,13 @@ def generate_launch_description():
 
     pcd_file_mapping_arg = DeclareLaunchArgument(
         'pcd_file_mapping',
-        default_value='/home/cub/maps/map_tc25_gnss_0_2.pcd',
+        default_value='/home/cub/maps/mid360_cleaned/clean_map.pcd',
         description='Path to high-density PCD file for mapping'
     )
 
     pcd_file_display_arg = DeclareLaunchArgument(
         'pcd_file_display',
-        default_value='/home/cub/maps/map_tc25_gnss_0_3.pcd',
+        default_value='/home/cub/maps/mid360_cleaned/clean_map.pcd',
         description='Path to lightweight PCD file for RViz display'
     )
 

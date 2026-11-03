@@ -38,6 +38,35 @@ def _launch_mapping(context, sensor):
         raise RuntimeError(f'Choose an empty output directory: {dump}')
     dump.mkdir(parents=True, exist_ok=True)
 
+    save_frames = LaunchConfiguration('save_frames').perform(context).lower()
+    if save_frames not in ('true', 'false'):
+        raise RuntimeError('save_frames must be true or false')
+
+    def frame_config(config_dir):
+        if save_frames == 'false':
+            return
+        library = Path(get_package_prefix('cub_mapping')) / 'lib' / 'libcub_mapping_save_frames.so'
+        if not library.is_file():
+            raise RuntimeError(f'Build cub_mapping before saving frames: {library}')
+        root_path = config_dir / 'config.json'
+        root = json.loads(root_path.read_text())
+        root['global']['config_save_frames'] = 'config_save_frames.json'
+        root_path.write_text(json.dumps(root, indent=2) + '\n')
+        ros_path = config_dir / root['global']['config_ros']
+        ros = json.loads(ros_path.read_text())
+        modules = ros['glim_ros'].setdefault('extension_modules', [])
+        modules[:] = [m for m in modules if Path(m).name != library.name]
+        modules.append(str(library))
+        ros_path.write_text(json.dumps(ros, indent=2) + '\n')
+        (config_dir / 'config_save_frames.json').write_text(json.dumps(
+            {'save_frames': {'directory': str(dump / 'frames'), 'sensor': sensor}}, indent=2) + '\n')
+
+    def check_frames():
+        if save_frames == 'true':
+            report = json.loads((dump / 'frames' / 'report.json').read_text())
+            if not report.get('success') or report.get('frames', 0) <= 0:
+                raise RuntimeError('Scan saving failed; see frames/report.json')
+
     def mapping_node(config_dir, output_dir, seconds):
         # Inline parameters: glim_rosbag can mistake a parameters YAML for a bag.
         return Node(
@@ -53,6 +82,19 @@ def _launch_mapping(context, sensor):
         raise RuntimeError('enable_gnss must be true or false')
     info = [LogInfo(msg=f'GLIM {sensor} input: {bag}'), LogInfo(msg=f'GLIM map output: {dump}')]
     if enabled == 'false':
+        if save_frames == 'true':
+            target = dump / 'mapping_config'
+            shutil.copytree(config, target)
+            frame_config(target)
+            mapping = mapping_node(target, dump, duration)
+
+            def finish_frames(event, _context):
+                if event.returncode != 0:
+                    raise RuntimeError(f'GLIM failed with code {event.returncode}')
+                check_frames()
+                return []
+
+            return info + [RegisterEventHandler(OnProcessExit(target_action=mapping, on_exit=finish_frames)), mapping]
         return info + [mapping_node(config, dump, duration)]
 
     seconds = float(LaunchConfiguration('calibration_duration').perform(context))
@@ -96,6 +138,7 @@ def _launch_mapping(context, sensor):
 
     calibration = mapping_node(prepare_config('calibration_config', 'calibrate'), dump / 'calibration', seconds)
     mapping_config = prepare_config('mapping_config', 'mapping')
+    frame_config(mapping_config)
 
     def check_result(event, output_dir):
         if event.returncode != 0:
@@ -111,6 +154,7 @@ def _launch_mapping(context, sensor):
 
         def finish(event, _context):
             final = check_result(event, dump)
+            check_frames()
             return [LogInfo(msg=f'GNSS map complete: {final["counts"].get("factors", 0)} factors; {dump}')]
 
         return [LogInfo(msg=f'ENU alignment RMSE: {report["alignment_rmse_m"]:.3f} m; starting GNSS mapping'),
@@ -128,6 +172,8 @@ def generate_mapping_launch_description(sensor):
             description=f'Empty output directory; defaults to ~/maps/<bag>_glim_{sensor}_<timestamp>'),
         DeclareLaunchArgument('config_path', default_value=str(config), description='GLIM JSON config directory'),
         DeclareLaunchArgument('enable_gnss', default_value='true', description='Use secondary RTK FIX in an ENU map'),
+        DeclareLaunchArgument('save_frames', default_value='false',
+                              description='Save deskewed LiDAR scans indexed to the final trajectory for MapCleaner'),
         DeclareLaunchArgument('gnss_config', default_value='', description='Optional GNSS JSON override'),
         DeclareLaunchArgument('calibration_duration', default_value='60.0',
                               description='Initial bag interval for GNSS/LIO yaw and translation alignment'),

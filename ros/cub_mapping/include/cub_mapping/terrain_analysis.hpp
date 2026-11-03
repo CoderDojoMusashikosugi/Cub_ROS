@@ -53,6 +53,7 @@ private:
   void processFullPointCloud();
   void initializeGrids();
   void estimateGroundElevation();
+  void filterGroundElevationByRegionGrowing();
   void generateOccupancyGrid();
   void publishResults();
   bool saveMapToFile(const std::string & filename);
@@ -80,6 +81,13 @@ private:
   std::string pointcloud_topic_;
   std::string output_directory_;
   bool auto_generate_;          // Auto-generate map when PCD received
+
+  // Slope & Region Growing parameters
+  bool enable_slope_filter_;
+  double max_ground_slope_;
+  double max_ground_jump_;
+  int min_ground_cluster_size_;
+  int fill_iterations_;
 
   // Grid parameters (computed from point cloud bounds)
   double origin_x_, origin_y_;

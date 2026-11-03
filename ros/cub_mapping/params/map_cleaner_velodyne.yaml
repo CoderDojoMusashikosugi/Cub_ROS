@@ -1,0 +1,95 @@
+# MapCleaner source: BSD-3-Clause, Takahiro Aoyagi (2025). See docker/map_cleaner/UPSTREAM_LICENSE.
+divide_by_terrain:
+  on_terrain_only: false
+  threshold: 0.1
+first_bgk:
+  kernel_radius: 1.0
+  lambda: 0.0
+  min_num: 3
+  sigma: 1.0
+grid_map_builder:
+  grid_res: 0.2
+ground_segmentation:
+  frame_skip: 2
+  use_voxel_grid: true
+  voxel_leaf_size: 0.15
+loader:
+  end: -1
+  format: glim
+  kitti_calibration_file: ''
+  pcds_dir: /tmp/dump/frames
+  pose_file: /tmp/dump/traj_lidar.txt
+  start: 0
+map_cleaner:
+  frame_id: map
+  in_process_visualization: false
+  save_dir: /tmp
+  visualization_vg_res: 0.4
+median:
+  enable: true
+  kernel_size: 3
+moving_point_identification:
+  delta_h: 1
+  delta_v: 1
+  fov_h_deg: 360.0
+  fov_v_deg: 40.0
+  frame_skip: 2
+  lidar_range: 50.0
+  res_h_deg: 0.4
+  res_v_deg: 2.0
+  submap_update_dist: 5.0
+  threshold: 0.2
+  voxel_leaf_size: 0.2
+patchworkpp:
+  adaptive_seed_selection_margin: -1.2
+  elevation_thr:
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  enable_rnr: true
+  enable_rvpf: true
+  enable_tgr: true
+  flatness_thr:
+  - 0.0
+  - 0.0
+  - 0.0
+  - 0.0
+  max_elevation_storage: 1000
+  max_flatness_storage: 1000
+  max_range: 80.0
+  min_range: 0.3
+  num_iter: 3
+  num_lpr: 20
+  num_min_pts: 10
+  num_rings_each_zone:
+  - 2
+  - 4
+  - 4
+  - 4
+  num_rings_of_interest: 4
+  num_sectors_each_zone:
+  - 16
+  - 32
+  - 54
+  - 32
+  num_zones: 4
+  rnr_intensity_thr: 0.2
+  rnr_ver_angle_thr: -15.0
+  sensor_height: 0.2492
+  th_dist: 0.125
+  th_dist_v: 0.1
+  th_seeds: 0.125
+  th_seeds_v: 0.25
+  uprightness_thr: 0.707
+  verbose: false
+second_bgk:
+  kernel_radius: 2.0
+  lambda: 0.0
+  min_num: 3
+  sigma: 0.5
+trajectory_filter:
+  normal_th_deg: 15.0
+variance_filter:
+  min_num: 1
+  variance_th: 0.01

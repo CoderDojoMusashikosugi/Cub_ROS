@@ -1,0 +1,5 @@
+<launch>
+  <arg name="config" />
+  <rosparam file="$(arg config)" command="load" />
+  <node name="map_cleaner" pkg="map_cleaner" type="map_cleaner" output="screen" required="true" />
+</launch>
