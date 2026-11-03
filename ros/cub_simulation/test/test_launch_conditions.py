@@ -34,15 +34,15 @@ def test_cub4_hardware_nodes_are_decided_in_launch(name, expected):
     assert len(nodes) - len(conditional) == 6  # shared nodes remain enabled
 
 
-@pytest.mark.parametrize('name,route,clear', [('none', 1, True), ('godot', 0, False)])
-def test_common_routes_hardware_target_and_godot_cub4(monkeypatch, name, route, clear):
+@pytest.mark.parametrize('name,clear', [('none', True), ('godot', False)])
+def test_common_routes_target_respects_cub_target(monkeypatch, name, clear):
     monkeypatch.setenv('CUB_TARGET', 'mcub_direct')
     module = load_launch('cub_bringup/launch/common.launch.py')
     context = context_for(name)
     actions = module.launch_setup(context)
     assert actions[0].condition.evaluate(context) == clear
     includes = [a for a in actions if isinstance(a, IncludeLaunchDescription)]
-    assert [a.condition.evaluate(context) for a in includes] == [i == route for i in range(4)]
+    assert [a.condition.evaluate(context) for a in includes] == [i == 1 for i in range(4)]
     assert not any(key.startswith('simulation_') for key in context.launch_configurations)
 
 

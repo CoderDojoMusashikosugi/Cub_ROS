@@ -13,7 +13,7 @@ import os
 
 def launch_setup(context):
     simulation = LaunchConfiguration('simulation').perform(context)
-    cub_target = 'cub4' if simulation == 'godot' else os.getenv('CUB_TARGET', 'cub4')
+    cub_target = os.getenv('CUB_TARGET', 'cub4')
     print("launch target:", cub_target)
 
     use_sim_time = LaunchConfiguration('use_sim_time')

@@ -31,8 +31,8 @@ from launch.conditions import IfCondition
 # TURTLEBOT3_MODEL = os.environ['TURTLEBOT3_MODEL']
 
 
-def select_default_params(simulation: str) -> str:
-    cub_target = 'cub4' if simulation == 'godot' else os.getenv('CUB_TARGET', 'cub4')
+def select_default_params(simulation: str = 'none') -> str:
+    cub_target = os.getenv('CUB_TARGET', 'cub4')
     if cub_target == 'cub4':
         param_file_name = 'cub4_nav2.yaml'
     elif cub_target == 'mcub' or cub_target == 'mcub_direct':

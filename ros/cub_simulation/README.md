@@ -39,7 +39,7 @@ Node(
 
 ### 共通ノード（URDF / robot_state_publisher 等）の起動
 
-`common.launch.py simulation:=none`は従来の`CUB_TARGET`を使い、`godot`はCub4を選びます。`use_sim_time`は独立した時計の選択で、今回のGodot接続は`false`です。
+機体ターゲットは実機・シミュレーション共通で環境変数`CUB_TARGET`（未指定時は`cub4`）に従います。`use_sim_time`は独立した時計の選択で、今回のGodot接続は`false`です。
 
 ```bash
 # 実機
