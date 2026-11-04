@@ -207,8 +207,8 @@ func _test_map_controls() -> void:
 		else:
 			_check(is_equal_approx(rig.yaw, yaw) and is_equal_approx(rig.pitch, pitch)
 				and camera.projection == Camera3D.PROJECTION_ORTHOGONAL
-				and camera.global_basis.y.is_equal_approx(Vector3.FORWARD),
-				"2D map stays orthographic and north-up even with Ctrl-drag")
+				and camera.global_basis.y.is_equal_approx(Vector3.LEFT),
+				"2D map stays orthographic and image-up even with Ctrl-drag")
 			_scroll(Vector2(1, -1), start, true)
 			_button(MOUSE_BUTTON_RIGHT, true, start, true)
 			_motion(Vector2(20, 10), start + Vector2(20, 10), MOUSE_BUTTON_MASK_RIGHT, true)

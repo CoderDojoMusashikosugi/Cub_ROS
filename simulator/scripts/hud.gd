@@ -1,15 +1,19 @@
 extends CanvasLayer
-## Mouse-operated lobby, then a single passive status line during gameplay.
+## Mouse-operated lobby with text-only world/preset selection, then a single passive status line during gameplay.
 
 signal host_requested(address: String, port: int, nickname: String)
 signal join_requested(address: String, port: int, kind: String, nickname: String)
 signal cancel_requested
+signal world_selected(world_id: String)
+signal spawn_selected(preset_name: String)
 
 const CAMERA_NAMES := ["TPS", "ORBIT", "TOP"]
 const BAR_HEIGHT := 28
 const KINDS := ["robot", "pedestrian", "cone"]
 
 var _connection_status := "OFFLINE"
+var _world_ready := true
+var _world_status_text := ""
 var _lobby: PanelContainer
 var _bar: PanelContainer
 var _nickname: LineEdit
@@ -17,6 +21,9 @@ var _address: LineEdit
 var _ros_url: LineEdit
 var _port: SpinBox
 var _kind: OptionButton
+var _world_option: OptionButton
+var _spawn_option: OptionButton
+var _world_info: Label
 var _host_button: Button
 var _join_button: Button
 var _cancel_button: Button
@@ -76,7 +83,7 @@ func _build_lobby(root: Control) -> void:
 	root.add_child(center)
 	_lobby = PanelContainer.new()
 	_lobby.name = "Lobby"
-	_lobby.custom_minimum_size.x = 360
+	_lobby.custom_minimum_size.x = 400
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.06, 0.10, 0.14, 0.96)
 	style.set_content_margin_all(20)
@@ -103,6 +110,14 @@ func _build_lobby(root: Control) -> void:
 	for kind in KINDS:
 		_kind.add_item(kind.capitalize())
 	_add_field(form, "Client actor", _kind)
+	_world_option = OptionButton.new()
+	_world_option.name = "WorldOption"
+	_world_option.item_selected.connect(_on_world_item_selected)
+	_add_field(form, "Host world", _world_option)
+	_spawn_option = OptionButton.new()
+	_spawn_option.name = "SpawnOption"
+	_spawn_option.item_selected.connect(_on_spawn_item_selected)
+	_add_field(form, "Start preset", _spawn_option)
 	_address = LineEdit.new()
 	_address.text = "127.0.0.1"
 	_add_field(form, "Address", _address)
@@ -114,6 +129,11 @@ func _build_lobby(root: Control) -> void:
 	_ros_url = LineEdit.new()
 	_ros_url.text = "ws://127.0.0.1:9090"
 	_add_field(form, "Host ROS URL", _ros_url)
+	_world_info = _label()
+	_world_info.name = "WorldInfo"
+	_world_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_world_info.add_theme_color_override("font_color", Color("9cb6c9"))
+	column.add_child(_world_info)
 	var buttons := HBoxContainer.new()
 	buttons.add_theme_constant_override("separation", 10)
 	column.add_child(buttons)
@@ -133,6 +153,7 @@ func _build_lobby(root: Control) -> void:
 	buttons.add_child(_cancel_button)
 	_cancel_button.hide()
 	_lobby_status = _label()
+	_lobby_status.name = "LobbyStatus"
 	_lobby_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	column.add_child(_lobby_status)
 
@@ -143,6 +164,95 @@ func _add_field(form: GridContainer, title: String, field: Control) -> void:
 	form.add_child(label)
 	field.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	form.add_child(field)
+
+
+func set_worlds(worlds: Array[Dictionary], current_world_id: String) -> void:
+	_world_option.clear()
+	var selected_idx := 0
+	for index in range(worlds.size()):
+		var entry: Dictionary = worlds[index]
+		var w_id := str(entry.get("world_id", ""))
+		var w_name := str(entry.get("display_name", w_id))
+		var w_kind := str(entry.get("kind", "unknown"))
+		var ok := bool(entry.get("ok", false))
+		var item_text := "%s (%s)%s" % [w_name, w_kind, "" if ok else " [INVALID]"]
+		_world_option.add_item(item_text, index)
+		_world_option.set_item_metadata(index, w_id)
+		if w_id == current_world_id:
+			selected_idx = index
+	if _world_option.item_count > 0:
+		_world_option.select(selected_idx)
+
+
+func set_spawn_presets(definition: Dictionary, selected_preset := "") -> void:
+	_spawn_option.clear()
+	var spawns: Variant = definition.get("spawns", {})
+	if not (spawns is Dictionary) or (spawns as Dictionary).is_empty():
+		_spawn_option.add_item("None", 0)
+		_spawn_option.set_item_metadata(0, "")
+		_spawn_option.disabled = true
+		return
+	_spawn_option.disabled = false
+	var default_preset := str(definition.get("default_spawn", "start_a"))
+	var target := selected_preset if not selected_preset.is_empty() else default_preset
+	var names: Array[String] = []
+	if spawns.has(default_preset):
+		names.append(default_preset)
+	var extra: Array[String] = []
+	for key in spawns.keys():
+		var k := str(key)
+		if k != default_preset and k != "default":
+			extra.append(k)
+	extra.sort()
+	names.append_array(extra)
+	if names.is_empty() and spawns.has("default"):
+		names.append("default")
+	var selected_idx := 0
+	for index in range(names.size()):
+		var preset_id := names[index]
+		var preset_dict: Dictionary = spawns.get(preset_id, {})
+		var label_text := str(preset_dict.get("display_name", preset_id))
+		_spawn_option.add_item("%s [%s]" % [label_text, preset_id], index)
+		_spawn_option.set_item_metadata(index, preset_id)
+		if preset_id == target or (target == "default" and preset_id == default_preset):
+			selected_idx = index
+	if _spawn_option.item_count > 0:
+		_spawn_option.select(selected_idx)
+
+
+func set_world_status(ready: bool, info_text: String) -> void:
+	_world_ready = ready
+	_world_status_text = info_text
+	if _world_info:
+		_world_info.text = info_text
+	if _host_button:
+		_host_button.disabled = not ready
+
+
+func selected_world_id() -> String:
+	if not _world_option or _world_option.selected < 0 or _world_option.item_count == 0:
+		return ""
+	var meta: Variant = _world_option.get_item_metadata(_world_option.selected)
+	return str(meta) if meta != null else ""
+
+
+func selected_spawn_preset() -> String:
+	if not _spawn_option or _spawn_option.selected < 0 or _spawn_option.item_count == 0:
+		return ""
+	var meta: Variant = _spawn_option.get_item_metadata(_spawn_option.selected)
+	return str(meta) if meta != null else ""
+
+
+func _on_world_item_selected(index: int) -> void:
+	var meta: Variant = _world_option.get_item_metadata(index)
+	if meta != null:
+		world_selected.emit(str(meta))
+
+
+func _on_spawn_item_selected(index: int) -> void:
+	var meta: Variant = _spawn_option.get_item_metadata(index)
+	if meta != null:
+		spawn_selected.emit(str(meta))
 
 
 func set_options(options: Dictionary) -> void:
@@ -167,18 +277,28 @@ func update_readout(state: Dictionary) -> void:
 	_bar.visible = state["active"]
 	if not state["active"]:
 		var connecting: bool = state["connecting"]
-		_host_button.disabled = connecting
+		_host_button.disabled = connecting or not _world_ready
 		_join_button.disabled = connecting
 		_cancel_button.visible = connecting
 		_nickname.editable = not connecting
 		_address.editable = not connecting
 		_port.editable = not connecting
+		_ros_url.editable = not connecting
 		_kind.disabled = connecting
+		_world_option.disabled = connecting
+		_spawn_option.disabled = connecting or _spawn_option.item_count == 0
+		_world_info.text = _world_status_text
 		_lobby_status.text = "" if _connection_status == "OFFLINE" else _connection_status
 		return
 	var connection := "HOST" if state["host"] else "CLIENT"
-	_state.text = "%s | %s | %s%s" % [connection, str(state["kind"]).capitalize(),
-		CAMERA_NAMES[int(state["camera"])], " | CURSOR" if state["cursor_free"] else ""]
+	var world_label := str(state.get("world_name", "")).strip_edges()
+	_state.text = "%s | %s | %s%s%s" % [
+		connection,
+		str(state["kind"]).capitalize(),
+		CAMERA_NAMES[int(state["camera"])],
+		" | CURSOR" if state["cursor_free"] else "",
+		(" | " + world_label) if not world_label.is_empty() else "",
+	]
 	if state["host"]:
 		_state.text += " | " + str(state.get("ros", "ROS OFFLINE"))
 	if state["position"] is Vector3:

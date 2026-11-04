@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "kind": "playground",
+  "world_id": "cub_playground_v1",
+  "display_name": "Cub Playground",
+  "bounds": {
+    "ros_min": [
+      -25.0,
+      -25.0,
+      0.0
+    ],
+    "ros_max": [
+      25.0,
+      25.0,
+      2.0
+    ],
+    "godot_min": [
+      -25.0,
+      0.0,
+      -25.0
+    ],
+    "godot_max": [
+      25.0,
+      2.0,
+      25.0
+    ],
+    "size_m": [
+      50.0,
+      50.0,
+      2.0
+    ]
+  },
+  "default_spawn": "start_a",
+  "spawns": {
+    "start_a": {
+      "display_name": "Default Playground Start",
+      "robot": {
+        "x": -4.0,
+        "y": 0.0,
+        "z": 0.0,
+        "yaw_deg": 0.0
+      },
+      "clients": [
+        {
+          "x": -6.0,
+          "y": 2.0,
+          "z": 0.0,
+          "yaw_deg": 0.0
+        },
+        {
+          "x": -6.0,
+          "y": 0.0,
+          "z": 0.0,
+          "yaw_deg": 0.0
+        },
+        {
+          "x": -6.0,
+          "y": -2.0,
+          "z": 0.0,
+          "yaw_deg": 0.0
+        }
+      ]
+    },
+    "default": {
+      "display_name": "Default Playground Start",
+      "robot": {
+        "x": -4.0,
+        "y": 0.0,
+        "z": 0.0,
+        "yaw_deg": 0.0
+      },
+      "clients": [
+        {
+          "x": -6.0,
+          "y": 2.0,
+          "z": 0.0,
+          "yaw_deg": 0.0
+        },
+        {
+          "x": -6.0,
+          "y": 0.0,
+          "z": 0.0,
+          "yaw_deg": 0.0
+        },
+        {
+          "x": -6.0,
+          "y": -2.0,
+          "z": 0.0,
+          "yaw_deg": 0.0
+        }
+      ]
+    }
+  },
+  "playground": {
+    "generator_version": 1,
+    "capsule_clearance_radius_m": 0.28
+  },
+  "world_hash": "6af17b14614cbae4043c2b62037b021551dc2daecd6650ff73bd302bdc51cd90"
+}

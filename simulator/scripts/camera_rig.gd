@@ -1,14 +1,22 @@
 extends Node3D
 
+const TOP_UP := Vector3.LEFT
+const TOP_YAW := PI * 0.5
+const MIN_ZOOM_DISTANCE := 2.0
+const DEFAULT_MAX_ZOOM_DISTANCE := 65.0
+
 var camera: Camera3D
 var mode := 0
 var yaw := 0.55
 var pitch := 0.55
 var distance := 9.0
+var max_zoom_distance := DEFAULT_MAX_ZOOM_DISTANCE
 var target: Node3D
 var center := Vector3(0, 0.7, 1)
 var look_enabled := false
 var mouse_sensitivity := 0.003
+var _top_height := 40.0
+var _pick_range := 300.0
 var _drag_button := 0
 var _control_click := false
 var _rotating := false
@@ -22,6 +30,24 @@ func _ready() -> void:
 	camera.near = 0.1
 	camera.far = 100.0
 	add_child(camera)
+
+
+func configure_world_bounds(bounds: AABB) -> void:
+	var span := maxf(bounds.size.x, bounds.size.z)
+	if span <= 60.0:
+		max_zoom_distance = DEFAULT_MAX_ZOOM_DISTANCE
+		_top_height = 40.0
+		_pick_range = 300.0
+		if camera:
+			camera.far = 100.0
+	else:
+		max_zoom_distance = clampf(span * 1.2, DEFAULT_MAX_ZOOM_DISTANCE, 2500.0)
+		_top_height = maxf(40.0, bounds.end.y + 60.0)
+		_pick_range = maxf(300.0, span * 3.0)
+		if camera:
+			camera.far = maxf(100.0, span * 2.5)
+	distance = clampf(distance, MIN_ZOOM_DISTANCE, max_zoom_distance)
+	_place_camera()
 
 
 func select_mode(value: int) -> void:
@@ -64,8 +90,8 @@ func _place_camera() -> void:
 	if mode == 2:
 		camera.projection = Camera3D.PROJECTION_ORTHOGONAL
 		camera.size = distance
-		camera.global_position = center + Vector3.UP * 40.0
-		camera.look_at(center, Vector3.FORWARD)
+		camera.global_position = center + Vector3.UP * _top_height
+		camera.look_at(center, TOP_UP)
 	else:
 		camera.projection = Camera3D.PROJECTION_PERSPECTIVE
 		var offset := Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch)) * distance
@@ -82,7 +108,7 @@ func _place_camera() -> void:
 func pan(direction: Vector2, delta: float) -> void:
 	if mode == 0 or direction.is_zero_approx():
 		return
-	var orientation := yaw if mode == 1 else 0.0
+	var orientation := yaw if mode == 1 else TOP_YAW
 	center += Basis(Vector3.UP, orientation) * Vector3(direction.x, 0, direction.y) * distance * delta * 0.55
 
 
@@ -187,7 +213,7 @@ func _rotate_map(motion: Vector2) -> void:
 
 func _zoom_at(screen_position: Vector2, factor: float) -> void:
 	var anchor: Variant = _terrain_point(screen_position) if mode != 0 else null
-	distance = clampf(distance * factor, 2.0, 65.0)
+	distance = clampf(distance * factor, MIN_ZOOM_DISTANCE, max_zoom_distance)
 	_place_camera()
 	if anchor != null:
 		var at: Variant = _plane_point(screen_position, anchor.y)
@@ -205,12 +231,12 @@ func _plane_point(screen_position: Vector2, height: float) -> Variant:
 	var origin := camera.project_ray_origin(screen_position)
 	var at: Variant = Plane(Vector3.UP, height).intersects_ray(origin, camera.project_ray_normal(screen_position))
 	# Ignore sky and near-horizon intersections rather than jumping far away.
-	return at if at != null and origin.distance_squared_to(at) <= 300.0 * 300.0 else null
+	return at if at != null and origin.distance_squared_to(at) <= _pick_range * _pick_range else null
 
 
 func _terrain_point(screen_position: Vector2) -> Variant:
 	var origin := camera.project_ray_origin(screen_position)
 	var direction := camera.project_ray_normal(screen_position)
-	var query := PhysicsRayQueryParameters3D.create(origin, origin + direction * 300.0, 1)
+	var query := PhysicsRayQueryParameters3D.create(origin, origin + direction * _pick_range, 1)
 	var hit := get_world_3d().direct_space_state.intersect_ray(query)
 	return hit["position"] if not hit.is_empty() else _plane_point(screen_position, center.y)

@@ -19,6 +19,8 @@ var controlled := false
 var simulated := false
 var target_position := Vector3.ZERO
 var target_yaw := 0.0
+var spawn_position := Vector3(0.0, 0.1, 4.0)
+var spawn_yaw := 0.0
 var angular_velocity := 0.0
 var body_height := 0.9
 var received_updates := 0
@@ -42,6 +44,8 @@ func configure(record: Dictionary, local_control: bool) -> void:
 	_color = Color(record["color"])
 	position = record["position"]
 	rotation.y = float(record["yaw"])
+	spawn_position = record.get("spawn_position", position)
+	spawn_yaw = float(record.get("spawn_yaw", rotation.y))
 	target_position = position
 	target_yaw = rotation.y
 	_poses.reset(position, rotation.y, float(record.get("sample_time", 0.0)))
@@ -138,7 +142,8 @@ func _move(horizontal: Vector3, delta: float) -> void:
 		_try_step(horizontal * delta)
 	move_and_slide()
 	if position.y < -12.0:
-		position = Vector3(0.0, 0.1, 4.0)
+		position = spawn_position
+		rotation.y = spawn_yaw
 		velocity = Vector3.ZERO
 	# Smooth only the picture; simulation and network state keep the actual height.
 	_display_height = move_toward(_display_height, 0.0, delta * 2.5)

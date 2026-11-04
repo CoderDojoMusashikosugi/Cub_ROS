@@ -2,6 +2,7 @@ extends Node3D
 
 const ActorScript = preload("res://scripts/actor.gd")
 const WorldScript = preload("res://scripts/world.gd")
+const WorldRegistryScript = preload("res://scripts/world_registry.gd")
 const SessionScript = preload("res://scripts/session.gd")
 const CameraScript = preload("res://scripts/camera_rig.gd")
 const HudScript = preload("res://scripts/hud.gd")
@@ -10,6 +11,10 @@ const JoyInputScript = preload("res://scripts/ros/joy_input.gd")
 const LidarScript = preload("res://scripts/ros/lidar.gd")
 const OdomScript = preload("res://scripts/ros/odom.gd")
 const CAMERA_MODES := {"tps": 0, "3d": 1, "orbit": 1, "2d": 2, "top": 2}
+const VALUE_OPTION_KEYS := [
+	"join", "bind", "port", "actor", "name", "camera", "run-seconds", "ros-url", "joy-device",
+	"world", "spawn", "spawn-x", "spawn-y", "spawn-z", "spawn-yaw-deg",
+]
 
 var ros_bridge: Node
 var joy_input = JoyInputScript.new()
@@ -21,6 +26,8 @@ var camera_rig: Node3D
 var hud: CanvasLayer
 var actors: Dictionary = {}
 var options: Dictionary = {}
+var available_worlds: Array[Dictionary] = []
+var _cli_spawn_request: Dictionary = {}
 var _has_focus := true
 var _publish_elapsed := 0.0
 var _scan_elapsed := 0.0
@@ -46,19 +53,32 @@ func _ready() -> void:
 	hud.host_requested.connect(_host)
 	hud.join_requested.connect(_join)
 	hud.cancel_requested.connect(_leave)
+	hud.world_selected.connect(_on_lobby_world_selected)
+	hud.spawn_selected.connect(_on_lobby_spawn_selected)
 	session = SessionScript.new()
 	session.name = "Session"
+	session.world_node = world
 	session.actor_added.connect(_add_actor)
 	session.actor_removed.connect(_remove_actor)
 	session.pose_received.connect(_receive_pose)
 	session.status_changed.connect(_status_changed)
 	session.session_reset.connect(_reset)
 	session.roster_changed.connect(_refresh_session)
+	session.world_changed.connect(_on_session_world_changed)
 	add_child(session)
 	ros_bridge = RosBridgeScript.new()
 	add_child(ros_bridge)
+
+	available_worlds = WorldRegistryScript.list_worlds()
 	options = parse_options(OS.get_cmdline_user_args())
 	var argument_error := validate_options(options)
+	var requested_world_id := str(options.get("world", WorldRegistryScript.DEFAULT_WORLD_ID)).strip_edges()
+	if requested_world_id.is_empty():
+		requested_world_id = WorldRegistryScript.DEFAULT_WORLD_ID
+
+	hud.set_worlds(available_worlds, requested_world_id)
+	_select_world(requested_world_id, str(options.get("spawn", "")))
+
 	if argument_error.is_empty():
 		options["actor"] = "robot" if options.has("host") else str(options.get("actor", "pedestrian" if options.has("join") else "robot"))
 		options["name"] = str(options.get("name", "Host" if options.has("host") else ("Guest" if options.has("join") else "Player")))
@@ -66,6 +86,16 @@ func _ready() -> void:
 		hud.set_options(options)
 		ros_bridge.url = str(options.get("ros-url", "ws://127.0.0.1:9090"))
 		joy_input.preferred_device_id = int(options.get("joy-device", -1))
+		_cli_spawn_request = extract_spawn_request(options)
+		session.local_spawn_request = _cli_spawn_request.duplicate(true)
+		# Validate startup world and spawn for lobby or host startup.
+		if options.has("world") and not world.is_loaded:
+			argument_error = world.load_error
+		elif not options.has("join") and not _cli_spawn_request.is_empty():
+			var check: Dictionary = world.resolve_spawn(_cli_spawn_request, true, 0)
+			if not bool(check.get("ok", false)):
+				argument_error = str(check.get("error", "Invalid spawn arguments."))
+
 	get_window().focus_entered.connect(func(): _set_window_focus(true))
 	get_window().focus_exited.connect(func(): _set_window_focus(false))
 	_set_window_focus(DisplayServer.get_name() == "headless" or get_window().has_focus())
@@ -101,7 +131,7 @@ func _physics_process(delta: float) -> void:
 			var command: Vector2 = ros_bridge.command()
 			actors[id].simulate_velocity(command.x, command.y, delta)
 		else:
-			actors[id].simulate(movement, camera_rig.yaw if camera_rig.mode != 2 else 0.0, fast, delta)
+			actors[id].simulate(movement, camera_rig.yaw if camera_rig.mode != 2 else camera_rig.TOP_YAW, fast, delta)
 	_publish_elapsed += delta
 	if _publish_elapsed >= 0.05:
 		_publish_elapsed = fmod(_publish_elapsed, 0.05)
@@ -208,15 +238,75 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	_update_hud()
 
 
+func _select_world(target_world_id: String, preferred_preset := "") -> bool:
+	var ok: bool = world.load_world(target_world_id)
+	hud.set_worlds(available_worlds, target_world_id)
+	if ok:
+		camera_rig.configure_world_bounds(world.get_world_bounds_godot())
+		hud.set_spawn_presets(world.definition, preferred_preset)
+		var preset_id: String = hud.selected_spawn_preset()
+		if not preset_id.is_empty():
+			world.active_spawn_preset = preset_id
+		session.world_info = world.world_summary()
+		var size_arr: Variant = world.definition.get("bounds", {}).get("size_m", [50, 50, 2])
+		var dim_text := "%.1f x %.1f m" % [float(size_arr[0]), float(size_arr[1])] if (size_arr is Array and size_arr.size() >= 2) else ""
+		hud.set_world_status(true, "World: %s [%s] (%s) — READY. Join follows host world." % [
+			world.display_name, world.kind, dim_text
+		])
+	else:
+		hud.set_spawn_presets({}, "")
+		hud.set_world_status(false, "World error: " + world.load_error)
+	_update_hud()
+	return ok
+
+
+func _on_lobby_world_selected(world_id: String) -> void:
+	if session.ready_to_play or session._joining:
+		return
+	_cli_spawn_request.clear()
+	_select_world(world_id)
+
+
+func _on_lobby_spawn_selected(preset_name: String) -> void:
+	if session.ready_to_play or session._joining:
+		return
+	_cli_spawn_request.clear()
+	world.active_spawn_preset = preset_name
+	session.local_spawn_request = {"spawn": preset_name}
+
+
+func _on_session_world_changed(_info: Dictionary) -> void:
+	if world and world.is_loaded:
+		camera_rig.configure_world_bounds(world.get_world_bounds_godot())
+		hud.set_worlds(available_worlds, world.world_id)
+		hud.set_spawn_presets(world.definition, world.active_spawn_preset)
+		hud.set_world_status(true, "World: %s [%s] — READY." % [world.display_name, world.kind])
+	_update_hud()
+
+
 func _host(address: String, port: int, nickname: String) -> void:
+	var target_world_id: String = hud.selected_world_id()
+	if not target_world_id.is_empty() and (world.world_id != target_world_id or not world.is_loaded):
+		_select_world(target_world_id, hud.selected_spawn_preset())
+	if not world.is_loaded:
+		_status_changed("Cannot host: " + world.load_error)
+		return
+	var spawn_req := _cli_spawn_request.duplicate(true)
+	if spawn_req.is_empty():
+		var preset: String = hud.selected_spawn_preset()
+		if not preset.is_empty():
+			spawn_req = {"spawn": preset}
+	session.local_spawn_request = spawn_req
 	ros_bridge.url = hud.ros_url()
 	joy_input.preferred_device_id = int(options.get("joy-device", -1))
-	session.start_host(port, nickname, address)
+	session.start_host(port, nickname, address, spawn_req)
 	_refresh_session()
 
 
 func _join(address: String, port: int, kind: String, nickname: String) -> void:
-	session.join_host(address, port, kind, nickname)
+	var spawn_req := _cli_spawn_request.duplicate(true)
+	session.local_spawn_request = spawn_req
+	session.join_host(address, port, kind, nickname, spawn_req)
 	_refresh_session()
 
 
@@ -300,7 +390,11 @@ func _refresh_session() -> void:
 	_update_mouse_capture()
 	_update_hud()
 	var role := "HOST" if session.is_host else "CLIENT"
-	DisplayServer.window_set_title("Cub Simulator | %s | %s" % [role, session.nickname] if session.ready_to_play else "Cub Simulator | Lobby")
+	DisplayServer.window_set_title(
+		"Cub Simulator | %s | %s | %s" % [role, session.nickname, world.world_id]
+		if session.ready_to_play
+		else "Cub Simulator | Lobby"
+	)
 
 
 func _status_changed(message: String) -> void:
@@ -321,12 +415,21 @@ func _update_hud() -> void:
 		return
 	var id: int = session.local_actor_id
 	var actor: Node3D = actors.get(id)
-	hud.update_readout({"active": session.ready_to_play, "connecting": session._joining,
-		"host": session.is_host, "kind": _pending_kind, "camera": camera_rig.mode,
+	hud.update_readout({
+		"active": session.ready_to_play,
+		"connecting": session._joining,
+		"host": session.is_host,
+		"kind": _pending_kind,
+		"camera": camera_rig.mode,
+		"world_name": world.display_name if world else "",
+		"world_id": world.world_id if world else "",
 		"position": actor.position if is_instance_valid(actor) else null,
 		"yaw": rad_to_deg(actor.rotation.y) if is_instance_valid(actor) else 0.0,
 		"ros": (ros_bridge.status if ros_bridge else "ROS OFFLINE") + " | " + joy_input.device_name,
-		"fps": Engine.get_frames_per_second(), "actors": actors.size(), "cursor_free": _cursor_released})
+		"fps": Engine.get_frames_per_second(),
+		"actors": actors.size(),
+		"cursor_free": _cursor_released,
+	})
 
 
 func _register_input() -> void:
@@ -365,16 +468,35 @@ static func parse_options(arguments: PackedStringArray) -> Dictionary:
 	return parsed
 
 
+static func extract_spawn_request(parsed: Dictionary) -> Dictionary:
+	var req: Dictionary = {}
+	if parsed.has("spawn"):
+		req["spawn"] = str(parsed["spawn"]).strip_edges()
+	if parsed.has("spawn-x"):
+		req["x"] = float(str(parsed["spawn-x"]))
+	if parsed.has("spawn-y"):
+		req["y"] = float(str(parsed["spawn-y"]))
+	if parsed.has("spawn-z"):
+		req["z"] = float(str(parsed["spawn-z"]))
+	if parsed.has("spawn-yaw-deg"):
+		req["yaw_deg"] = float(str(parsed["spawn-yaw-deg"]))
+	return req
+
+
 static func validate_options(parsed: Dictionary) -> String:
 	if parsed.has("host") and parsed.has("join"):
 		return "Use either --host or --join ADDRESS."
 	if parsed.has("host") and not parsed["host"] is bool:
 		return "--host is a flag; use --bind ADDRESS to set its address."
-	for key in ["join", "bind", "port", "actor", "name", "camera", "run-seconds", "ros-url", "joy-device"]:
+	for key in VALUE_OPTION_KEYS:
 		if parsed.has(key) and parsed[key] is bool:
 			return "--%s requires a value." % key
 	if parsed.has("join") and str(parsed["join"]).strip_edges().is_empty():
 		return "--join requires a host address."
+	if parsed.has("join") and parsed.has("world"):
+		return "--world cannot be used with --join; clients follow the host's world."
+	if parsed.has("world") and str(parsed["world"]).strip_edges().is_empty():
+		return "--world requires a world ID."
 	if parsed.has("actor") and str(parsed["actor"]) not in SessionScript.KINDS:
 		return "--actor must be robot, pedestrian or cone."
 	if parsed.has("camera") and not CAMERA_MODES.has(str(parsed["camera"])):
@@ -393,4 +515,26 @@ static func validate_options(parsed: Dictionary) -> String:
 		return "--input has been removed; controller/keyboard selection and manual/autonomous handover are automatic."
 	if parsed.has("joy-device") and (not str(parsed["joy-device"]).is_valid_int() or int(parsed["joy-device"]) < -1):
 		return "--joy-device must be -1 (automatic selection) or a non-negative device ID to prefer."
+
+	# Spawn argument validation:
+	var has_preset := parsed.has("spawn")
+	var has_x := parsed.has("spawn-x")
+	var has_y := parsed.has("spawn-y")
+	var has_z := parsed.has("spawn-z")
+	var has_yaw := parsed.has("spawn-yaw-deg")
+	var has_coords := has_x or has_y or has_z or has_yaw
+
+	if has_preset and str(parsed["spawn"]).strip_edges().is_empty():
+		return "--spawn requires a preset name."
+	if has_preset and has_coords:
+		return "Cannot combine --spawn preset with --spawn-x/--spawn-y/--spawn-z/--spawn-yaw-deg."
+	if has_x != has_y:
+		return "Specify both --spawn-x and --spawn-y together."
+	if (has_z or has_yaw) and not (has_x and has_y):
+		return "--spawn-z and --spawn-yaw-deg require both --spawn-x and --spawn-y."
+	for float_key in ["spawn-x", "spawn-y", "spawn-z", "spawn-yaw-deg"]:
+		if parsed.has(float_key):
+			var text := str(parsed[float_key]).strip_edges()
+			if not text.is_valid_float() or not is_finite(float(text)):
+				return "--%s must be a finite number." % float_key
 	return ""

@@ -59,11 +59,13 @@ ros2 launch cub_bringup localization.launch.py simulation:=godot
 
 ### 自律移動 (Nav2) の起動
 
-`navigation.launch.py simulation:=godot`は実機と同じく`map:=<path>`引数で地図ファイルを受け取り、Godotの`/scan`と`/odom`を使ってNav2を動かします。Godot空間に対応する地図は`cub_simulation/maps/cub_playground_v1/map.yaml`にあります（内部で`localization.launch.py`も起動されます）。
+`navigation.launch.py simulation:=godot`は実機と同じく`map:=<path>`引数で地図ファイルを受け取り、Godotの`/scan`と`/odom`を使ってNav2を動かします。既存の試験ワールドで使う地図の例は`cub_simulation/maps/cub_playground_v1/map.yaml`にあります（内部で`localization.launch.py`も起動されます）。ナビゲーション地図はシミュレーターの環境とは独立して指定し、ワールド生成用データと内容が異なる場合も利用できます。
 
 ```bash
 ros2 launch cub_bringup navigation.launch.py simulation:=godot map:=/home/cub/colcon_ws/src/cub/cub_simulation/maps/cub_playground_v1/map.yaml
 ```
+
+ワールド生成用PGMから平らな床と高さ0.5 mの壁を生成する構成を用意しています（例：`simulator/worlds/gnss2026_mid360_1017_02`、および変換ツール`simulator/tools/build_occupancy_world.py`）。黒（画素値0）のみを壁、白・灰色はすべて空きの床として扱い、地図の形状加工は行いません。文字だけのワールド選択、起動引数による開始位置指定、Godot参加者同士の照合、将来の3Dメッシュ対応は[ワールド生成の実装計画](../../simulator/occupancy_world_plan.md)を参照してください。ワールドの選択・変更からROS側の地図切替・一致確認・Nav2再起動は行いません。
 
 ## テスト
 

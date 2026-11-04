@@ -66,8 +66,12 @@ func _process(delta: float) -> bool:
 			remote_updates = maxi(remote_updates, remote.received_updates)
 		if elapsed < 4.5:
 			Input.action_press("move_forward")
+		elif elapsed < 8.5:
+			Input.action_release("move_forward")
+			Input.action_press("move_backward")
 		else:
 			Input.action_release("move_forward")
+			Input.action_release("move_backward")
 		if app.actors.has(id):
 			own_distance = maxf(own_distance, app.actors[id].position.distance_to(start_position))
 		if str(app.options.get("name", "")) == "Early2" and elapsed > 3.0 and not changed_kind:
@@ -87,6 +91,7 @@ func _finish(reason: String) -> void:
 		return
 	_finished = true
 	Input.action_release("move_forward")
+	Input.action_release("move_backward")
 	var report := {"reason": reason, "connected": connected_once, "maximum_actors": maximum_actors,
 		"snapshots": max_snapshots, "distance": own_distance, "first_positions": first_positions,
 		"first_times": first_times, "remote_distance": remote_distance, "remote_updates": remote_updates,
