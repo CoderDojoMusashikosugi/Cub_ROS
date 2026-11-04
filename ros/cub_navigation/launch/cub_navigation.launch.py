@@ -79,7 +79,8 @@ def launch_setup(context):
         ),
         Node(
             package='cub_navigation',
-            executable='waypoint_visualizer'
+            executable='waypoint_visualizer',
+            parameters=[{'json_file': waypoints_file}]
         ),
 
 
@@ -100,11 +101,11 @@ def generate_launch_description():
     # 白紙地図なら /home/cub/colcon_ws/src/cub/cub_navigation/maps/empty/map.yaml を使うと良い
     map_dir = LaunchConfiguration(
         'map',
-        default="/home/cub/maps/kakunin-1004/kakunin-1004-modified.yaml") # cub_bringup navigation.launch.pyで呼び出し時に上書きされる。デフォルト値設定はそちらに。
+        default="/home/cub/maps/1017_02/map.yaml") # cub_bringup navigation.launch.pyで呼び出し時に上書きされる。デフォルト値設定はそちらに。
 
     waypoints_dir = LaunchConfiguration(
         'waypoints',
-        default="/home/cub/colcon_ws/src/cub/cub_behavior_tree/routes/furo_waypoints.yaml")
+        default="/home/cub/colcon_ws/src/cub/cub_behavior_tree/routes/kakunin.yaml")
 
     return LaunchDescription([
         DeclareLaunchArgument(
