@@ -133,5 +133,9 @@
     "chunks_sha256": "70fb635c787b3b376e501380c2a339093b1dce5d1b012189b3b16a654165b174",
     "capsule_clearance_radius_m": 0.28
   },
-  "world_hash": "66c0aac38951dd4034c53c6bec953ca372041793427054db9de6db1ddf19ea13"
+  "appearance": {
+    "floor_texture": "floor_texture.png",
+    "floor_texture_sha256": "db9a3a41e521cb6a3d6a88a42a3ad934a3cce6560331d1154cc0448f88569385"
+  },
+  "world_hash": "2ce48443472731bd1461093d16874b3640ee2320848a220caf4145f7fa3b847f"
 }

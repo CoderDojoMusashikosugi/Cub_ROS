@@ -4,6 +4,7 @@
 Uses only Python's standard library. Preserves all original pixel values in
 source.png without dilation, smoothing, hole-filling, or cropping. Black pixels
 (value 0) become 0.5 m walls; white and gray pixels (> 0) become flat floor.
+An optional, aligned PNG floor texture is copied unchanged for nearest-filtered display.
 """
 
 from __future__ import annotations
@@ -137,6 +138,17 @@ def parse_map_yaml(yaml_path: Path) -> dict[str, Any]:
     if "resolution" not in result or "origin" not in result:
         raise ValueError(f"Missing resolution or origin in {yaml_path}")
     return result
+
+
+def read_png_dimensions(data: bytes) -> tuple[int, int]:
+    """Read a PNG's canvas size without resampling or re-encoding its pixels."""
+    if (
+        len(data) < 33
+        or data[:8] != b"\x89PNG\r\n\x1a\n"
+        or data[8:16] != b"\x00\x00\x00\x0dIHDR"
+    ):
+        raise ValueError("Floor texture must be a PNG image")
+    return struct.unpack(">II", data[16:24])
 
 
 def cell_center_to_ros(
@@ -481,10 +493,21 @@ def build_occupancy_world(
     chunk_cells: int = 64,
     wall_height: float = 0.5,
     floor_height: float = 0.0,
+    floor_texture_path: Path | None = None,
 ) -> dict[str, Any]:
     pgm_bytes = pgm_path.read_bytes()
     pgm_sha256 = sha256(pgm_bytes).hexdigest()
     width, height, _maxval, pixels = parse_pgm(pgm_bytes)
+
+    floor_texture_bytes = None
+    if floor_texture_path is not None:
+        floor_texture_bytes = floor_texture_path.read_bytes()
+        texture_width, texture_height = read_png_dimensions(floor_texture_bytes)
+        if (texture_width, texture_height) != (width, height):
+            raise ValueError(
+                f"Floor texture dimensions ({texture_width}x{texture_height}) "
+                f"must match PGM dimensions ({width}x{height}); no resizing is performed"
+            )
 
     occupied_count = pixels.count(0)
     white_count = pixels.count(254)
@@ -605,11 +628,18 @@ def build_occupancy_world(
             "capsule_clearance_radius_m": CAPSULE_CLEARANCE_RADIUS_M,
         },
     }
+    if floor_texture_bytes is not None:
+        world_def["appearance"] = {
+            "floor_texture": "floor_texture.png",
+            "floor_texture_sha256": sha256(floor_texture_bytes).hexdigest(),
+        }
     world_def["world_hash"] = compute_world_hash(world_def)
 
     output_dir.mkdir(parents=True, exist_ok=True)
     (output_dir / "source.png").write_bytes(png_bytes)
     (output_dir / "wall_chunks.json").write_bytes(chunks_bytes)
+    if floor_texture_bytes is not None:
+        (output_dir / "floor_texture.png").write_bytes(floor_texture_bytes)
     (output_dir / "world.json").write_text(
         json.dumps(world_def, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
@@ -706,6 +736,12 @@ def main() -> None:
     parser.add_argument("--chunk-cells", type=int, default=64, help="Chunk size in cells (default: 64)")
     parser.add_argument("--wall-height", type=float, default=0.5, help="Extruded wall height in meters (default: 0.5)")
     parser.add_argument(
+        "--floor-texture",
+        type=Path,
+        default=None,
+        help="Optional PNG floor image with the same canvas/coordinates as the PGM (nearest filtering, no resizing)",
+    )
+    parser.add_argument(
         "--skip-playground",
         action="store_true",
         help="Do not update simulator/worlds/cub_playground_v1/world.json",
@@ -733,6 +769,7 @@ def main() -> None:
         start_yaw_deg=float(args.spawn_yaw_deg),
         chunk_cells=int(args.chunk_cells),
         wall_height=float(args.wall_height),
+        floor_texture_path=args.floor_texture,
     )
 
     if not args.skip_playground:

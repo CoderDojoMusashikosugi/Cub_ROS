@@ -150,6 +150,7 @@ TPSではカーソルをウインドウ内に捕捉し、ボタンを押さず�
 
 - `simulator/tools/build_occupancy_world.py`は、編集済みPGM画像とYAML（解像度・原点）からロスレスグレースケール`source.png`、64×64セル単位の結合壁矩形`wall_chunks.json`、および`world.json`を生成します。
 - 黒（画素値`0`）のみを高さ`0.5 m`の壁として押し出し、白（`254`）と灰色（`205`等）はすべて平らな空きの床（`0.0 m`）として扱います。画像の膨張・平滑化・穴埋め・切り出しは行いません。
+- 床には任意のPNG画像を`--floor-texture`で指定できます。PGMと同じキャンバスサイズ・座標配置の画像を使い、床全体に1枚として貼ります。最近傍補間・ミップマップなしで、拡大時もピクセルの四角と元の色を保ちます。`gnss2026_mid360_1017_02`には`map_intensity.png`を同梱済みです。画像は見た目にだけ使用し、壁やLiDARの判定はPGMが決めます。
 - `gnss2026_mid360_1017_02`（`3580 × 2122` px、`0.2 m/cell`、`716.0 × 424.4 m`）の既定開始地点`start_a`は、画像上の`(u=773, v=1467)`（ROS `map` 座標 `(x=62.2725, y=30.194, z=0.0)`）で画像左向き（`-u`方向、`yaw = 180°`）です。`3`キーの真上2D地図カメラも元PGM画像の向き（画面上が画像上`-v`＝ROS `+Y`、画面右が画像右`+u`＝ROS `+X`）に一致します。
 - Godotのワールド選択はROSのナビゲーション地図（`map:=...`）とは独立しており、ワールド変更に伴うROS側の地図切替・一致照合・Nav2再起動は行いません。
 
@@ -171,6 +172,7 @@ TPSではカーソルをウインドウ内に捕捉し、ボタンを押さず�
 python3 simulator/tools/build_occupancy_world.py \
   --pgm docker/home/maps/gnss2026/mid360/1017_02/map_navigation.pgm \
   --yaml docker/home/maps/gnss2026/mid360/1017_02/map.yaml \
+  --floor-texture docker/home/maps/gnss2026/mid360/1017_02/map_intensity.png \
   --world-id gnss2026_mid360_1017_02 \
   --display-name "GNSS 2026 Mid360 1017_02" \
   --spawn-pixel 773 1467 \
@@ -186,6 +188,8 @@ python3 simulator/tools/build_occupancy_world.py \
   --spawn-pixel 250 250 \
   --spawn-yaw-deg 0
 ```
+
+`--floor-texture`を省略すると従来の単色床になります。指定したPNGは変更せず`floor_texture.png`としてワールド内にコピーされ、`world.json`の`appearance.floor_texture`と`floor_texture_sha256`に記録されます。元の`docker/home/maps/`は実行時には不要です。画像の寸法がPGMと異なる場合は、位置ずれを防ぐため生成をエラーにします。床画像もGodot同士の`world_hash`照合対象なので、別PCには更新したワールドフォルダ一式を配布してください。ROSのナビゲーション地図には影響しません。
 
 3. **Godotでの選択・開始**
    - `simulator/worlds/<world-id>/world.json`が配置されていれば、Godot起動時に自動で検出され、開始前のロビー画面の`Host world`一覧に表示されます（スクリプトの変更は不要です）。
@@ -229,6 +233,8 @@ $godot = 'C:\Users\tomok\workspace\Godot_v4.7.2-stable_win64.exe\Godot_v4.7.2-st
 & $godot --headless --path .\simulator --script res://tests/lidar_test.gd
 & $godot --headless --path .\simulator --script res://tests/occupancy_world_test.gd
 ```
+
+`occupancy_world_test.gd`を`--headless`なしで実行すると、床画像の描画も検証します。4×4画素のテスト画像を128×128画素へ拡大し、向き・表面の可視性・画素境界に補間色がないことを全画素で確認します。
 
 Python側のワールド変換ツールの単体テストは次で実行できます。
 

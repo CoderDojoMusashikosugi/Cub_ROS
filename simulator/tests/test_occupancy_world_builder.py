@@ -2,6 +2,7 @@
 """Unit tests for simulator/tools/build_occupancy_world.py."""
 
 import json
+from hashlib import sha256
 import math
 from pathlib import Path
 import struct
@@ -158,6 +159,11 @@ class OccupancyWorldBuilderTest(unittest.TestCase):
         self.assertEqual((src["width"], src["height"]), (3580, 2122))
         self.assertAlmostEqual(src["resolution"], 0.2)
         self.assertEqual(src["origin"], [-92.4275, -100.706, 0.0])
+        appearance = meta["appearance"]
+        texture_bytes = (world_dir / appearance["floor_texture"]).read_bytes()
+        self.assertEqual(bow.read_png_dimensions(texture_bytes), (3580, 2122))
+        self.assertEqual(sha256(texture_bytes).hexdigest(), appearance["floor_texture_sha256"])
+        self.assertEqual(bow.compute_world_hash(meta), meta["world_hash"])
         counts = src["pixel_counts"]
         self.assertEqual(counts["occupied_0"], 65640)
         self.assertEqual(counts["free_white_254"], 7530733)
@@ -178,6 +184,43 @@ class OccupancyWorldBuilderTest(unittest.TestCase):
         self.assertAlmostEqual(robot_start["x"], 62.2725, places=4)
         self.assertAlmostEqual(robot_start["y"], 30.194, places=4)
         self.assertAlmostEqual(robot_start["yaw_deg"], 180.0, places=4)
+
+    def test_optional_floor_texture_preserves_pixels_and_geometry(self) -> None:
+        w, h = 12, 10
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            pgm = tmp_path / "map.pgm"
+            pgm.write_bytes(f"P5\n{w} {h}\n255\n".encode("ascii") + bytes([254] * w * h))
+            texture = tmp_path / "intensity.png"
+            texture_bytes = bow.encode_grayscale_png(w, h, bytes(range(w * h)))
+            texture.write_bytes(texture_bytes)
+            params = dict(
+                pgm_path=pgm, world_id="test_world", display_name="Test",
+                resolution=0.2, origin=[10.0, -5.0, math.pi / 2], start_pixel=(5, 5),
+            )
+            plain_dir, textured_dir = tmp_path / "plain", tmp_path / "textured"
+            plain = bow.build_occupancy_world(output_dir=plain_dir, **params)
+            textured = bow.build_occupancy_world(
+                output_dir=textured_dir, floor_texture_path=texture, **params,
+            )
+            self.assertNotIn("appearance", plain)
+            self.assertEqual((textured_dir / "floor_texture.png").read_bytes(), texture_bytes)
+            self.assertEqual(textured["appearance"]["floor_texture_sha256"], sha256(texture_bytes).hexdigest())
+            for key in ("source", "extrusion", "bounds", "spawns"):
+                self.assertEqual(plain[key], textured[key])
+            self.assertEqual((plain_dir / "wall_chunks.json").read_bytes(), (textured_dir / "wall_chunks.json").read_bytes())
+            self.assertNotEqual(plain["world_hash"], textured["world_hash"])
+            texture.write_bytes(bow.encode_grayscale_png(w, h, bytes([128] * w * h)))
+            changed = bow.build_occupancy_world(
+                output_dir=textured_dir, floor_texture_path=texture, **params,
+            )
+            self.assertNotEqual(changed["world_hash"], textured["world_hash"])
+            texture.write_bytes(bow.encode_grayscale_png(w - 1, h, bytes([0] * (w - 1) * h)))
+            with self.assertRaisesRegex(ValueError, "must match PGM dimensions"):
+                bow.build_occupancy_world(output_dir=textured_dir, floor_texture_path=texture, **params)
+            texture.write_bytes(b"not a PNG")
+            with self.assertRaisesRegex(ValueError, "must be a PNG"):
+                bow.build_occupancy_world(output_dir=textured_dir, floor_texture_path=texture, **params)
 
 
 if __name__ == "__main__":

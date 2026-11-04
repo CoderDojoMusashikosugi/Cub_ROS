@@ -100,6 +100,22 @@ static func validate_definition(raw: Dictionary, base_dir: String, verify_hashes
 				if not actual_chunks_sha.is_empty() and actual_chunks_sha != expected_chunks_sha:
 					return _invalid(world_id, "World '%s' asset '%s' SHA-256 mismatch." % [world_id, chunks_name], display_name, kind)
 
+	# Appearance assets travel with the world, independently of ROS map files.
+	var appearance: Variant = definition.get("appearance", {})
+	if not (appearance is Dictionary):
+		return _invalid(world_id, "World '%s' has invalid 'appearance' settings." % world_id, display_name, kind)
+	if appearance.has("floor_texture"):
+		var texture_name := str(appearance["floor_texture"])
+		if texture_name.is_empty() or texture_name.is_absolute_path() or ".." in texture_name.split("/"):
+			return _invalid(world_id, "World '%s' floor texture must be a relative asset path." % world_id, display_name, kind)
+		var texture_path := "%s/%s" % [base_dir, texture_name]
+		if not FileAccess.file_exists(texture_path):
+			return _invalid(world_id, "World '%s' is missing floor texture '%s'." % [world_id, texture_name], display_name, kind)
+		if verify_hashes:
+			var expected_texture_sha := str(appearance.get("floor_texture_sha256", ""))
+			if not expected_texture_sha.is_empty() and FileAccess.get_sha256(texture_path) != expected_texture_sha:
+				return _invalid(world_id, "World '%s' floor texture '%s' SHA-256 mismatch." % [world_id, texture_name], display_name, kind)
+
 	definition["ok"] = true
 	definition["error"] = ""
 	definition["base_dir"] = base_dir

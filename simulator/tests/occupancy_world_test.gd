@@ -164,8 +164,96 @@ func _test_synthetic_rotated_gray_world() -> void:
 	_check(not bool(hole_spawn.get("ok", true)),
 		"single free cell (0.2 m) surrounded by black walls is rejected for capsule clearance")
 
+	# An optional image changes only the floor's appearance, with no rotation/mirroring or filtering.
+	var floor_image := Image.create(w, h, false, Image.FORMAT_RGB8)
+	floor_image.fill(Color.BLUE)
+	floor_image.set_pixel(0, 0, Color.RED)
+	floor_image.set_pixel(w - 1, 0, Color.GREEN)
+	floor_image.set_pixel(0, h - 1, Color.YELLOW)
+	floor_image.save_png(ProjectSettings.globalize_path(world_dir + "/floor_texture.png"))
+	world_def["appearance"] = {
+		"floor_texture": "floor_texture.png",
+		"floor_texture_sha256": FileAccess.get_sha256(world_dir + "/floor_texture.png"),
+	}
+	var textured_def := WorldRegistryScript.validate_definition(world_def, world_dir)
+	_check(test_world.load_from_definition(textured_def), "loads optional PNG floor texture")
+	var surface: MeshInstance3D = test_world.get_node("OccupancyWorld/OccupancyFloor/FloorSurface")
+	var mat: BaseMaterial3D = surface.material_override
+	_check(mat.albedo_texture != null and mat.texture_filter == BaseMaterial3D.TEXTURE_FILTER_NEAREST
+		and not mat.albedo_texture.get_image().has_mipmaps() and not mat.texture_repeat,
+		"floor uses nearest-neighbor filtering without mipmaps or texture repetition")
+	_check(mat.albedo_texture.get_image().get_pixel(0, 0).is_equal_approx(Color.RED)
+		and mat.albedo_texture.get_image().get_pixel(w - 1, 0).is_equal_approx(Color.GREEN)
+		and mat.albedo_texture.get_image().get_pixel(0, h - 1).is_equal_approx(Color.YELLOW),
+		"floor image retains distinct corner pixels")
+	var arrays := surface.mesh.surface_get_arrays(0)
+	var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	var uvs: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV]
+	for i in range(vertices.size()):
+		var ros: Vector2 = test_world.occupancy_loader.local_to_ros(uvs[i].x * w * r, (1.0 - uvs[i].y) * h * r)
+		var expected := LidarScript.ros_to_godot(Vector3(ros.x, ros.y, 0.0))
+		_check((surface.global_transform * vertices[i]).distance_to(expected) < 0.0001,
+			"floor UV corner %d matches map coordinates with rotated origin" % i)
+	if DisplayServer.get_name() != "headless":
+		await _test_floor_rendering(surface, test_world.occupancy_loader)
+	var bad_def := world_def.duplicate(true)
+	bad_def["appearance"]["floor_texture"] = "missing.png"
+	_check(not WorldRegistryScript.validate_definition(bad_def, world_dir).get("ok", true),
+		"rejects missing floor texture before world start")
+	bad_def["appearance"]["floor_texture"] = "floor_texture.png"
+	bad_def["appearance"]["floor_texture_sha256"] = "incorrect"
+	_check(not WorldRegistryScript.validate_definition(bad_def, world_dir).get("ok", true),
+		"rejects mismatched floor texture hash")
+	floor_image.resize(w - 1, h, Image.INTERPOLATE_NEAREST)
+	floor_image.save_png(ProjectSettings.globalize_path(world_dir + "/floor_texture.png"))
+	textured_def = WorldRegistryScript.validate_definition(world_def, world_dir, false)
+	_check(not test_world.load_from_definition(textured_def) and test_world.load_error.contains("dimensions"),
+		"rejects floor texture with a different canvas size")
+
 	root.remove_child(test_world)
 	test_world.free()
+
+
+func _test_floor_rendering(surface: MeshInstance3D, loader: RefCounted) -> void:
+	# Render a 4x4 color grid through the production mesh/material. Each texel must
+	# cover exactly 32x32 pixels: this catches invisible back faces and filtered edges.
+	var viewport := SubViewport.new()
+	viewport.size = Vector2i(128, 128)
+	viewport.own_world_3d = true
+	viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	root.add_child(viewport)
+	var texture_image := Image.create(4, 4, false, Image.FORMAT_RGB8)
+	var colors := [Color.RED, Color.GREEN, Color.BLUE, Color.YELLOW]
+	for v in range(4):
+		for u in range(4):
+			texture_image.set_pixel(u, v, colors[(u + v) % 4])
+	var material: StandardMaterial3D = surface.material_override.duplicate()
+	material.albedo_texture = ImageTexture.create_from_image(texture_image)
+	var quad := MeshInstance3D.new()
+	quad.mesh = loader._floor_surface_mesh(Vector3(4, 0.3, 4))
+	quad.position.y = -0.15
+	quad.material_override = material
+	viewport.add_child(quad)
+	var cam := Camera3D.new()
+	viewport.add_child(cam)
+	cam.position = Vector3(0, 10, 0)
+	cam.look_at(Vector3.ZERO, Vector3.LEFT)
+	cam.projection = Camera3D.PROJECTION_ORTHOGONAL
+	cam.size = 4
+	cam.current = true
+	for frame in range(3):
+		await process_frame
+	RenderingServer.force_draw()
+	var capture := viewport.get_texture().get_image()
+	var mismatches := 0
+	for y in range(128):
+		for x in range(128):
+			var expected: Color = colors[(int(x / 32.0) + int(y / 32.0)) % 4]
+			var actual := capture.get_pixel(x, y)
+			if absf(actual.r - expected.r) > 0.02 or absf(actual.g - expected.g) > 0.02 or absf(actual.b - expected.b) > 0.02:
+				mismatches += 1
+	_check(mismatches == 0, "floor renders all 16384 pixels with correct orientation and no blended edges (%d mismatches)" % mismatches)
+	viewport.free()
 
 
 func _test_gnss2026_world_and_gameplay() -> void:

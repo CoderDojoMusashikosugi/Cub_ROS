@@ -76,13 +76,32 @@ func build_into(parent: Node3D, definition: Dictionary, floor_material: Material
 	if not err.is_empty():
 		return err
 	var base_dir := str(definition.get("base_dir", ""))
+	var appearance: Dictionary = definition.get("appearance", {})
+	var textured_floor := appearance.has("floor_texture")
+	if textured_floor:
+		var texture_path := "%s/%s" % [base_dir, str(appearance["floor_texture"])]
+		var floor_image := Image.new()
+		var texture_err := floor_image.load_png_from_buffer(FileAccess.get_file_as_bytes(texture_path))
+		if texture_err != OK:
+			return "Failed to decode floor texture %s: %s" % [texture_path, error_string(texture_err)]
+		if floor_image.get_width() != width or floor_image.get_height() != height:
+			return "Floor texture dimensions (%dx%d) do not match occupancy image (%dx%d)." % [
+				floor_image.get_width(), floor_image.get_height(), width, height
+			]
+		var texture_material := StandardMaterial3D.new()
+		# Decode the original PNG directly: no import-time resizing, lossy compression, or mipmaps.
+		texture_material.albedo_texture = ImageTexture.create_from_image(floor_image)
+		texture_material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+		texture_material.texture_repeat = false
+		texture_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		floor_material = texture_material
 	var extrusion: Dictionary = definition.get("extrusion", {})
 	var chunks_path := "%s/%s" % [base_dir, str(extrusion.get("chunks_file", "wall_chunks.json"))]
 	var parsed_chunks: Variant = JSON.parse_string(FileAccess.get_file_as_string(chunks_path))
 	if not (parsed_chunks is Dictionary) or not (parsed_chunks.get("chunks") is Array):
 		return "Invalid wall_chunks.json in %s" % chunks_path
 
-	_build_floor(parent, floor_material)
+	_build_floor(parent, floor_material, textured_floor)
 	var chunks_root := Node3D.new()
 	chunks_root.name = "WallChunks"
 	parent.add_child(chunks_root)
@@ -101,7 +120,7 @@ func build_into(parent: Node3D, definition: Dictionary, floor_material: Material
 	return ""
 
 
-func _build_floor(parent: Node3D, material: Material) -> StaticBody3D:
+func _build_floor(parent: Node3D, material: Material, textured := false) -> StaticBody3D:
 	var map_w := float(width) * resolution
 	var map_h := float(height) * resolution
 	var center_ros := local_to_ros(map_w * 0.5, map_h * 0.5)
@@ -122,16 +141,39 @@ func _build_floor(parent: Node3D, material: Material) -> StaticBody3D:
 	collision.shape = shape
 	body.add_child(collision)
 
-	var mesh := BoxMesh.new()
-	mesh.size = size_godot
 	var picture := MeshInstance3D.new()
-	picture.mesh = mesh
+	picture.name = "FloorSurface"
+	if textured:
+		picture.mesh = _floor_surface_mesh(size_godot)
+	else:
+		var mesh := BoxMesh.new()
+		mesh.size = size_godot
+		picture.mesh = mesh
 	picture.material_override = material
 	picture.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	body.add_child(picture)
 
 	parent.add_child(body)
 	return body
+
+
+func _floor_surface_mesh(size: Vector3) -> ArrayMesh:
+	# Image (u=0,v=0) is map-local (x=0,y=map_height). The body applies origin yaw.
+	# A single top quad avoids BoxMesh's face atlas and keeps each pixel at exactly one cell.
+	var half := size * 0.5
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = PackedVector3Array([
+		Vector3(-half.x, half.y, half.z), Vector3(half.x, half.y, half.z),
+		Vector3(half.x, half.y, -half.z), Vector3(-half.x, half.y, -half.z),
+	])
+	arrays[Mesh.ARRAY_NORMAL] = PackedVector3Array([Vector3.UP, Vector3.UP, Vector3.UP, Vector3.UP])
+	arrays[Mesh.ARRAY_TEX_UV] = PackedVector2Array([Vector2(0, 0), Vector2(0, 1), Vector2(1, 1), Vector2(1, 0)])
+	# Godot front faces use clockwise winding when viewed from above.
+	arrays[Mesh.ARRAY_INDEX] = PackedInt32Array([0, 2, 1, 0, 3, 2])
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	return mesh
 
 
 func _build_chunk(chunk: Dictionary, material: Material) -> StaticBody3D:
