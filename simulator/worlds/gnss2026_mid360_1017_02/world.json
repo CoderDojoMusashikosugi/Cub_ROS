@@ -33,66 +33,66 @@
   "default_spawn": "start_a",
   "spawns": {
     "start_a": {
-      "display_name": "Start A (773, 1467)",
+      "display_name": "Start A (780, 1469)",
       "pixel": [
-        773,
-        1467
+        780,
+        1469
       ],
       "robot": {
-        "x": 62.2725,
-        "y": 30.194,
+        "x": 63.6725,
+        "y": 29.794,
         "z": 0.0,
         "yaw_deg": 180.0
       },
       "clients": [
         {
-          "x": 64.2725,
-          "y": 30.194,
+          "x": 65.6725,
+          "y": 29.794,
           "z": 0.0,
           "yaw_deg": 180.0
         },
         {
-          "x": 66.2725,
-          "y": 30.194,
+          "x": 67.6725,
+          "y": 29.794,
           "z": 0.0,
           "yaw_deg": 180.0
         },
         {
-          "x": 68.2725,
-          "y": 30.194,
+          "x": 69.6725,
+          "y": 29.794,
           "z": 0.0,
           "yaw_deg": 180.0
         }
       ]
     },
     "default": {
-      "display_name": "Default (773, 1467)",
+      "display_name": "Default (780, 1469)",
       "pixel": [
-        773,
-        1467
+        780,
+        1469
       ],
       "robot": {
-        "x": 62.2725,
-        "y": 30.194,
+        "x": 63.6725,
+        "y": 29.794,
         "z": 0.0,
         "yaw_deg": 180.0
       },
       "clients": [
         {
-          "x": 64.2725,
-          "y": 30.194,
+          "x": 65.6725,
+          "y": 29.794,
           "z": 0.0,
           "yaw_deg": 180.0
         },
         {
-          "x": 66.2725,
-          "y": 30.194,
+          "x": 67.6725,
+          "y": 29.794,
           "z": 0.0,
           "yaw_deg": 180.0
         },
         {
-          "x": 68.2725,
-          "y": 30.194,
+          "x": 69.6725,
+          "y": 29.794,
           "z": 0.0,
           "yaw_deg": 180.0
         }
@@ -101,9 +101,9 @@
   },
   "source": {
     "image": "source.png",
-    "original_pgm_name": "map_navigation.pgm",
-    "original_pgm_sha256": "b5eed9d9334fff4496a408d61eedb9cffe8dc3724f62574677f53582f3a663a4",
-    "source_png_sha256": "32c29881610ee06581e5bf425cd06e73593e406c86e49a4b7ee2905f3b71e1e2",
+    "original_pgm_name": "map_sim.pgm",
+    "original_pgm_sha256": "51a84e586ffac121234e7b678f22cb2100b37ef37d428aded3f43bee8b3cb95f",
+    "source_png_sha256": "c41aead754fa09ba22c52cec45eb8982163c38180f5f877400b6c9d127a33276",
     "width": 3580,
     "height": 2122,
     "resolution": 0.2,
@@ -117,9 +117,9 @@
     ],
     "free_gray_policy": "free",
     "pixel_counts": {
-      "occupied_0": 65640,
-      "free_white_254": 7530733,
-      "free_gray_205": 387,
+      "occupied_0": 55246,
+      "free_white_254": 7541126,
+      "free_gray_205": 388,
       "free_other": 0
     }
   },
@@ -130,12 +130,12 @@
     "wall_height": 0.5,
     "chunk_cells": 64,
     "chunks_file": "wall_chunks.json",
-    "chunks_sha256": "70fb635c787b3b376e501380c2a339093b1dce5d1b012189b3b16a654165b174",
+    "chunks_sha256": "1f4e7a22f2aaaa7ac3b1705a9412fa1337e243af4f846e831c8737110acc81a1",
     "capsule_clearance_radius_m": 0.28
   },
   "appearance": {
     "floor_texture": "floor_texture.png",
     "floor_texture_sha256": "db9a3a41e521cb6a3d6a88a42a3ad934a3cce6560331d1154cc0448f88569385"
   },
-  "world_hash": "2ce48443472731bd1461093d16874b3640ee2320848a220caf4145f7fa3b847f"
+  "world_hash": "ab44dd4bdf13abf9c8d15b19af665edcceae512dedb170e05566791ca03b38f6"
 }

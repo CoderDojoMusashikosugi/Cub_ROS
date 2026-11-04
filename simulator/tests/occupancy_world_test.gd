@@ -286,23 +286,23 @@ func _test_gnss2026_world_and_gameplay() -> void:
 	_check(not app._select_world("nonexistent_world_id") and app.hud._host_button.disabled,
 		"selecting an invalid world disables the Host button and shows error info")
 	app._select_world("gnss2026_mid360_1017_02")
-	_check(app.world.occupancy_loader != null and app.world.occupancy_loader.chunk_count == 309,
-		"builds all 309 non-empty 64x64 chunks for gnss2026_mid360_1017_02")
+	_check(app.world.occupancy_loader != null and app.world.occupancy_loader.chunk_count == 304,
+		"builds all 304 non-empty 64x64 chunks for gnss2026_mid360_1017_02")
 	_check(app.camera_rig.max_zoom_distance > 716.0 and app.camera_rig.camera.far > 1000.0,
 		"camera zoom limit and far clip scale to cover the 716 m world")
 
-	# Start host on gnss2026_mid360_1017_02 using default preset (pixel 773, 1467, facing left = 180 deg).
+	# Start host on gnss2026_mid360_1017_02 using default preset (pixel 780, 1469, facing left = 180 deg).
 	app._host("127.0.0.1", 27361, "GnssHost")
 	_check(app.session.ready_to_play and app.actors.has(1), "host starts session on gnss2026_mid360_1017_02")
 	await physics_frame
 	await physics_frame
 
 	var primary: Node3D = app.actors[1]
-	var expected_ros := Vector3(62.2725, 30.194, 0.1)
+	var expected_ros := Vector3(63.6725, 29.794, 0.1)
 	var expected_godot := LidarScript.ros_to_godot(expected_ros)
 	_check(Vector2(primary.position.x, primary.position.z).distance_to(Vector2(expected_godot.x, expected_godot.z)) < 0.01
 		and is_equal_approx(wrapf(primary.rotation.y - PI, -PI, PI), 0.0),
-		"primary robot spawns at pixel (773, 1467) = ROS (62.2725, 30.194) facing left (yaw 180 deg)")
+		"primary robot spawns at pixel (780, 1469) = ROS (63.6725, 29.794) facing left (yaw 180 deg)")
 
 	# Verify 2D camera orientation (KEY_3 / mode 2) matches the PGM image:
 	# Image up (-v, ROS +Y) is Godot -X (Vector3.LEFT), Image right (+u, ROS +X) is Godot -Z (Vector3.FORWARD).
@@ -315,21 +315,21 @@ func _test_gnss2026_world_and_gameplay() -> void:
 	var robot_screen := cam.unproject_position(primary.global_position)
 	var forward_screen := cam.unproject_position(primary.global_position + (-primary.global_basis.z) * 2.0)
 	_check(forward_screen.x < robot_screen.x - 1.0 and absf(forward_screen.y - robot_screen.y) < 0.5,
-		"robot at (773, 1467) with yaw 180 deg faces left on the 2D camera screen")
+		"robot at (780, 1469) with yaw 180 deg faces left on the 2D camera screen")
 
 	# Verify Odometry reports ROS map coordinates directly (since map -> odom is identity).
 	var odom_msg: Dictionary = app.odom.sample(primary)
 	var odom_pos: Dictionary = odom_msg["pose"]["pose"]["position"]
 	var odom_ori: Dictionary = odom_msg["pose"]["pose"]["orientation"]
-	_check(absf(float(odom_pos["x"]) - 62.2725) < 0.02
-		and absf(float(odom_pos["y"]) - 30.194) < 0.02
+	_check(absf(float(odom_pos["x"]) - 63.6725) < 0.02
+		and absf(float(odom_pos["y"]) - 29.794) < 0.02
 		and absf(absf(float(odom_ori["z"])) - 1.0) < 0.001
 		and absf(float(odom_ori["w"])) < 0.001,
-		"Odometry reports ROS pose (62.2725, 30.194, yaw=pi) at start position")
+		"Odometry reports ROS pose (63.6725, 29.794, yaw=pi) at start position")
 
-	# Verify LiDAR scan at start position (773, 1467) facing West (180 deg):
-	# North wall (v=1455, south face at v=1456) is 11.5 * 0.2 = 2.30 m to the robot's right (-pi/2).
-	# South wall at u=773 (v=1497, north face at v=1497) is 29.5 * 0.2 = 5.90 m to the robot's left (+pi/2).
+	# Verify LiDAR scan at start position (780, 1469) facing West (180 deg):
+	# North wall (v=1437, south face at v=1438) is 31.5 * 0.2 = 6.30 m to the robot's right (-pi/2).
+	# South (+pi/2) has no wall within the 30 m LiDAR range in map_sim.pgm.
 	# Forward (0 rad, West along corridor) is open (> 15 m), proving flat floor is ignored.
 	var scan_t0 := Time.get_ticks_usec()
 	var scan: Dictionary = app.lidar.sample(primary, app.actors)
@@ -339,32 +339,31 @@ func _test_gnss2026_world_and_gameplay() -> void:
 	var right_dist := float(ranges[_ray_index(-PI * 0.5)])
 	var left_dist := float(ranges[_ray_index(PI * 0.5)])
 	var forward_dist := float(ranges[_ray_index(0.0)])
-	_check(absf(right_dist - 2.30) < 0.12,
-		"LiDAR detects North corridor wall on the right at ~2.30 m (actual %.2f m)" % right_dist)
-	_check(absf(left_dist - 5.90) < 0.12,
-		"LiDAR detects South corridor wall on the left at ~5.90 m (actual %.2f m)" % left_dist)
+	_check(absf(right_dist - 6.30) < 0.12,
+		"LiDAR detects North corridor wall on the right at ~6.30 m (actual %.2f m)" % right_dist)
+	_check(absf(left_dist - LidarScript.RANGE_MAX) < 0.12,
+		"LiDAR reports open space to the South at the 30 m range limit (actual %.2f m)" % left_dist)
 	_check(forward_dist > 15.0,
 		"LiDAR ignores flat floor and reports open corridor ahead (actual %.2f m)" % forward_dist)
 
-	# Verify collision with 0.5 m wall (including high-speed 5 m/s motion toward the North wall at v=1455):
-	# Face North (ROS +Y -> yaw = +90 deg -> Godot -X). North wall inner face is at Godot X = -30.194 - 2.30 = -32.494.
+	# Verify collision with 0.5 m wall (including high-speed 5 m/s motion toward the North wall at v=1437):
+	# Face North (ROS +Y -> yaw = +90 deg -> Godot -X). North wall inner face is at Godot X = -29.794 - 6.30 = -36.094.
 	primary.rotation.y = PI * 0.5
-	for frame in range(60):
+	for frame in range(120):
 		await physics_frame
 		primary.simulate_velocity(5.0, 0.0, 1.0 / 60.0)
-	_check(primary.position.x > -32.494 + 0.20 and primary.position.y < 0.15,
+	_check(primary.position.x > -36.094 + 0.20 and primary.position.y < 0.15,
 		"primary robot collides with 0.5 m wall without climbing or tunneling at 5 m/s (pos=%s)" % str(primary.position))
 
-	# Verify sliding along the North wall across the 64x64 chunk boundary at u = 768 (ROS X = -92.4275 + 768*0.2 = 61.1725, Godot Z = -61.1725):
-	# Place robot just south of the v=1454/1455 wall near u = 770 (Godot Z = -61.6725) facing West (rotation.y = PI, moving toward +Z)
-	# and angle slightly into the wall while crossing u = 768 (Godot Z = -61.1725).
+	# Verify motion across the 64x64 chunk boundary at u = 768 (Godot Z = -61.1725).
+	# map_sim.pgm leaves this former corridor-wall location open.
 	primary.position = Vector3(-32.15, 0.05, -61.8)
 	primary.rotation.y = PI - 0.12
 	for frame in range(60):
 		await physics_frame
 		primary.simulate_velocity(3.0, 0.0, 1.0 / 60.0)
 	_check(primary.position.z > -60.5,
-		"robot slides smoothly across 64x64 chunk boundary without snagging (z=%.2f)" % primary.position.z)
+		"robot crosses the open 64x64 chunk boundary without snagging (z=%.2f)" % primary.position.z)
 
 	# Verify falling off or below the floor respawns at the world's validated start point, not (0, 0.1, 4):
 	primary.position = Vector3(500.0, -15.0, 500.0)
@@ -377,8 +376,8 @@ func _test_gnss2026_world_and_gameplay() -> void:
 	var oob_res: Dictionary = app.world.resolve_spawn({"x": 9999.0, "y": 9999.0}, true)
 	_check(not bool(oob_res.get("ok", true)) and str(oob_res.get("error", "")).contains("outside"),
 		"rejects out-of-bounds spawn coordinates with a clear message")
-	# Pixel (773, 1455) is a black wall cell: ROS (62.2725, 32.594)
-	var wall_res: Dictionary = app.world.resolve_spawn({"x": 62.2725, "y": 32.594}, true)
+	# Pixel (773, 1448) is a black wall cell: ROS (62.2725, 33.994)
+	var wall_res: Dictionary = app.world.resolve_spawn({"x": 62.2725, "y": 33.994}, true)
 	_check(not bool(wall_res.get("ok", true)) and str(wall_res.get("error", "")).contains("wall"),
 		"rejects spawn coordinates inside a black wall cell without silently moving to another spot")
 
@@ -428,10 +427,10 @@ func _test_online_handshake_and_spawn_enforcement() -> void:
 	client_session.leave()
 	await _wait_for(func(): return app.session.records.size() == 1, 5.0)
 
-	# 2. Client requesting an invalid spawn inside a wall (62.2725, 32.594) must be rejected by host:
+	# 2. Client requesting an invalid spawn inside a wall (62.2725, 33.994) must be rejected by host:
 	var bad_statuses := PackedStringArray()
 	client_session.status_changed.connect(func(msg: String): bad_statuses.append(msg))
-	client_session.join_host("127.0.0.1", port, "cone", "WallCone", {"x": 62.2725, "y": 32.594})
+	client_session.join_host("127.0.0.1", port, "cone", "WallCone", {"x": 62.2725, "y": 33.994})
 	var rejected := await _wait_for(func():
 		for s in bad_statuses:
 			if s.contains("Spawn error"):

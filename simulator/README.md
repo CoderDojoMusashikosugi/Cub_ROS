@@ -150,8 +150,9 @@ TPSではカーソルをウインドウ内に捕捉し、ボタンを押さず�
 
 - `simulator/tools/build_occupancy_world.py`は、編集済みPGM画像とYAML（解像度・原点）からロスレスグレースケール`source.png`、64×64セル単位の結合壁矩形`wall_chunks.json`、および`world.json`を生成します。
 - 黒（画素値`0`）のみを高さ`0.5 m`の壁として押し出し、白（`254`）と灰色（`205`等）はすべて平らな空きの床（`0.0 m`）として扱います。画像の膨張・平滑化・穴埋め・切り出しは行いません。
+- `gnss2026_mid360_1017_02`の壁データには`docker/home/maps/1017_02/map_sim.pgm`を使います。生成ツールの既定入力もこのPGMと同じディレクトリの`map.yaml`です。
 - 床には任意のPNG画像を`--floor-texture`で指定できます。PGMと同じキャンバスサイズ・座標配置の画像を使い、床全体に1枚として貼ります。最近傍補間・ミップマップなしで、拡大時もピクセルの四角と元の色を保ちます。`gnss2026_mid360_1017_02`には`map_intensity.png`を同梱済みです。画像は見た目にだけ使用し、壁やLiDARの判定はPGMが決めます。
-- `gnss2026_mid360_1017_02`（`3580 × 2122` px、`0.2 m/cell`、`716.0 × 424.4 m`）の既定開始地点`start_a`は、画像上の`(u=773, v=1467)`（ROS `map` 座標 `(x=62.2725, y=30.194, z=0.0)`）で画像左向き（`-u`方向、`yaw = 180°`）です。`3`キーの真上2D地図カメラも元PGM画像の向き（画面上が画像上`-v`＝ROS `+Y`、画面右が画像右`+u`＝ROS `+X`）に一致します。
+- `gnss2026_mid360_1017_02`（`3580 × 2122` px、`0.2 m/cell`、`716.0 × 424.4 m`）の既定開始地点`start_a`は、画像上の`(u=780, v=1469)`（ROS `map` 座標 `(x=63.6725, y=29.794, z=0.0)`）で画像左向き（`-u`方向、`yaw = 180°`）です。`3`キーの真上2D地図カメラも元PGM画像の向き（画面上が画像上`-v`＝ROS `+Y`、画面右が画像右`+u`＝ROS `+X`）に一致します。
 - Godotのワールド選択はROSのナビゲーション地図（`map:=...`）とは独立しており、ワールド変更に伴うROS側の地図切替・一致照合・Nav2再起動は行いません。
 
 #### 手動でPGMマップを編集・生成してワールドを追加する手順
@@ -170,12 +171,12 @@ TPSではカーソルをウインドウ内に捕捉し、ボタンを押さず�
 ```bash
 # 例1：既存の map.yaml から解像度(resolution)と原点(origin)を引き継いで生成する場合
 python3 simulator/tools/build_occupancy_world.py \
-  --pgm docker/home/maps/gnss2026/mid360/1017_02/map_navigation.pgm \
-  --yaml docker/home/maps/gnss2026/mid360/1017_02/map.yaml \
-  --floor-texture docker/home/maps/gnss2026/mid360/1017_02/map_intensity.png \
+  --pgm docker/home/maps/1017_02/map_sim.pgm \
+  --yaml docker/home/maps/1017_02/map.yaml \
+  --floor-texture docker/home/maps/1017_02/map_intensity.png \
   --world-id gnss2026_mid360_1017_02 \
   --display-name "GNSS 2026 Mid360 1017_02" \
-  --spawn-pixel 773 1467 \
+  --spawn-pixel 780 1469 \
   --spawn-yaw-deg 180
 
 # 例2：YAMLを使わず、解像度（m/cell）と原点（ROS座標 X Y YAW_RAD）を直接指定する場合

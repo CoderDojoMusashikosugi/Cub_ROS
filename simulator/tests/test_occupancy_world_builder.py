@@ -164,10 +164,15 @@ class OccupancyWorldBuilderTest(unittest.TestCase):
         self.assertEqual(bow.read_png_dimensions(texture_bytes), (3580, 2122))
         self.assertEqual(sha256(texture_bytes).hexdigest(), appearance["floor_texture_sha256"])
         self.assertEqual(bow.compute_world_hash(meta), meta["world_hash"])
+        self.assertEqual(src["original_pgm_name"], "map_sim.pgm")
+        self.assertEqual(src["original_pgm_sha256"],
+                         "51a84e586ffac121234e7b678f22cb2100b37ef37d428aded3f43bee8b3cb95f")
+        self.assertEqual(sha256(source_png.read_bytes()).hexdigest(), src["source_png_sha256"])
+        self.assertEqual(sha256(chunks_json.read_bytes()).hexdigest(), meta["extrusion"]["chunks_sha256"])
         counts = src["pixel_counts"]
-        self.assertEqual(counts["occupied_0"], 65640)
-        self.assertEqual(counts["free_white_254"], 7530733)
-        self.assertEqual(counts["free_gray_205"], 387)
+        self.assertEqual(counts["occupied_0"], 55246)
+        self.assertEqual(counts["free_white_254"], 7541126)
+        self.assertEqual(counts["free_gray_205"], 388)
         self.assertEqual(counts["free_other"], 0)
 
         ext = meta["extrusion"]
@@ -176,13 +181,13 @@ class OccupancyWorldBuilderTest(unittest.TestCase):
         self.assertEqual(ext["chunk_cells"], 64)
 
         chunks = json.loads(chunks_json.read_text(encoding="utf-8"))
-        self.assertEqual(chunks["stats"]["non_empty_chunks"], 309)
-        self.assertEqual(chunks["stats"]["global_runs"], 22587)
-        self.assertEqual(chunks["stats"]["global_merged_rects"], 13909)
+        self.assertEqual(chunks["stats"]["non_empty_chunks"], 304)
+        self.assertEqual(chunks["stats"]["global_runs"], 17329)
+        self.assertEqual(chunks["stats"]["global_merged_rects"], 12704)
 
         robot_start = meta["spawns"]["start_a"]["robot"]
-        self.assertAlmostEqual(robot_start["x"], 62.2725, places=4)
-        self.assertAlmostEqual(robot_start["y"], 30.194, places=4)
+        self.assertAlmostEqual(robot_start["x"], 63.6725, places=4)
+        self.assertAlmostEqual(robot_start["y"], 29.794, places=4)
         self.assertAlmostEqual(robot_start["yaw_deg"], 180.0, places=4)
 
     def test_optional_floor_texture_preserves_pixels_and_geometry(self) -> None:

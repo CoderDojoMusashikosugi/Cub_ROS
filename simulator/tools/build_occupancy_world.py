@@ -20,8 +20,8 @@ import zlib
 
 
 ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_MAP_PGM = ROOT / "docker/home/maps/gnss2026/mid360/1017_02/map_navigation.pgm"
-DEFAULT_MAP_YAML = ROOT / "docker/home/maps/gnss2026/mid360/1017_02/map.yaml"
+DEFAULT_MAP_PGM = ROOT / "docker/home/maps/1017_02/map_sim.pgm"
+DEFAULT_MAP_YAML = ROOT / "docker/home/maps/1017_02/map.yaml"
 DEFAULT_WORLD_ID = "gnss2026_mid360_1017_02"
 DEFAULT_DISPLAY_NAME = "GNSS 2026 Mid360 (1017_02)"
 CAPSULE_CLEARANCE_RADIUS_M = 0.28
@@ -488,7 +488,7 @@ def build_occupancy_world(
     display_name: str,
     resolution: float,
     origin: list[float],
-    start_pixel: tuple[int, int] = (773, 1467),
+    start_pixel: tuple[int, int] = (780, 1469),
     start_yaw_deg: float = 180.0,
     chunk_cells: int = 64,
     wall_height: float = 0.5,
@@ -723,7 +723,7 @@ def main() -> None:
         "--spawn-pixel",
         type=int,
         nargs=2,
-        default=[773, 1467],
+        default=[780, 1469],
         metavar=("U", "V"),
         help="Primary robot start pixel (u, v) with top-left = (0, 0)",
     )
