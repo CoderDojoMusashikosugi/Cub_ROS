@@ -66,6 +66,7 @@ func _process(_delta: float) -> void:
 			_send({"op": "advertise", "topic": "/joy", "type": "sensor_msgs/msg/Joy", "queue_size": 1})
 			_send({"op": "advertise", "topic": "/odom", "type": "nav_msgs/msg/Odometry", "queue_size": 1})
 			_send({"op": "advertise", "topic": "/scan", "type": "sensor_msgs/msg/LaserScan", "queue_size": 1})
+			_send({"op": "advertise", "topic": "/proceed_to_next_group", "type": "std_msgs/msg/Empty", "queue_size": 1})
 			_send({"op": "subscribe", "topic": "/cmd_vel_atom", "type": "geometry_msgs/msg/Twist", "queue_length": 1})
 			# Start with all buttons released; normal input polling resumes next tick.
 			_send({"op": "publish", "topic": "/joy", "msg":
@@ -106,6 +107,11 @@ func send_odom(message: Dictionary) -> void:
 			return
 		_send({"op": "publish", "topic": "/odom", "msg": message})
 		sent_odoms += 1
+
+
+func send_proceed_to_next_group() -> void:
+	if connected:
+		_send({"op": "publish", "topic": "/proceed_to_next_group", "msg": {}})
 
 
 func _send(message: Dictionary) -> void:

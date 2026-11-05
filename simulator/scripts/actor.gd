@@ -105,6 +105,19 @@ func set_controlled(value: bool, simulate_locally := false) -> void:
 		_caption.text = "%s%s%s" % [nickname, " / CUB" if primary else "", " [YOU]" if value else ""]
 
 
+func teleport_to(at: Vector3) -> void:
+	position = at
+	target_position = at
+	target_yaw = rotation.y
+	velocity = Vector3.ZERO
+	angular_velocity = 0.0
+	_display_height = 0.0
+	_step_snap_cooldown = 0.0
+	_visual.position.y = 0.0
+	sync_sensor_pose()
+	reset_physics_interpolation()
+
+
 func simulate(input: Vector2, camera_yaw: float, fast: bool, delta: float) -> void:
 	if primary:
 		return  # The primary robot accepts only ROS velocity commands.

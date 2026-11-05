@@ -60,7 +60,7 @@ launch引数`simulation`は`none`が既定で実機用の動作を維持しま�
 Godot指定ではCub4のcommonを選び、wheel odometry・実機の再開ボタン・オドメトリクリア・GNSS状態監視を停止します。機体の既定設定`CUB_TARGET`自体は変更しません。`cub4_bringup`が機体設定による`COLCON_IGNORE`対象の場合は、commonの使用前にそのパッケージを有効にしてビルドしてください。距離ログ・URDFの固定TF・システム診断は継続し、トピック監視はJoyと速度指令に切り替えます。
 
 Joy/Twistの往復、簡易LiDAR（`/scan`）、およびシミュレータ座標に基づく真値オドメトリ（`/odom`、20 Hz）を配信します。簡易LiDARの位置と`frame_id`は`ros/cub_description/urdf/cub4.urdf`の`base_to_velodyne`（`velodyne`、`base_link`から高さ0.2492 m）を参照し、10 Hz・360本で壁・箱・他のロボット・通行人・コーンのセンサー用形状を測距して`/scan`へ配信します。床・坂道・階段・凹凸地形はLiDAR検出から除外し、床と壁が一体の三角形メッシュでは面の法線から壁面だけを抽出します。`navigation.launch.py simulation:=godot map:=/home/cub/colcon_ws/src/cub/cub_simulation/maps/cub_playground_v1/map.yaml`で実機と同様に地図パスを引数で渡してNav2自律移動を実行できます（内部の`localization.launch.py`では`odom_to_tf`で`odom -> base_link`を配信します）。`simulation`とROS時刻の`use_sim_time`は別で、現在は実時間（`false`）です。
-
+ros2 launch cub_bringup navigation.launch.py simulation:=godot map:=/home/cub/maps/1017_02/map.yaml
 ## Godotエディタから役割を指定して起動する
 
 「デバッグ → 実行インスタンスのカスタマイズ（Customize Run Instances）」を開き、複数インスタンスを有効にして数を**4**に設定します。「メインの実行引数（Main Run Args）」を空にし、各行の「起動引数（Launch Arguments）」へ次を入力して、`F5`で実行します。
@@ -126,7 +126,7 @@ TPSではカーソルをウインドウ内に捕捉し、ボタンを押さず�
 | ロボットの左右旋回 | A / D、または左右矢印 |
 | 通行人・コーンの移動 | WASD / 矢印。カメラの水平向きが基準 |
 | クライアントの速度を上げる | Shift。主ロボットの速度はcommanderで決定 |
-| TPS追従視点 | 1 |
+| TPS追従視点 | 1。真上の2D地図から戻ると、画面中央の十字の位置へ自分のキャラクターをワープ |
 | 3D地図視点 | 2。カーソルを表示 |
 | 真上の2D地図視点 | 3。カーソルを表示。この視点のキャラクター移動は画面の上下左右が基準 |
 | TPSで周囲を見渡す | マウス移動。ボタン操作不要 |
@@ -135,10 +135,13 @@ TPSではカーソルをウインドウ内に捕捉し、ボタンを押さず�
 | 地図を拡大 | 左ダブルクリック |
 | 地図の平行移動 | 左ドラッグ。I / J / K / Lでも可能 |
 | 自分の操作対象へカメラを戻す | F |
+| 経路走行の開始・次グループへの進行 | P（ホストのみ）。`/proceed_to_next_group`へ`std_msgs/msg/Empty`を1回送信。長押しの連続送信なし |
 | クライアントのキャラクター変更 | T（ロボット → 通行人 → コーン）。ホストは主ロボットに固定 |
 | TPSでカーソル解放・復帰を切り替え／地図のドラッグを中断 | Esc |
 | TPSでカーソル解放中に視点操作へ復帰 | 操作画面を左クリック |
 | 退出して開始前の画面へ戻る | Backspace |
+
+ホスト・クライアントとも、真上2D地図（`3`）には画面中央にワープ位置の十字を表示します。地図を移動して十字を目的地に合わせ、`1`を押すと、その地形の高さへ自分のキャラクターを移動してTPSへ戻ります。向きは維持し、移動後の位置はほかの参加者にも同期します。壁に近すぎる場所やマップ外では地図表示を維持するため、十字を空いた場所へ移動して再度`1`を押してください。
 
 キャラクター同士はすり抜けます。固定地形・壁には衝突します。全キャラクターは直立し、坂道や小段差へ接地します。ジャンプ、歩行アニメーション、自動移動はありません。
 
@@ -220,6 +223,8 @@ Godotの生成データと検証ログは`.godot/`以下に保存し、Gitでは
 
 ## 検証
 
+`proceed_test.gd`はローカルのWebSocketサーバーを使い、`P`によるEmptyメッセージの送信、長押し抑制、ホスト限定、切断・再接続時の動作を確認します。
+
 Godotを使って結果をターミナルやログファイルで確認できます。プロジェクトを一度インポートしてから実行します。
 
 ```powershell
@@ -228,6 +233,7 @@ $godot = 'C:\Users\tomok\workspace\Godot_v4.7.2-stable_win64.exe\Godot_v4.7.2-st
 & $godot --headless --path .\simulator --fixed-fps 60 --script res://tests/terrain_test.gd
 & $godot --headless --path .\simulator --script res://tests/network_test.gd
 & $godot --headless --path .\simulator --script res://tests/ui_test.gd
+& $godot --headless --path .\simulator --script res://tests/proceed_test.gd
 & $godot --headless --path .\simulator --script res://tests/launch_test.gd
 & $godot --headless --path .\simulator --script res://tests/smoothing_test.gd
 & $godot --headless --path .\simulator --script res://tests/cub4_model_test.gd

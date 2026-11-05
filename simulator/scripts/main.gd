@@ -232,6 +232,9 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			_select_camera(2)
 		KEY_F:
 			camera_rig.recenter()
+		KEY_P:
+			if session.is_host:
+				ros_bridge.send_proceed_to_next_group()
 		_:
 			return
 	get_viewport().set_input_as_handled()
@@ -404,10 +407,32 @@ func _status_changed(message: String) -> void:
 
 
 func _select_camera(mode: int) -> void:
+	if mode == 0 and camera_rig.mode == 2 and session.ready_to_play:
+		if not _warp_local_actor_to_map_center():
+			return
 	camera_rig.select_mode(mode)
 	_cursor_released = false
 	_update_mouse_capture()
 	_update_hud()
+
+
+func _warp_local_actor_to_map_center() -> bool:
+	var actor: Node3D = actors.get(session.local_actor_id)
+	if not is_instance_valid(actor):
+		return false
+	var at: Variant = camera_rig.map_center_ground_point()
+	if at == null:
+		push_warning("Cannot warp: place the map center crosshair over terrain.")
+		return false
+	var ros_position := LidarScript.godot_to_ros(at)
+	var check: Dictionary = world.validate_spawn_ros(ros_position.x, ros_position.y)
+	if not bool(check.get("ok", false)):
+		push_warning("Cannot warp: " + str(check.get("error", "Invalid destination.")))
+		return false
+	actor.teleport_to(at + Vector3.UP * 0.1)
+	# Publish the local actor's new pose on the next physics tick (and odometry for the host).
+	_publish_elapsed = 0.05
+	return true
 
 
 func _update_hud() -> void:

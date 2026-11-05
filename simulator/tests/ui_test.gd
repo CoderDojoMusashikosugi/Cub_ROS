@@ -95,6 +95,7 @@ func _run() -> void:
 	_check(not app.camera_rig.look_enabled, "manual cursor release survives a focus change")
 	_key(KEY_ESCAPE)
 	await _test_map_controls()
+	await _test_map_warp()
 	_key(KEY_1)
 	_check_mouse_mode(Input.MOUSE_MODE_CAPTURED, "switching from map to TPS captures the cursor")
 	var yaw_after_map: float = app.camera_rig.yaw
@@ -259,6 +260,79 @@ func _test_map_controls() -> void:
 		"3D map zoom preserves the pointer position on raised terrain")
 	_test_trackpad_zoom("raised 3D terrain", screen, raised)
 	_test_drag_modifiers()
+
+
+func _test_map_warp() -> void:
+	var rig: Node3D = app.camera_rig
+	var actor: CharacterBody3D = app.actors[1]
+	var original: Vector3 = actor.position
+	_key(KEY_1)
+	_check(actor.position.is_equal_approx(original), "3D map returns to TPS without moving the robot")
+	_key(KEY_3)
+	_check(app.hud._warp_crosshair.is_visible_in_tree()
+		and app.hud._warp_crosshair.get_global_rect().get_center().distance_to(root.get_visible_rect().get_center()) < 0.1,
+		"host's top map shows a crosshair at the screen center")
+	rig.center = Vector3(12, 0, -2)
+	rig.update(0.0)
+	var heading: float = actor.rotation.y
+	actor.velocity = Vector3(1, -3, 2)
+	actor.angular_velocity = 1.0
+	_key(KEY_1)
+	_check(rig.mode == 0 and actor.position.distance_to(Vector3(12, 0.1, -2)) < 0.01
+		and is_equal_approx(actor.rotation.y, heading), "top map warps the host robot to its center and preserves heading")
+	_check(actor.velocity.is_zero_approx() and is_zero_approx(actor.angular_velocity)
+		and actor.target_position.is_equal_approx(actor.position), "warp clears motion and updates the sensor target")
+	_check(not app.hud._warp_crosshair.is_visible_in_tree()
+		and rig.center.distance_to(actor.position + Vector3.UP * 0.8) < 0.01,
+		"warping hides the crosshair and recenters TPS on the robot")
+	await _frames(8)
+	_check(app.session.records[1]["position"].distance_to(actor.position) < 0.01,
+		"network state receives the warped robot position")
+	var ros_position: Vector3 = app.LidarScript.godot_to_ros(actor.position)
+	var published: Dictionary = app.odom.last_odom["pose"]["pose"]["position"]
+	_check(Vector3(published["x"], published["y"], published["z"]).distance_to(ros_position) < 0.02,
+		"ground-truth odometry receives the warped robot position")
+	_key(KEY_3)
+	rig.center = Vector3(-8, 0, -9.5)
+	rig.update(0.0)
+	_key(KEY_1)
+	_check(actor.position.distance_to(Vector3(-8, 1.3, -9.5)) < 0.01,
+		"warp places the robot above raised terrain rather than below it")
+	_key(KEY_3)
+	original = actor.position
+	rig.center = Vector3(100, 0, 100)
+	rig.update(0.0)
+	_key(KEY_1)
+	_check(rig.mode == 2 and actor.position.is_equal_approx(original), "out-of-map warp keeps the robot and map view in place")
+	rig.center = Vector3(14, 0, 8)
+	rig.update(0.0)
+	_key(KEY_1)
+	_check(rig.mode == 2 and actor.position.is_equal_approx(original), "warp cannot place the robot inside a wall")
+	# Exercise the same shortcut with the session in the client role.
+	app.session.is_host = false
+	app._update_hud()
+	_check(app.hud._warp_crosshair.is_visible_in_tree(), "client's top map shows the warp crosshair")
+	_key(KEY_1)
+	_check(rig.mode == 2 and actor.position.is_equal_approx(original), "client cannot warp inside a wall")
+	rig.center = Vector3(100, 0, 100)
+	rig.update(0.0)
+	_key(KEY_1)
+	_check(rig.mode == 2 and actor.position.is_equal_approx(original), "client cannot warp outside the map")
+	rig.center = Vector3(12, 0, -2)
+	rig.update(0.0)
+	heading = actor.rotation.y
+	actor.velocity = Vector3(1, -3, 2)
+	actor.angular_velocity = 1.0
+	_key(KEY_1)
+	_check(rig.mode == 0 and actor.position.distance_to(Vector3(12, 0.1, -2)) < 0.01
+		and is_equal_approx(actor.rotation.y, heading), "client warps its local actor to the map center and preserves heading")
+	_check(actor.velocity.is_zero_approx() and is_zero_approx(actor.angular_velocity)
+		and actor.target_position.is_equal_approx(actor.position), "client warp clears motion and updates the sensor target")
+	_check(not app.hud._warp_crosshair.is_visible_in_tree()
+		and rig.center.distance_to(actor.position + Vector3.UP * 0.8) < 0.01,
+		"client warp hides the crosshair and recenters TPS")
+	app.session.is_host = true
+	app._update_hud()
 
 
 func _test_drag_modifiers() -> void:

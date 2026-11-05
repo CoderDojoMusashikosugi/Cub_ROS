@@ -31,6 +31,7 @@ var _lobby_status: Label
 var _state: Label
 var _position: Label
 var _performance: Label
+var _warp_crosshair: Control
 
 
 func _ready() -> void:
@@ -40,6 +41,7 @@ func _ready() -> void:
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(root)
 	_build_lobby(root)
+	_build_warp_crosshair(root)
 	var bar := PanelContainer.new()
 	_bar = bar
 	bar.name = "StatusBar"
@@ -74,6 +76,27 @@ func _ready() -> void:
 	_performance.name = "Performance"
 	row.add_child(_performance)
 	bar.hide()
+
+
+func _build_warp_crosshair(root: Control) -> void:
+	_warp_crosshair = Control.new()
+	_warp_crosshair.name = "WarpCrosshair"
+	_warp_crosshair.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(_warp_crosshair)
+	_warp_crosshair.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	_warp_crosshair.offset_left = -14
+	_warp_crosshair.offset_top = -14
+	_warp_crosshair.offset_right = 14
+	_warp_crosshair.offset_bottom = 14
+	_warp_crosshair.draw.connect(_draw_warp_crosshair)
+	_warp_crosshair.hide()
+
+
+func _draw_warp_crosshair() -> void:
+	for width in [4.0, 2.0]:
+		var color := Color("17232e") if width == 4.0 else Color.WHITE
+		_warp_crosshair.draw_line(Vector2(2, 14), Vector2(26, 14), color, width)
+		_warp_crosshair.draw_line(Vector2(14, 2), Vector2(14, 26), color, width)
 
 
 func _build_lobby(root: Control) -> void:
@@ -275,6 +298,7 @@ func set_status(message: String) -> void:
 func update_readout(state: Dictionary) -> void:
 	_lobby.visible = not state["active"]
 	_bar.visible = state["active"]
+	_warp_crosshair.visible = state["active"] and int(state["camera"]) == 2
 	if not state["active"]:
 		var connecting: bool = state["connecting"]
 		_host_button.disabled = connecting or not _world_ready

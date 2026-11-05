@@ -234,9 +234,15 @@ func _plane_point(screen_position: Vector2, height: float) -> Variant:
 	return at if at != null and origin.distance_squared_to(at) <= _pick_range * _pick_range else null
 
 
-func _terrain_point(screen_position: Vector2) -> Variant:
+func map_center_ground_point() -> Variant:
+	return _terrain_point(get_viewport().get_visible_rect().get_center(), false)
+
+
+func _terrain_point(screen_position: Vector2, allow_plane_fallback := true) -> Variant:
 	var origin := camera.project_ray_origin(screen_position)
 	var direction := camera.project_ray_normal(screen_position)
 	var query := PhysicsRayQueryParameters3D.create(origin, origin + direction * _pick_range, 1)
 	var hit := get_world_3d().direct_space_state.intersect_ray(query)
-	return hit["position"] if not hit.is_empty() else _plane_point(screen_position, center.y)
+	if not hit.is_empty():
+		return hit["position"]
+	return _plane_point(screen_position, center.y) if allow_plane_fallback else null
