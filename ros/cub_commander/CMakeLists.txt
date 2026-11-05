@@ -30,7 +30,10 @@ add_executable(start_button_serial src/start_button_serial.cpp)
 ament_target_dependencies(start_button_serial rclcpp std_msgs)
 target_link_libraries(start_button_serial serial)
 
-install(TARGETS cub_commander_node nav2_action_client start_button_serial
+add_executable(start_button_dial src/start_button_dial.cpp)
+ament_target_dependencies(start_button_dial rclcpp std_msgs)
+
+install(TARGETS cub_commander_node nav2_action_client start_button_serial start_button_dial
   DESTINATION lib/${PROJECT_NAME})
 
 install(
