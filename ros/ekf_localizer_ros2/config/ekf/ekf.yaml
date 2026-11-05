@@ -23,6 +23,9 @@ ekf_localizer_node:
 
     # GPSリスポーン機能の有効/無効（追加）
     gps_respawn_enable: true  # true: 有効, false: 無効
+    gps_auto_init_enable: true          # true: 初回GPS受信時に初期位置(x, y, z)を自動設定
+    gps_auto_yaw_init_enable: true      # true: NDT収束前に移動した場合、GPS軌跡から初期ヨー角を自動補正
+    gps_init_yaw_min_distance: 0.5      # [m] 初期ヨー角推定に必要な最小GPS移動距離
     
     # EKF Initial pose
     INIT_X: 62.2
@@ -36,8 +39,8 @@ ekf_localizer_node:
     # Sensor noise parameters
     SIGMA_IMU: 0.01
     SIGMA_ODOM: 0.05
-    SIGMA_NDT: 0.15
-    SIGMA_GPS: 2.0                    # GPS標準測定更新時のノイズ [m]
+    SIGMA_NDT: 0.25
+    SIGMA_GPS: 4.0                    # GPS標準測定更新時のノイズ [m]
     
     # Motion noise parameters
     MOTION_NOISE_NN: 0.01
@@ -46,7 +49,7 @@ ekf_localizer_node:
     MOTION_NOISE_OO: 0.01
     
     # Mahalanobis distance and covariance thresholds
-    TH_MAHALANOBIS: 5.0
+    TH_MAHALANOBIS: 2.0
     TH_COVARIANCE: 1.0
     TH_POSE_COVARIANCE: 1.0
     TH_DIRECTION_COVARIANCE: 0.5
@@ -60,8 +63,8 @@ ekf_localizer_node:
     # ========================================
     # GPS高精度リスポーン機能のパラメータ
     # ========================================
-    navsat_topic_name: "/um982_node/fix"
-    require_rtk_fix_for_respawn: false   # true: RTK-FIX受信時のみリスポーンを許可
+    navsat_topic_name: "/um982_node/fix_secondary"
+    require_rtk_fix_for_respawn: true   # true: RTK-FIX受信時のみリスポーンを許可
     
     # GPS高精度判定の閾値
     # RTK-FIXの場合は0.1m以下に設定（RTK-Floatや単独測位のブレを確実に排除）

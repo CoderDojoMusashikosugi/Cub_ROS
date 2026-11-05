@@ -167,6 +167,16 @@ private:
 	Eigen::MatrixXd P_;
 
 	bool first_callback_ = true;
+	bool is_gps_pose_initialized_ = false;
+	bool is_gps_yaw_initialized_ = false;
+	bool gps_auto_init_enable_ = true;
+	bool gps_auto_yaw_init_enable_ = true;
+	double gps_init_yaw_min_distance_ = 0.5;
+	double gps_init_ref_x_ = 0.0;
+	double gps_init_ref_y_ = 0.0;
+	double gps_init_ref_z_ = 0.0;
+	double odom_accum_since_gps_init_ = 0.0;
+	double yaw_accum_since_gps_init_ = 0.0;
 	geometry_msgs::msg::Point last_position_;
 	Eigen::Vector3d last_odom_pose_ = Eigen::Vector3d::Zero();
 	double last_odom_yaw_;

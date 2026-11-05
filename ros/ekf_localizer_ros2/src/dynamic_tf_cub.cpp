@@ -43,11 +43,14 @@ DynamicTfCub::DynamicTfCub() : Node("DynamicTFCub")
 DynamicTfCub::~DynamicTfCub(){}
 void DynamicTfCub::current_pose_callback(const geometry_msgs::msg::PoseStamped::ConstSharedPtr& msg)
 {
-    // RCLCPP_INFO(this->get_logger(), "Received EKF Pose");
+    if (!std::isfinite(msg->pose.position.x) || !std::isfinite(msg->pose.position.y) || !std::isfinite(msg->pose.position.z) ||
+        !std::isfinite(msg->pose.orientation.x) || !std::isfinite(msg->pose.orientation.y) ||
+        !std::isfinite(msg->pose.orientation.z) || !std::isfinite(msg->pose.orientation.w)) {
+        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Ignoring EKF Pose containing NaN/Inf");
+        return;
+    }
     current_pose = *msg;
     has_received_current_pose_ = true;
-    
-    // pub_static_tf();
 }
 void DynamicTfCub::wheel_odometry_callback(const nav_msgs::msg::Odometry::ConstSharedPtr& msg)
 {

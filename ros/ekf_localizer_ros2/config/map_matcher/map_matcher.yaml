@@ -6,11 +6,15 @@ map_matcher_node:
     # pcd_file_path: /home/cub/colcon_ws/src/cub/ekf_localizer/pcd/mapoudanhodoumade.pcd
     # pcd_file_path: /home/cub/colcon_ws/src/cub/ekf_localizer/pcd/mapkakunin.pcd
     # pcd_file_path: /home/cub/colcon_ws/src/cub/ekf_localizer_ros2/pcd/11-2025tsukuba-map-1004.pcd
-    pcd_file_path: /home/cub/maps/map_tc25_gnss_0_2.pcd
+    pcd_file_path: /home/cub/colcon_ws/src/cub/ekf_localizer_ros2/pcd/map_tc25_gnss_0_2.pcd
 
     # pcdファイルを読み込んだらpublishするかどうか
     is_publish_map: true
     is_pcl_offset: true
+
+    # デバッグ用：切り出したローカル点群地図をpublishするかどうか（デフォルト: false）
+    publish_local_map: true
+    local_map_topic_name: "/local_map"
 
     # LiDAR点群をダウンサンプルする時のボクセルサイズ(マシンスペックに合わせて調整)
     VOXEL_SIZE: 0.2
@@ -18,7 +22,7 @@ map_matcher_node:
     VOXEL_SIZE_MAP: 0.2
 
     # 値の距離以内の点群を処理する(m)
-    LIMIT_RANGE: 25.0
+    LIMIT_RANGE: 40.0
     LIMIT_RANGE_HEIGHT: 30.0
     # 前回地図を切り出した位置からこの距離(m)以上動いたら地図を切り出し直す
     # 切り出し範囲は LIMIT_RANGE + この値 になる
@@ -33,8 +37,8 @@ map_matcher_node:
     TRANS_EPSILON: 0.001
     STEP_SIZE: 0.1
     # RESOLUTION: 0.1
-    RESOLUTION: 1.5
-    MAX_ITERATION: 30.0 # 最適化計算を最大何回繰り返すか
+    RESOLUTION: 1.0
+    MAX_ITERATION: 35.0 # 最適化計算を最大何回繰り返すか
 
 
     # Map Offset
