@@ -28,12 +28,12 @@ ekf_localizer_node:
     gps_init_yaw_min_distance: 0.5      # [m] 初期ヨー角推定に必要な最小GPS移動距離
     
     # EKF Initial pose
-    INIT_X: 62.2
-    INIT_Y: 28.9
+    INIT_X: 62.6
+    INIT_Y: 31.2
     INIT_Z: 0.0
     INIT_ROLL: 0.0
     INIT_PITCH: 0.0
-    INIT_YAW: 3.01
+    INIT_YAW: 2.82
     INIT_SIGMA: 0.2
     
     # Sensor noise parameters

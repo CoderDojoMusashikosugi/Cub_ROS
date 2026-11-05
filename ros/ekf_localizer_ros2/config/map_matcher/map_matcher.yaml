@@ -6,7 +6,8 @@ map_matcher_node:
     # pcd_file_path: /home/cub/colcon_ws/src/cub/ekf_localizer/pcd/mapoudanhodoumade.pcd
     # pcd_file_path: /home/cub/colcon_ws/src/cub/ekf_localizer/pcd/mapkakunin.pcd
     # pcd_file_path: /home/cub/colcon_ws/src/cub/ekf_localizer_ros2/pcd/11-2025tsukuba-map-1004.pcd
-    pcd_file_path: /home/cub/colcon_ws/src/cub/ekf_localizer_ros2/pcd/map_tc25_gnss_0_2.pcd
+    # pcd_file_path: /home/cub/colcon_ws/src/cub/ekf_localizer_ros2/pcd/map_tc25_gnss_0_2.pcd
+    pcd_file_path: /home/cub/colcon_ws/src/cub/ekf_localizer_ros2/pcd/map_vel_tc26.pcd
 
     # pcdファイルを読み込んだらpublishするかどうか
     is_publish_map: true
