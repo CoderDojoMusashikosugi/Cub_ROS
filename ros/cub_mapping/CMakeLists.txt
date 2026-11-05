@@ -258,6 +258,8 @@ ament_export_dependencies(
 # Testing
 option(CUB_MAPPING_BUILD_GNSS "Build the GLIM RTK GNSS extension" ON)
 if(CUB_MAPPING_BUILD_GNSS)
+  # GPSFactorArm and the GLIM binaries require the GTSAM 4.3 API/ABI.
+  find_package(GTSAM 4.3 REQUIRED)
   find_package(glim REQUIRED)
   add_library(cub_mapping_save_frames SHARED src/glim_save_frames.cpp)
   set_target_properties(cub_mapping_save_frames PROPERTIES AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)

@@ -49,6 +49,7 @@
   - `cd colcon_ws`
   - `colcon build --symlink-install`
   - (↑を入力するのが長くて面倒なので、一応`cb`というエイリアスで上記を一気に実行して元のディレクトリに戻れるようにしてある。)
+- `ekf_localizer`を使うCUDA環境では、初回に`cbc`を実行して`fast_gicp`の`BUILD_VGICP_CUDA=ON`を設定する（ホストからは`./docker/run_in_container.sh cbc`）。設定はCMakeキャッシュに保存されるため、その後は`cb`でビルドできる。`build/fast_gicp`のキャッシュを削除した場合は再度`cbc`を実行する。
 - もし`colcon build --symlink-install`がエラー終了する場合は↓
   - 依存するライブラリが不足していそうな場合は、一度./run.shの環境から`exit`して、`./stop.sh`してから再度`./run.sh`するとビルドが通るようになっている場合がある。(コンテナ立ち上げ直し)
   - メモリ不足で止まっていそうな場合は、`MAKEFLAGS="-j 1" colcon build --symlink-install`のようにして1並列でビルドさせることでメモリ使用量を削減可能。

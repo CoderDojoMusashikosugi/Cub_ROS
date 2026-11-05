@@ -1,0 +1,8 @@
+# Local rosdep rules for system dependencies not defined in rosdistro.
+libmetis-dev:
+  debian: [libmetis-dev]
+  ubuntu: [libmetis-dev]
+
+# GLIM from the koide3 PPA requires GTSAM 4.3, not ros-${ROS_DISTRO}-gtsam.
+gtsam-notbb:
+  ubuntu: [libgtsam-notbb-dev]
