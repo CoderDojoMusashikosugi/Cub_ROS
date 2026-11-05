@@ -1,0 +1,23 @@
+{
+  "mode": "calibrate",
+  "topic": "/um982_node/fix_secondary",
+  "accepted_frame_ids": ["gnss_secondary_link", "gnss_sub_link"],
+  "origin_lla": [36.082628231, 140.076144739, 67.078],
+  "altitude_reference": "msl",
+  "geoid_height_m": 40.1473,
+  "antenna_in_imu_m": [-0.09, 0.100608736, -0.382140249],
+  "time_offset_s": 0.0,
+  "min_interval_s": 1.0,
+  "max_interpolation_gap_s": 0.25,
+  "sigma_horizontal_m": 0.15,
+  "sigma_vertical_m": 0.30,
+  "max_sigma_m": 5.0,
+  "huber_k": 1.345,
+  "information_scale": 1000.0,
+  "settle_iterations": 20,
+  "max_residual_m": 20.0,
+  "alignment_min_pairs": 20,
+  "alignment_min_baseline_m": 10.0,
+  "alignment_max_rmse_m": 1.5,
+  "alignment_file": ""
+}

@@ -25,7 +25,7 @@ def generate_launch_description():
                 output="screen",
                 parameters=[str(param_file)],
                 remappings=[
-                    ("/cloud_pcd", "/cloud_pcd_mapping"),
+                    # ("/cloud_pcd", "/cloud_pcd"),
                     ("/terrain_occupancy_grid", "/terrain_occupancy_grid"),
                     ("/ground_cloud", "/ground_cloud"),
                     ("/obstacle_cloud", "/obstacle_cloud"),

@@ -1,12 +1,12 @@
 terrain_analysis_node:
   ros__parameters:
     # Grid resolution (m/cell) - same as map_converter for consistency
-    resolution: 0.2
+    resolution: 0.1
 
     # Obstacle detection height thresholds (relative to ground)
     obstacle_height_min: 0.15  # Minimum height above ground to be considered obstacle (m)
     obstacle_height_max: 1.0   # Maximum height above ground to be considered obstacle (m)
-    ground_clearance: 0.1      # Height tolerance for ground detection (m)
+    ground_clearance: 0.2      # Height tolerance for ground detection (m)
 
     # Ground estimation parameters
     quantile_z: 0.25           # Quantile for ground estimation (0.0-1.0, lower = more conservative)
@@ -17,5 +17,12 @@ terrain_analysis_node:
     pointcloud_topic: "/cloud_pcd"  # Same as map_converter
 
     # Output settings
-    output_directory: "/Users/nyanziba/hobby/texnitis/texnitis-template/cub/cub-mapping/src/cub_mapping/maps"
+    output_directory: "/home/cub/maps/terrain_analysis_output" 
     auto_generate: true        # Auto-generate map when PCD is received
+
+    # Region growing & slope filter parameters (Ground continuity & canopy removal)
+    enable_slope_filter: true        # Enable slope-constrained region growing
+    max_ground_slope: 0.1            # Maximum allowable ground slope (tan(theta), ~26 deg)
+    max_ground_jump: 0.04             # Maximum elevation jump between adjacent cells (m)
+    min_ground_cluster_size: 100     # Minimum cell count for a valid ground cluster
+    fill_iterations: 5               # Number of iterations for ground elevation hole filling

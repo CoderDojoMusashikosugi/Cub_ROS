@@ -12,6 +12,7 @@
 #include <ctime>
 #include <fstream>
 #include <iomanip>
+#include <queue>
 #include <sstream>
 #include <sys/stat.h>
 
@@ -69,6 +70,14 @@ TerrainAnalysis::TerrainAnalysis()
   RCLCPP_INFO(this->get_logger(), "  Resolution: %.3f m/cell", resolution_);
   RCLCPP_INFO(this->get_logger(), "  Obstacle height: %.2f - %.2f m", obstacle_height_min_, obstacle_height_max_);
   RCLCPP_INFO(this->get_logger(), "  Auto-generate: %s", auto_generate_ ? "true" : "false");
+  RCLCPP_INFO(this->get_logger(), "  Slope filter: %s", enable_slope_filter_ ? "true" : "false");
+  if (enable_slope_filter_) {
+    RCLCPP_INFO(this->get_logger(), "    Max ground slope: %.2f (%.1f deg)",
+                max_ground_slope_, std::atan(max_ground_slope_) * 180.0 / M_PI);
+    RCLCPP_INFO(this->get_logger(), "    Max ground jump: %.2f m", max_ground_jump_);
+    RCLCPP_INFO(this->get_logger(), "    Min cluster size: %d cells", min_ground_cluster_size_);
+    RCLCPP_INFO(this->get_logger(), "    Fill iterations: %d", fill_iterations_);
+  }
 }
 
 void TerrainAnalysis::loadParameters()
@@ -83,6 +92,12 @@ void TerrainAnalysis::loadParameters()
   pointcloud_topic_ = this->declare_parameter<std::string>("pointcloud_topic", "/cloud_pcd");
   output_directory_ = this->declare_parameter<std::string>("output_directory", "/tmp/terrain_maps");
   auto_generate_ = this->declare_parameter<bool>("auto_generate", true);
+
+  enable_slope_filter_ = this->declare_parameter<bool>("enable_slope_filter", true);
+  max_ground_slope_ = this->declare_parameter<double>("max_ground_slope", 0.5);
+  max_ground_jump_ = this->declare_parameter<double>("max_ground_jump", 0.3);
+  min_ground_cluster_size_ = this->declare_parameter<int>("min_ground_cluster_size", 100);
+  fill_iterations_ = this->declare_parameter<int>("fill_iterations", 5);
 }
 
 void TerrainAnalysis::pointCloudCallback(const sensor_msgs::msg::PointCloud2::ConstSharedPtr cloud)
@@ -261,34 +276,166 @@ void TerrainAnalysis::estimateGroundElevation()
     }
   }
 
-  // Fill gaps in ground elevation using interpolation
-  // Simple neighbor averaging for cells with no ground estimate
-  std::vector<float> filled_elevation = ground_elevation_;
-  for (int y = 0; y < grid_height_; y++) {
-    for (int x = 0; x < grid_width_; x++) {
-      int idx = getGridIndex(x, y);
-      if (std::isnan(ground_elevation_[idx])) {
-        // Average of neighbors
-        float sum = 0;
-        int count = 0;
-        for (int dy = -2; dy <= 2; dy++) {
-          for (int dx = -2; dx <= 2; dx++) {
-            if (isInBounds(x + dx, y + dy)) {
-              int neighbor_idx = getGridIndex(x + dx, y + dy);
-              if (!std::isnan(ground_elevation_[neighbor_idx])) {
-                sum += ground_elevation_[neighbor_idx];
-                count++;
+  // Filter ground elevation using slope-constrained region growing
+  if (enable_slope_filter_) {
+    filterGroundElevationByRegionGrowing();
+  }
+
+  // Fill gaps in ground elevation using iterative neighbor averaging
+  for (int iter = 0; iter < fill_iterations_; ++iter) {
+    bool has_new_fill = false;
+    std::vector<float> filled_elevation = ground_elevation_;
+
+    for (int y = 0; y < grid_height_; y++) {
+      for (int x = 0; x < grid_width_; x++) {
+        int idx = getGridIndex(x, y);
+        if (std::isnan(ground_elevation_[idx])) {
+          float sum = 0;
+          int count = 0;
+          for (int dy = -2; dy <= 2; dy++) {
+            for (int dx = -2; dx <= 2; dx++) {
+              if (isInBounds(x + dx, y + dy)) {
+                int neighbor_idx = getGridIndex(x + dx, y + dy);
+                if (!std::isnan(ground_elevation_[neighbor_idx])) {
+                  sum += ground_elevation_[neighbor_idx];
+                  count++;
+                }
+              }
+            }
+          }
+          if (count > 0) {
+            filled_elevation[idx] = sum / count;
+            has_new_fill = true;
+          }
+        }
+      }
+    }
+    ground_elevation_ = filled_elevation;
+    if (!has_new_fill) {
+      break;
+    }
+  }
+}
+
+void TerrainAnalysis::filterGroundElevationByRegionGrowing()
+{
+  int total_cells = grid_width_ * grid_height_;
+  std::vector<bool> visited(total_cells, false);
+  std::vector<std::vector<int>> clusters;
+
+  // 8-neighbor offsets
+  const int dx[8] = {-1, 0, 1, -1, 1, -1, 0, 1};
+  const int dy[8] = {-1, -1, -1, 0, 0, 1, 1, 1};
+  const double dist_weight[8] = {
+    std::sqrt(2.0), 1.0, std::sqrt(2.0),
+    1.0,                 1.0,
+    std::sqrt(2.0), 1.0, std::sqrt(2.0)
+  };
+
+  // Find connected components using BFS
+  for (int y = 0; y < grid_height_; ++y) {
+    for (int x = 0; x < grid_width_; ++x) {
+      int start_idx = getGridIndex(x, y);
+      if (visited[start_idx] || std::isnan(ground_elevation_[start_idx])) {
+        continue;
+      }
+
+      std::vector<int> current_cluster;
+      std::queue<int> q;
+      q.push(start_idx);
+      visited[start_idx] = true;
+
+      while (!q.empty()) {
+        int curr_idx = q.front();
+        q.pop();
+        current_cluster.push_back(curr_idx);
+
+        int cx = curr_idx % grid_width_;
+        int cy = curr_idx / grid_width_;
+        float cz = ground_elevation_[curr_idx];
+
+        for (int i = 0; i < 8; ++i) {
+          int nx = cx + dx[i];
+          int ny = cy + dy[i];
+
+          if (isInBounds(nx, ny)) {
+            int n_idx = getGridIndex(nx, ny);
+            if (!visited[n_idx] && !std::isnan(ground_elevation_[n_idx])) {
+              float nz = ground_elevation_[n_idx];
+              double distance = dist_weight[i] * resolution_;
+              double max_allowed_diff = max_ground_jump_ + max_ground_slope_ * distance;
+
+              if (std::abs(nz - cz) <= max_allowed_diff) {
+                visited[n_idx] = true;
+                q.push(n_idx);
               }
             }
           }
         }
-        if (count > 0) {
-          filled_elevation[idx] = sum / count;
-        }
+      }
+
+      if (!current_cluster.empty()) {
+        clusters.push_back(std::move(current_cluster));
       }
     }
   }
-  ground_elevation_ = filled_elevation;
+
+  if (clusters.empty()) {
+    return;
+  }
+
+  // Find the largest cluster (representing primary ground surface)
+  size_t max_cluster_size = 0;
+  size_t largest_cluster_idx = 0;
+  for (size_t i = 0; i < clusters.size(); ++i) {
+    if (clusters[i].size() > max_cluster_size) {
+      max_cluster_size = clusters[i].size();
+      largest_cluster_idx = i;
+    }
+  }
+
+  // Calculate average elevation of the largest cluster
+  double main_ground_z_sum = 0.0;
+  for (int idx : clusters[largest_cluster_idx]) {
+    main_ground_z_sum += ground_elevation_[idx];
+  }
+  double main_ground_z_avg = main_ground_z_sum / max_cluster_size;
+
+  RCLCPP_INFO(this->get_logger(),
+              "Ground clustering: %zu clusters found. Largest cluster: %zu cells (avg z: %.2f m)",
+              clusters.size(), max_cluster_size, main_ground_z_avg);
+
+  // Invalidate clusters that:
+  // 1. Have size < min_ground_cluster_size_ AND are much smaller than largest cluster (< 5% of largest)
+  // 2. OR have average elevation significantly higher than the main ground (> 1.5m above main ground)
+  int removed_cells = 0;
+  for (size_t i = 0; i < clusters.size(); ++i) {
+    if (i == largest_cluster_idx) {
+      continue;
+    }
+
+    bool is_too_small = (clusters[i].size() < static_cast<size_t>(min_ground_cluster_size_)) &&
+                        (clusters[i].size() < max_cluster_size * 0.05);
+
+    double cluster_z_sum = 0.0;
+    for (int idx : clusters[i]) {
+      cluster_z_sum += ground_elevation_[idx];
+    }
+    double cluster_z_avg = cluster_z_sum / clusters[i].size();
+
+    bool is_significantly_elevated = (cluster_z_avg - main_ground_z_avg > 1.5);
+
+    if (is_too_small || is_significantly_elevated) {
+      for (int idx : clusters[i]) {
+        ground_elevation_[idx] = std::numeric_limits<float>::quiet_NaN();
+        removed_cells++;
+      }
+    }
+  }
+
+  RCLCPP_INFO(this->get_logger(),
+              "Region growing filter removed %d cells as non-ground (branches/canopies/outliers)",
+              removed_cells);
 }
 
 void TerrainAnalysis::generateOccupancyGrid()

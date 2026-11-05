@@ -1,5 +1,62 @@
 # cub4_bringup
 
+## MID360 + 内蔵IMUのrosbagからGLIM地図を生成
+
+設定一式は[`config/glim_params_mid360`](config/glim_params_mid360/README.md)です。
+MID360の点群と内蔵IMU、サブアンテナのRTK FIXを使用します。
+GNSS原点・ジオイド補正・二段階処理はVelodyne版と共通です。
+
+```bash
+./docker/run_in_container.sh 'cbs cub4_bringup'
+./docker/run_in_container.sh 'ros2 launch cub4_bringup glim_mid360.launch.py rosbag:=/home/cub/rosbag2_2026_10_17-15_09_06_no_images'
+```
+
+出力は`~/maps/<bag名>_glim_mid360_<日時>/`です。先頭180秒だけ確認する場合は
+`playback_duration:=180`、GNSSを使わない場合は`enable_gnss:=false`を追加してください。
+
+## Velodyne + IMU の rosbag から GLIM 地図を生成
+
+CUDA対応の `glim_ros` と MCAP storage plugin を導入したコンテナで実行します。
+設定は [`config/glim_params_velodyne`](config/glim_params_velodyne/README.md) にあります。
+点群とIMUは`/velodyne_points` と `/imu/data_raw`を使用します。
+既定ではサブアンテナRTK FIXも統合し、`enable_gnss:=false`で無効化できます。
+
+ホストのプロジェクトルートから:
+
+```bash
+./docker/run_in_container.sh 'cbs cub4_bringup'
+./docker/run_in_container.sh 'ros2 launch cub4_bringup glim_velodyne.launch.py rosbag:=/home/cub/rosbag2_2026_10_17-15_09_06_no_images'
+```
+
+依存パッケージも未ビルドの場合は、最初に以下を実行してください（GLIMはコンテナに導入済みのものを使います）。
+
+```bash
+./docker/run_in_container.sh 'cd /home/cub/colcon_ws && colcon build --symlink-install --packages-up-to cub4_bringup --packages-ignore glim glim_ros'
+```
+
+処理完了後、`/home/cub/maps/<bag名>_glim_velodyne_<実行日時>/` にGLIM形式の地図を保存して終了します。
+ホストでは `docker/home/maps/` に対応します。出力先を固定する場合は `dump_path:=/home/cub/maps/任意の空ディレクトリ` を追加してください。既存データのある出力先はエラーになります。
+保存内容は `graph.bin`、`values.bin`、サブマップ、軌跡（`traj_lidar.txt` 等）、使用したJSON設定です。
+点群PLYとして書き出す場合は、保存したディレクトリをoffline viewerで開いてExportを使用します。
+
+```bash
+./docker/run_in_container.sh 'ros2 run glim_ros offline_viewer /home/cub/maps/生成されたディレクトリ'
+```
+
+GUI環境なしで地図生成が可能です。offline viewerでの表示・PLY出力にはGUI環境が必要です。
+bagはGLIMが直接読み込むため、別途 `ros2 bag play` やセンサドライバ、ロボット制御ノードを起動する必要はありません。
+
+| launch引数 | 既定値 | 説明 |
+|---|---|---|
+| `rosbag` | 必須 | コンテナ内のbagディレクトリまたはMCAPファイル |
+| `dump_path` | 自動生成 | 地図の出力先（空ディレクトリ） |
+| `config_path` | パッケージ内 `config/glim_params_velodyne` | GLIM設定ディレクトリ |
+| `start_offset` | `0.0` | 読み飛ばす秒数 |
+| `playback_duration` | `0.0` | 読み飛ばした後の処理秒数（0は最後まで） |
+
+例えば先頭60秒のみを確認するには `playback_duration:=60.0` を追加します。
+このbagに合わせてVelodyne時刻に-1.0秒の補正を設定しています。詳細は設定ディレクトリのREADMEを参照してください。
+
 ## spresense_imu_node
 
 Spresense からシリアル通信経由で送信される 6 軸 IMU（CXD5602PWBIMU）および外部 GNSS（UM982 等）による高精度時刻同期パケットを受信し、ROS2 トピックとして配信するノードです。

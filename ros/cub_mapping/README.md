@@ -2,6 +2,10 @@
 
 3D点群から2D占有格子地図への変換ツールおよびナビゲーションウェイポイント編集ツールパッケージ
 
+Cub4のGLIM GNSS統合については[ビルド・起動・座標系・検証手順](doc/glim_gnss.md)を参照してください。
+
+動体除去については[MapCleanerのセットアップと操作手順](doc/map_cleaner.md)を参照してください。
+
 ## 概要
 
 このパッケージは、以下の2つの主要機能を提供します：
@@ -456,6 +460,11 @@ terrain_analysis_node:
 | `pointcloud_topic` | string | "/cloud_pcd" | 購読する点群トピック |
 | `output_directory` | string | "/tmp/terrain_maps" | 地図保存先ディレクトリ |
 | `auto_generate` | bool | true | 点群受信時に自動でマップ生成 |
+| `enable_slope_filter` | bool | true | 勾配制約付き領域拡張フィルタの有効化 |
+| `max_ground_slope` | double | 0.5 | 地面として許容する最大勾配（tan(θ)） |
+| `max_ground_jump` | double | 0.3 | 隣接セル間の最大許容段差（m） |
+| `min_ground_cluster_size` | int | 100 | 地面とみなす最小クラスタサイズ（セル数） |
+| `fill_iterations` | int | 5 | 地面高さの欠損補間（穴埋め）の反復回数 |
 
 ## 提供サービス
 
@@ -506,10 +515,11 @@ terrain_analysis_node:
 
 1. **点群のグリッド分割**: 点群をXY平面のセルに分割
 2. **高さ情報の収集**: 各セル内の全点のZ座標を収集
-3. **地面高さの推定**: 分位点法（デフォルト25%）で各セルの地面高さを推定
-4. **隣接セル補間**: 点が少ないセルは隣接セルから地面高さを補間
-5. **障害物判定**: 地面からの高さが `obstacle_height_min` ～ `obstacle_height_max` の範囲にある点を障害物として判定
-6. **OccupancyGrid生成**: 障害物が存在するセルを占有（100）、それ以外を自由（0）としてマーク
+3. **初期地面高さの推定**: 分位点法（デフォルト25%）で各セルの地面高さを暫定推定
+4. **勾配制約付き領域拡張（外れ値・枝の除去）**: 8近傍BFSで連続した地面クラスタを特定し、地面から孤立した空中物（木の枝や屋根）を地面候補から除外
+5. **反復補間**: 枝を除去した穴や点の少ないセルを周囲の健全な地面から滑らかに反復補間
+6. **障害物判定**: 正しい地面からの相対高さが `obstacle_height_min` ～ `obstacle_height_max` の範囲にある点を障害物として判定
+7. **OccupancyGrid生成**: 障害物が存在するセルを占有（100）、それ以外を自由（0）としてマーク
 
 ## 使用例
 
@@ -527,6 +537,26 @@ ros2 topic echo /terrain_occupancy_grid --once
 ```
 
 ### RViz2での可視化
+
+### 手動地図修正用 Intensity 重ね合わせ画像の生成
+
+生成した 2D 地図（PGM）を手動で編集する際、白線やマンホール、舗装境界を識別しやすくするために、**PCD 点群の反射強度（Intensity）を 2D 地図と完全に同一サイズ・解像度で射影した透過カラー画像（RGBA PNG）** を生成できます。
+既定の点群には動体除去済みの `maps/mid360_cleaned/clean_map.pcd` が使用されます。
+
+```bash
+# 基本実行（--pcd 省略時は clean_map.pcd を自動使用）
+ros2 run cub_mapping pcd_to_intensity_image --yaml /home/cub/maps/terrain_analysis_output/1017_02/map.yaml
+```
+
+- **主なオプション**:
+  - `--pcd <path>`: 入力PCD（デフォルト: `/home/cub/maps/mid360_cleaned/clean_map.pcd`）
+  - `--yaml <path>`: 対象の 2D 地図の `map.yaml`（必須）
+  - `--colormap <name>`: `turbo` (デフォルト), `viridis`, `jet`, `gray`
+  - `--min_z <val>`, `--max_z <val>`: Z方向の高さ制限（例: 地面付近だけに限定する場合）
+  - `--percentile_clip <val>`: 高反射ノイズを除去する上限パーセンタイル（デフォルト: 99.0%）
+  - `--output, -o <path>`: 出力画像パス（デフォルト: `map.yaml` と同じディレクトリに `map_intensity.png`）
+
+GIMP や画像編集ツールで下レイヤーに `map.pgm`、上レイヤーに `map_intensity.png`（不透明度 50% など）を重ねることで、白線や縁石の位置を確認しながら正確に地図を修正できます。
 
 RViz2で以下のディスプレイを追加すると、結果を確認できます：
 
