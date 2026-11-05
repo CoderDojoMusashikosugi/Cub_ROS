@@ -97,50 +97,73 @@ MapMatcher::MapMatcher() : Node("MapMatcher")
 	map_pcl_ = std::make_shared<PointCloudType>();
 	current_pcl_ = std::make_shared<PointCloudType>();
 
-	// NDTCudaは一度だけ生成して使い回す(GPU上のターゲットボクセルマップを再利用するため)
-	ndt_ = std::make_unique<fast_gicp::NDTCuda<PointType, PointType>>();
-	ndt_->setTransformationEpsilon(TRANS_EPSILON_);
-	ndt_->setResolution(RESOLUTION_);
-	ndt_->setMaximumIterations(static_cast<int>(MAX_ITERATION_));
-	ndt_->setNeighborSearchMethod(fast_gicp::NeighborSearchMethod::DIRECT7);
+	reset_ndt();
 }
 
 MapMatcher::~MapMatcher(){}
 
+void MapMatcher::reset_ndt()
+{
+	try {
+		cudaGetLastError(); // 直前のCUDAエラーをクリア
+		ndt_ = std::make_unique<fast_gicp::NDTCuda<PointType, PointType>>();
+		ndt_->setTransformationEpsilon(TRANS_EPSILON_);
+		ndt_->setResolution(RESOLUTION_);
+		ndt_->setMaximumIterations(static_cast<int>(MAX_ITERATION_));
+		ndt_->setNeighborSearchMethod(fast_gicp::NeighborSearchMethod::DIRECT7);
+		has_local_map_ = false;
+		map_local_pcl_.reset();
+	} catch (const std::exception& e) {
+		RCLCPP_ERROR(this->get_logger(), "Failed to reset NDTCuda: %s", e.what());
+	} catch (...) {
+		RCLCPP_ERROR(this->get_logger(), "Failed to reset NDTCuda: unknown exception");
+	}
+}
+
 
 void MapMatcher::pc_callback(const sensor_msgs::msg::PointCloud2::ConstSharedPtr& msg)
 {
+	try {
+		if(has_read_map_ && has_received_ekf_pose_){
+			pc_time_ = msg->header.stamp;
+			pc_ = *msg;
+			PointCloudTypePtr raw_current_pcl(new PointCloudType);
+			pcl::fromROSMsg(*msg, *raw_current_pcl);
 
-	if(has_read_map_ && has_received_ekf_pose_){
-		pc_time_ = msg->header.stamp;
-		pc_ = *msg;
-		PointCloudTypePtr raw_current_pcl(new PointCloudType);
-		pcl::fromROSMsg(*msg, *raw_current_pcl);
+			// downsampling
+			if(VOXEL_SIZE_ > 0) downsample_pcl(raw_current_pcl, current_pcl_, VOXEL_SIZE_);
+			else current_pcl_ = raw_current_pcl;
 
-		// downsampling
-		if(VOXEL_SIZE_ > 0) downsample_pcl(raw_current_pcl, current_pcl_, VOXEL_SIZE_);
-		else current_pcl_ = raw_current_pcl;
-		current_pcl_->is_dense = false;
-		current_pcl_->width = current_pcl_->size();
-		// offset
-		if(is_pcl_offset_){
-			geometry_msgs::msg::TransformStamped transform_stamped;
-			try{
-				// lookupTransform("変換のベースとなる座標系","変更したい対象の座標系",変更したい時間(過去データを扱う場合は注意が必要))
-				// transform_stamped = tfBuffer_->lookupTransform("base_link", msg->header.frame_id, msg->header.stamp); //座標系の変換 
-				transform_stamped = tfBuffer_->lookupTransform("base_link", msg->header.frame_id, tf2::TimePointZero);
+			// NaN / Inf の点を除去
+			std::vector<int> nan_indices;
+			pcl::removeNaNFromPointCloud(*current_pcl_, *current_pcl_, nan_indices);
+
+			current_pcl_->is_dense = false;
+			current_pcl_->width = current_pcl_->size();
+			// offset
+			if(is_pcl_offset_){
+				geometry_msgs::msg::TransformStamped transform_stamped;
+				try{
+					// lookupTransform("変換のベースとなる座標系","変更したい対象の座標系",変更したい時間(過去データを扱う場合は注意が必要))
+					// transform_stamped = tfBuffer_->lookupTransform("base_link", msg->header.frame_id, msg->header.stamp); //座標系の変換 
+					transform_stamped = tfBuffer_->lookupTransform("base_link", msg->header.frame_id, tf2::TimePointZero);
+				}
+				catch(tf2::TransformException& ex){
+					// ROS_WARN("%s", ex.what());
+					return;
+				}	
+				Eigen::Matrix4f transform = tf2::transformToEigen(transform_stamped.transform).matrix().cast<float>();
+				pcl::transformPointCloud(*current_pcl_, *current_pcl_, transform);
 			}
-			catch(tf2::TransformException& ex){
-				// ROS_WARN("%s", ex.what());
-				return;
-			}	
-			Eigen::Matrix4f transform = tf2::transformToEigen(transform_stamped.transform).matrix().cast<float>();
-			pcl::transformPointCloud(*current_pcl_, *current_pcl_, transform);
-		}
-		// has_received_pc_ = true;
+			// has_received_pc_ = true;
 
-		matching(map_pcl_, current_pcl_);
-		has_received_ekf_pose_ = false;
+			matching(map_pcl_, current_pcl_);
+			has_received_ekf_pose_ = false;
+		}
+	} catch (const std::exception& e) {
+		RCLCPP_ERROR(this->get_logger(), "Exception in pc_callback: %s", e.what());
+	} catch (...) {
+		RCLCPP_ERROR(this->get_logger(), "Unknown exception in pc_callback");
 	}
 }
 
@@ -239,143 +262,167 @@ void MapMatcher::downsample_pcl(pcl::PointCloud<pcl::PointXYZI>::Ptr input_pcl,p
 
 void MapMatcher::matching(pcl::PointCloud<pcl::PointXYZI>::Ptr map_pcl,pcl::PointCloud<pcl::PointXYZI>::Ptr local_pcl)
 {
-	// passthrough
-	PointCloudTypePtr current_local_pcl(new PointCloudType);
-	// 地図の切り出しは、前回の切り出し中心から一定距離動いた時だけ行う
-	update_local_map_if_needed(ekf_pose_.pose.position.x, ekf_pose_.pose.position.y, ekf_pose_.pose.position.z);
-	set_pcl(current_pcl_,current_local_pcl,0.0,0.0,0.0);
-	// std::cout << "cur_local_pcl_ size: " << current_local_pcl->points.size() << std::endl;
-
-	if(!map_local_pcl_ || map_local_pcl_->points.empty() || current_local_pcl->points.empty()){
-		if(!map_local_pcl_ || map_local_pcl_->points.empty()) std::cout << "map_local_pcl is empty" << std::endl;
-		if(current_local_pcl->points.empty()) std::cout << "current_local_pcl is empty" << std::endl;
-		return;
-	}
-	// if(current_local_pcl->points.size() > map_local_pcl->points.size()){
-	// 	std::cout << "local clouds > map clouds" << std::endl;
-	// 	return;
-	// }
-
-	// initialize
-	Eigen::AngleAxisf init_rotation(msg_to_quat_eigen(ekf_pose_.pose.orientation));
-	// Eigen::AngleAxisf init_rotation((float)get_yaw_from_quat(ekf_pose_.pose.orientation), Eigen::Vector3f::UnitZ());
-	Eigen::Translation3f init_translation((float)ekf_pose_.pose.position.x, (float)ekf_pose_.pose.position.y, (float)ekf_pose_.pose.position.z);
-	Eigen::Matrix4f init_guess = (init_translation * init_rotation).matrix();
-
-	// align
-	PointCloudTypePtr ndt_pcl(new PointCloudType);
-	// pclomp::NormalDistributionsTransform<pcl::PointXYZI, pcl::PointXYZI> ndt;
-	// NDTCudaはコンストラクタで生成済み。ターゲットはupdate_local_map_if_needed()で更新時のみ設定される
-	fast_gicp::NDTCuda<pcl::PointXYZI, pcl::PointXYZI>& ndt = *ndt_;
-	ndt.setInputSource(current_local_pcl);
-	// ndt.setNumThreads(std::thread::hardware_concurrency()/2);
-  	// ndt.setNeighborhoodSearchMethod(pclomp::DIRECT7);
-	// NDTCuda uses CUDA for acceleration, no need for thread settings
-	ndt.align(*ndt_pcl, init_guess);
-
-	// まだ一度もNDTがマッチしておらず、初期角度のズレで収束しない・スコアが悪い場合は全方位(45度刻み)を探索して初期角度を合わせる
-	if(!has_converged_once_ && (!ndt.hasConverged() || ndt.getFitnessScore() > MATCHING_SCORE_TH_)){
-		const float base_yaw = static_cast<float>(get_yaw_from_quat(ekf_pose_.pose.orientation));
-		double best_score = ndt.hasConverged() ? ndt.getFitnessScore() : std::numeric_limits<double>::max();
-		Eigen::Matrix4f best_trans = ndt.getFinalTransformation();
-		PointCloudTypePtr best_pcl(new PointCloudType);
-		if(ndt.hasConverged()){
-			*best_pcl = *ndt_pcl;
+	try {
+		if(!ndt_){
+			reset_ndt();
 		}
-		bool found_valid = false;
-		for(int i = 1; i < 8; ++i){
-			const float cand_yaw = base_yaw + static_cast<float>(i) * static_cast<float>(M_PI / 4.0);
-			Eigen::AngleAxisf cand_rot(cand_yaw, Eigen::Vector3f::UnitZ());
-			Eigen::Matrix4f cand_guess = (init_translation * cand_rot).matrix();
-			PointCloudTypePtr cand_pcl(new PointCloudType);
-			ndt.align(*cand_pcl, cand_guess);
+
+		// passthrough
+		PointCloudTypePtr current_local_pcl(new PointCloudType);
+		// 地図の切り出しは、前回の切り出し中心から一定距離動いた時だけ行う
+		update_local_map_if_needed(ekf_pose_.pose.position.x, ekf_pose_.pose.position.y, ekf_pose_.pose.position.z);
+		set_pcl(current_pcl_,current_local_pcl,0.0,0.0,0.0);
+		// std::cout << "cur_local_pcl_ size: " << current_local_pcl->points.size() << std::endl;
+
+		// NaN / Inf の点を除去
+		std::vector<int> nan_indices;
+		pcl::removeNaNFromPointCloud(*current_local_pcl, *current_local_pcl, nan_indices);
+
+		if(!map_local_pcl_ || map_local_pcl_->points.size() < 10 || current_local_pcl->points.size() < 10){
+			if(!map_local_pcl_ || map_local_pcl_->points.empty()) std::cout << "map_local_pcl is empty" << std::endl;
+			else if(map_local_pcl_->points.size() < 10) std::cout << "map_local_pcl points too few: " << map_local_pcl_->points.size() << std::endl;
+			if(current_local_pcl->points.empty()) std::cout << "current_local_pcl is empty" << std::endl;
+			else if(current_local_pcl->points.size() < 10) std::cout << "current_local_pcl points too few: " << current_local_pcl->points.size() << std::endl;
+			return;
+		}
+		// if(current_local_pcl->points.size() > map_local_pcl->points.size()){
+		// 	std::cout << "local clouds > map clouds" << std::endl;
+		// 	return;
+		// }
+
+		// initialize
+		Eigen::AngleAxisf init_rotation(msg_to_quat_eigen(ekf_pose_.pose.orientation));
+		// Eigen::AngleAxisf init_rotation((float)get_yaw_from_quat(ekf_pose_.pose.orientation), Eigen::Vector3f::UnitZ());
+		Eigen::Translation3f init_translation((float)ekf_pose_.pose.position.x, (float)ekf_pose_.pose.position.y, (float)ekf_pose_.pose.position.z);
+		Eigen::Matrix4f init_guess = (init_translation * init_rotation).matrix();
+
+		if(!init_guess.allFinite()){
+			RCLCPP_WARN(this->get_logger(), "init_guess contains NaN or Inf, skipping matching");
+			return;
+		}
+
+		// align
+		PointCloudTypePtr ndt_pcl(new PointCloudType);
+		// pclomp::NormalDistributionsTransform<pcl::PointXYZI, pcl::PointXYZI> ndt;
+		// NDTCudaはコンストラクタで生成済み。ターゲットはupdate_local_map_if_needed()で更新時のみ設定される
+		fast_gicp::NDTCuda<pcl::PointXYZI, pcl::PointXYZI>& ndt = *ndt_;
+		ndt.setInputSource(current_local_pcl);
+		// ndt.setNumThreads(std::thread::hardware_concurrency()/2);
+		// ndt.setNeighborhoodSearchMethod(pclomp::DIRECT7);
+		// NDTCuda uses CUDA for acceleration, no need for thread settings
+		ndt.align(*ndt_pcl, init_guess);
+
+		// まだ一度もNDTがマッチしておらず、初期角度のズレで収束しない・スコアが悪い場合は全方位(45度刻み)を探索して初期角度を合わせる
+		if(!has_converged_once_ && (!ndt.hasConverged() || ndt.getFitnessScore() > MATCHING_SCORE_TH_)){
+			const float base_yaw = static_cast<float>(get_yaw_from_quat(ekf_pose_.pose.orientation));
+			double best_score = ndt.hasConverged() ? ndt.getFitnessScore() : std::numeric_limits<double>::max();
+			Eigen::Matrix4f best_trans = ndt.getFinalTransformation();
+			PointCloudTypePtr best_pcl(new PointCloudType);
 			if(ndt.hasConverged()){
-				const double score = ndt.getFitnessScore();
-				if(score < best_score){
-					best_score = score;
-					best_trans = ndt.getFinalTransformation();
-					*best_pcl = *cand_pcl;
-					if(score <= MATCHING_SCORE_TH_){
-						found_valid = true;
+				*best_pcl = *ndt_pcl;
+			}
+			bool found_valid = false;
+			for(int i = 1; i < 8; ++i){
+				const float cand_yaw = base_yaw + static_cast<float>(i) * static_cast<float>(M_PI / 4.0);
+				Eigen::AngleAxisf cand_rot(cand_yaw, Eigen::Vector3f::UnitZ());
+				Eigen::Matrix4f cand_guess = (init_translation * cand_rot).matrix();
+				if(!cand_guess.allFinite()) continue;
+				PointCloudTypePtr cand_pcl(new PointCloudType);
+				ndt.align(*cand_pcl, cand_guess);
+				if(ndt.hasConverged()){
+					const double score = ndt.getFitnessScore();
+					if(score < best_score){
+						best_score = score;
+						best_trans = ndt.getFinalTransformation();
+						*best_pcl = *cand_pcl;
+						if(score <= MATCHING_SCORE_TH_){
+							found_valid = true;
+						}
 					}
 				}
 			}
+			if(found_valid && !best_trans.isZero(1e-6)){
+				std::cout << "✓ Initial yaw search succeeded! Best FitnessScore: " << best_score << std::endl;
+				has_converged_once_ = true;
+				Eigen::Quaternionf quaternion(Eigen::Matrix3f(best_trans.block(0,0,3,3)));
+				quaternion.normalize();
+
+				geometry_msgs::msg::PoseStamped ndt_pose;
+				ndt_pose.pose.position.x = best_trans(0,3);
+				ndt_pose.pose.position.y = best_trans(1,3);
+				ndt_pose.pose.position.z = best_trans(2,3);
+				ndt_pose.pose.orientation = quat_eigen_to_msg(quaternion);
+				ndt_pose.header.stamp = pc_time_;
+				ndt_pose.header.frame_id = ekf_pose_.header.frame_id;
+				ndt_pose_pub_->publish(ndt_pose);
+
+				sensor_msgs::msg::PointCloud2 ndt_msg;
+				pcl::toROSMsg(*best_pcl, ndt_msg);
+				ndt_msg.header.stamp = pc_time_;
+				ndt_msg.header.frame_id = map_frame_id_;
+				ndt_pc_pub_->publish(ndt_msg);
+				std::cout << "Publish NDT POSE " << std::endl;
+				return;
+			}
 		}
-		if(found_valid && !best_trans.isZero(1e-6)){
-			std::cout << "✓ Initial yaw search succeeded! Best FitnessScore: " << best_score << std::endl;
+
+		if(!ndt.hasConverged()){
+			std::cout << "Has not converged" << std::endl;
+			return;
+		}
+
+		// 追加: 反復回数のチェック
+		// int final_iterations = ndt.getFinalNumIteration();
+		// // RCLCPP_INFO(this->get_logger(), "NDT converged in %d/%d iterations", final_iterations, (int)MAX_ITERATION_);
+		// std::cout << "NDT converged in " << final_iterations << "/" << (int)MAX_ITERATION_ << "iterations" << std::endl;
+
+		// if(final_iterations > MAX_ITERATION_ ) {
+		// 	// RCLCPP_WARN(this->get_logger(), "NG NDT reached max iterations - may not be accurate");
+		// 	std::cout << "NG NDT reached max iterations - may not be accurate" << std::endl;
+		// 	return;
+		// }
+
+		std::cout << "FitnessScore: " << ndt.getFitnessScore() << std::endl;
+		if(ndt.getFitnessScore() <= MATCHING_SCORE_TH_){
+			Eigen::Matrix4f translation = ndt.getFinalTransformation();	
+			if(translation.isZero(1e-6))
+			{
+				std::cout << "Translation is Zero " << std::endl;
+				return;
+			}
 			has_converged_once_ = true;
-			Eigen::Quaternionf quaternion(Eigen::Matrix3f(best_trans.block(0,0,3,3)));
+			Eigen::Quaternionf quaternion(Eigen::Matrix3f(translation.block(0,0,3,3)));
 			quaternion.normalize();
 
+			// publish_ndt_pose
 			geometry_msgs::msg::PoseStamped ndt_pose;
-			ndt_pose.pose.position.x = best_trans(0,3);
-			ndt_pose.pose.position.y = best_trans(1,3);
-			ndt_pose.pose.position.z = best_trans(2,3);
+			ndt_pose.pose.position.x = translation(0,3);
+			ndt_pose.pose.position.y = translation(1,3);
+			ndt_pose.pose.position.z = translation(2,3);
+			//ndt_pose.pose.position.z = 0.0;
 			ndt_pose.pose.orientation = quat_eigen_to_msg(quaternion);
-			ndt_pose.header.stamp = pc_time_;
+			ndt_pose.header.stamp = pc_time_; 	
+			// ndt_pose.header.stamp = ekf_pose_.header.stamp;
 			ndt_pose.header.frame_id = ekf_pose_.header.frame_id;
 			ndt_pose_pub_->publish(ndt_pose);
 
+			// publish ndt_pcl
 			sensor_msgs::msg::PointCloud2 ndt_msg;
-			pcl::toROSMsg(*best_pcl, ndt_msg);
+			pcl::toROSMsg(*ndt_pcl,ndt_msg);
 			ndt_msg.header.stamp = pc_time_;
 			ndt_msg.header.frame_id = map_frame_id_;
 			ndt_pc_pub_->publish(ndt_msg);
 			std::cout << "Publish NDT POSE " << std::endl;
-			return;
 		}
-	}
-
-	if(!ndt.hasConverged()){
-		std::cout << "Has not converged" << std::endl;
-		return;
-	}
-
-	// 追加: 反復回数のチェック
-	// int final_iterations = ndt.getFinalNumIteration();
-	// // RCLCPP_INFO(this->get_logger(), "NDT converged in %d/%d iterations", final_iterations, (int)MAX_ITERATION_);
-	// std::cout << "NDT converged in " << final_iterations << "/" << (int)MAX_ITERATION_ << "iterations" << std::endl;
-
-	// if(final_iterations > MAX_ITERATION_ ) {
-	// 	// RCLCPP_WARN(this->get_logger(), "NG NDT reached max iterations - may not be accurate");
-	// 	std::cout << "NG NDT reached max iterations - may not be accurate" << std::endl;
-	// 	return;
-	// }
-
-	std::cout << "FitnessScore: " << ndt.getFitnessScore() << std::endl;
-	if(ndt.getFitnessScore() <= MATCHING_SCORE_TH_){
-		Eigen::Matrix4f translation = ndt.getFinalTransformation();	
-		if(translation.isZero(1e-6))
-		{
-			std::cout << "Translation is Zero " << std::endl;
-			return;
+		else{
+			std::cout << "Fitness score is large " << std::endl;
 		}
-		has_converged_once_ = true;
-		Eigen::Quaternionf quaternion(Eigen::Matrix3f(translation.block(0,0,3,3)));
-		quaternion.normalize();
-
-		// publish_ndt_pose
-		geometry_msgs::msg::PoseStamped ndt_pose;
-		ndt_pose.pose.position.x = translation(0,3);
-		ndt_pose.pose.position.y = translation(1,3);
-		ndt_pose.pose.position.z = translation(2,3);
-		//ndt_pose.pose.position.z = 0.0;
-		ndt_pose.pose.orientation = quat_eigen_to_msg(quaternion);
-		ndt_pose.header.stamp = pc_time_; 	
-		// ndt_pose.header.stamp = ekf_pose_.header.stamp;
-		ndt_pose.header.frame_id = ekf_pose_.header.frame_id;
-		ndt_pose_pub_->publish(ndt_pose);
-
-		// publish ndt_pcl
-		sensor_msgs::msg::PointCloud2 ndt_msg;
-		pcl::toROSMsg(*ndt_pcl,ndt_msg);
-		ndt_msg.header.stamp = pc_time_;
-		ndt_msg.header.frame_id = map_frame_id_;
-		ndt_pc_pub_->publish(ndt_msg);
-		std::cout << "Publish NDT POSE " << std::endl;
-	}
-	else{
-		std::cout << "Fitness score is large " << std::endl;
+	} catch (const std::exception& e) {
+		RCLCPP_ERROR(this->get_logger(), "Exception during NDT matching: %s. Resetting NDTCuda.", e.what());
+		reset_ndt();
+	} catch (...) {
+		RCLCPP_ERROR(this->get_logger(), "Unknown exception during NDT matching. Resetting NDTCuda.");
+		reset_ndt();
 	}
 }
 
@@ -419,7 +466,13 @@ Eigen::Quaternionf MapMatcher::msg_to_quat_eigen(geometry_msgs::msg::Quaternion 
 	quaternion.y() = (float)q.y;
 	quaternion.z() = (float)q.z;
 	quaternion.w() = (float)q.w;
-	quaternion.normalize();
+	if (!std::isfinite(quaternion.x()) || !std::isfinite(quaternion.y()) ||
+	    !std::isfinite(quaternion.z()) || !std::isfinite(quaternion.w()) ||
+	    quaternion.squaredNorm() < 1e-6f) {
+		quaternion = Eigen::Quaternionf::Identity();
+	} else {
+		quaternion.normalize();
+	}
 
 	return quaternion;
 }
@@ -456,6 +509,7 @@ void MapMatcher::crop_local_map(const PointCloudTypePtr& input_pcl, PointCloudTy
 	PointCloudTypePtr out(new PointCloudType);
 	out->points.reserve(input_pcl->points.size() / 8);
 	for(const auto& p : input_pcl->points){
+		if(!std::isfinite(p.x) || !std::isfinite(p.y) || !std::isfinite(p.z)) continue;
 		if(p.x < min_x || p.x > max_x) continue;
 		if(p.y < min_y || p.y > max_y) continue;
 		if(p.z < min_z || p.z > max_z) continue;
@@ -488,6 +542,9 @@ bool MapMatcher::update_local_map_if_needed(double x, double y, double z)
 	if(!map_local_pcl_->points.empty()){
 		local_map_center_ = pos;
 		has_local_map_ = true;
+		if(!ndt_){
+			reset_ndt();
+		}
 		// ターゲットを更新した時だけGPUへの転送とボクセルマップ再生成が走る
 		ndt_->setInputTarget(map_local_pcl_);
 		if(publish_local_map_){

@@ -48,6 +48,13 @@ if(OPENMP_FOUND)
     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 endif()
 
+find_package(CUDAToolkit QUIET)
+if(CUDAToolkit_FOUND)
+  include_directories(${CUDAToolkit_INCLUDE_DIRS})
+else()
+  include_directories(/usr/local/cuda/include)
+endif()
+
 include_directories(
   include
   ${PCL_INCLUDE_DIRS}
@@ -114,6 +121,8 @@ target_link_libraries(map_matcher_node
   ${PCL_LIBRARIES}
   ${YAML_CPP_LIBRARIES}
   ${std_msgs_LIBRARIES}
+  $<$<BOOL:${CUDAToolkit_FOUND}>:CUDA::cudart>
+  $<$<NOT:$<BOOL:${CUDAToolkit_FOUND}>>:/usr/local/cuda/lib64/libcudart.so>
 )
 install(TARGETS
   map_matcher_node

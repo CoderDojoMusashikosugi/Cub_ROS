@@ -18,6 +18,7 @@
 // #include <pcl/filters/approximate_voxel_grid.h>
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/filters/passthrough.h>
+#include <pcl/filters/filter.h>
 // #include <pcl/filters/crop_box.h>
 #include <pcl/io/io.h>
 #include <pcl/io/pcd_io.h>
@@ -31,6 +32,7 @@
 #include <Eigen/Dense>
 // #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <fast_gicp/ndt/ndt_cuda.hpp>
+#include <cuda_runtime.h>
 #include <optional>
 #include <chrono>
 #include <memory>
@@ -55,6 +57,7 @@ private:
 
 
  	void init_map();
+	void reset_ndt();
 	void publish_local_map();
 
 	void set_pcl(pcl::PointCloud<pcl::PointXYZI>::Ptr input_pcl, pcl::PointCloud<pcl::PointXYZI>::Ptr& output_pcl, double x, double y, double z);

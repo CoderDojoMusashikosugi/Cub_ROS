@@ -17,7 +17,7 @@ ekf_localizer_node:
     use_imu_tf: true                  # true: URDF(TF)に基づきIMUの軸をbase_link座標系に変換 (TF未受信時はimu_yaw_signでフォールバック)
     imu_yaw_sign: -1.0                # TF未受信時、またはuse_imu_tf: false時のヨー角速度の符号倍率 (-1.0: 反転, 1.0: そのまま)
     imu_topic_name: "/imu/data_raw"   # Spresense IMUトピック
-    GPS_MEASUREMENT_ENABLE: true      # GPS測定更新を有効化
+    GPS_MEASUREMENT_ENABLE: false      # GPS測定更新を有効化
     NDT_MEASUREMENT_ENABLE: true      # NDT測定更新を有効化
     is_odom_tf: false
 
