@@ -28,12 +28,10 @@ def launch_setup(context):
         default = "/home/cub/maps/oudanhodoumade/mapoudanhodoumade_manual_crean.yaml")
 
 
-    return LaunchDescription([
+    return [
         declare_use_sim_time,
         SetParameter(name='use_sim_time', value=use_sim_time),
 
-        DeclareLaunchArgument('simulation', default_value='none', choices=['none', 'godot']),
-        OpaqueFunction(function=require_navigation),
         IncludeLaunchDescription(
             PathJoinSubstitution(
                 [FindPackageShare("cub_bringup"), "launch", "common.launch.py"]

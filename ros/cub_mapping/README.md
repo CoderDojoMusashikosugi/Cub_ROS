@@ -628,9 +628,9 @@ Waypoint Editor Toolは、Navigation2で使用するウェイポイント（経�
 ```bash
 ./docker/run_in_container.sh "source ~/colcon_ws/install/setup.bash && \
   ros2 launch cub_mapping waypoint_editor.launch.py \
-  waypoint_file:=/path/to/waypoints.yaml \
-  map_file:=/path/to/map.yaml \
-  pcd_file:=/path/to/pointcloud.pcd"
+  waypoint_file:=/home/cub/colcon_ws/src/cub/cub_behavior_tree/routes/kakunin.yaml \
+  map_file:=/home/cub/maps/1017_02/map.yaml \
+  pcd_file:=/home/cub/maps/1017_02/clean_map.pcd"
 ```
 
 ### 2. RViz2でウェイポイントを配置
@@ -837,7 +837,7 @@ waypoint_groups:
 ```bash
 ./docker/run_in_container.sh "source ~/colcon_ws/install/setup.bash && \
   ros2 service call /create_group cub_mapping/srv/CreateGroup \
-  '{group_name: \"Test Path\", require_input: false}'"
+  '{group_name: \"shiyakusyo\", require_input: false}'"
 ```
 
 ### ウェイポイントの追加
