@@ -4,7 +4,7 @@
     ros2 launch cub_bringup common.launch.py
     ros2 launch cub_bringup cub_console.launch.py
 
-アプリ本体は ~/cub_console(colcon ビルドの対象外)にある。初回は ~/cub_console/setup.sh が必要。
+アプリ本体は ~/colcon_ws/src/cub/cub_console(ros/cub_console。colcon ビルドの対象外)にある。依存は本パッケージの package.xml。
 既定では LAN の同じサブネットからのみ接続を許可する(認証は無い)。
 このマシンだけで見る場合: ros2 launch cub_bringup cub_console.launch.py host:=127.0.0.1
 """
@@ -19,7 +19,7 @@ def generate_launch_description():
     console_dir = LaunchConfiguration('console_dir')
     return LaunchDescription([
         DeclareLaunchArgument(
-            'console_dir', default_value=os.path.expanduser('~/cub_console'),
+            'console_dir', default_value=os.path.expanduser('~/colcon_ws/src/cub/cub_console'),
             description='cub_console の配置ディレクトリ'),
         DeclareLaunchArgument(
             'host', default_value='0.0.0.0',

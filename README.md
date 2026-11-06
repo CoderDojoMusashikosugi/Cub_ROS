@@ -75,9 +75,6 @@
 
 ### Webコンソール(cub console)で診断を見る
 - ロボットの診断(`/diagnostics_agg`)を、スマホやPCのブラウザから一覧で確認できる。異常(ERROR/WARN/STALE)のある項目が目立つように表示される。
-- 初回だけセットアップする(インターネット接続が必要)
-  - `cd ~/cub_console && ./setup.sh`
-  - `cbs cub_bringup`(launchファイルを入れるため)
 - ロボットを起動した後、別のターミナルで起動する
   - `ros2 launch cub_bringup cub_console.launch.py`
 - ブラウザで `http://<ロボットのIPアドレス>:8080/` を開く
@@ -85,7 +82,7 @@
   - 認証は無いので、信頼できるネットワークでだけ使うこと。
   - ロボット本体からだけ見たい場合は `host:=127.0.0.1` を付けて起動する。
 - 項目の行をタップすると詳細(値の一覧やグラフ)が開く。「コピー」でその項目の内容をテキストでコピーできる。
-- 詳しくは[docker/home/cub_console/README.md](./docker/home/cub_console/README.md)を参照。
+- 詳しくは[ros/cub_console/README.md](./ros/cub_console/README.md)を参照。
 
 ### 地図を作成する(2D)
 - 機体を手動で初期位置に持って行く

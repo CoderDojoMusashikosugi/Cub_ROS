@@ -2,7 +2,7 @@
 
 プロセス管理(app/processes.py)は枠組みを検討中のため、いったんアプリから外している。
 
-起動: python -m app.main
+起動: python3 -m app.main
 """
 from __future__ import annotations
 

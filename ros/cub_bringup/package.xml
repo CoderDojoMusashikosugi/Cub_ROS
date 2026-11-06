@@ -25,7 +25,15 @@
   <depend>joy_linux</depend>
   <depend>rqt_common_plugins</depend>
   <exec_depend>rclpy</exec_depend>
-  
+  <!-- cub_console(ros/cub_console, launch/cub_console.launch.py から起動) -->
+  <exec_depend>diagnostic_msgs</exec_depend>
+  <exec_depend>python3-fastapi</exec_depend>
+  <exec_depend>python3-uvicorn</exec_depend>
+  <exec_depend>python3-websockets</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
+  <test_depend>python3-httpx</test_depend>
+  <test_depend>python3-pytest</test_depend>
+
   <!-- <depend>Eigen3</depend>  -->
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
