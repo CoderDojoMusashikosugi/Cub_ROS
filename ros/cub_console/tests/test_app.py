@@ -1,6 +1,7 @@
 """アプリ(REST / WebSocket / 接続元制限)とフィクスチャの検証。"""
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 from pathlib import Path
@@ -10,11 +11,13 @@ from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
 from app.main import create_app
+from app.ros_bridge import Hub, level_to_int
+from conftest import as_client
 
 
 def test_health_and_static() -> None:
     app = create_app(enable_ros=False)
-    with TestClient(app, client=("127.0.0.1", 50000)) as client:
+    with TestClient(as_client(app, "127.0.0.1")) as client:
         r = client.get("/api/health")
         assert r.status_code == 200
         assert r.json() == {"ok": True, "ros": False, "last_diag_age_sec": None}
@@ -24,7 +27,7 @@ def test_health_and_static() -> None:
 
 def test_websocket_sends_latest_and_heartbeat() -> None:
     app = create_app(enable_ros=False)
-    with TestClient(app, client=("127.0.0.1", 50000)) as client:
+    with TestClient(as_client(app, "127.0.0.1")) as client:
         app.state.hub.publish_diagnostics('{"type":"diagnostics","stamp":1.0,"status":[]}')
         with client.websocket_connect("/ws") as ws:
             assert json.loads(ws.receive_text())["type"] == "diagnostics"
@@ -49,13 +52,13 @@ def test_access_control() -> None:
     with pytest.raises(ValueError):
         parse_allow("192.168.63.0/33")
 
-    # TestClient の接続元は "testclient"(IP ではない)なので、client を差し替えて試す
+    # TestClient の接続元は "testclient"(IP ではない)なので、as_client で差し替えて試す
     for client_ip, ok in (("192.168.63.10", True), ("192.168.1.10", False)):
         app = create_app(enable_ros=False, allow=allow)
-        with TestClient(app, client=(client_ip, 50000)) as c:
+        with TestClient(as_client(app, client_ip)) as c:
             assert (c.get("/api/health").status_code == 200) is ok
     app = create_app(enable_ros=False, allow=allow)
-    with TestClient(app, client=("192.168.63.10", 50000), base_url="http://192.168.63.204:8080") as c:
+    with TestClient(as_client(app, "192.168.63.10"), base_url="http://192.168.63.204:8080") as c:
         # 他サイトからの WebSocket は拒否、同じオリジンからは通る
         with pytest.raises(WebSocketDisconnect):
             with c.websocket_connect("/ws", headers={"origin": "http://evil.example"}) as ws:
@@ -103,3 +106,24 @@ def test_allow_auto() -> None:
     assert all(isinstance(n, ipaddress.IPv4Network) and not n.is_loopback for n in subnets)
     assert parse_allow("auto") == subnets
     assert parse_allow("auto 10.1.0.0/16")[-1] == ipaddress.ip_network("10.1.0.0/16")
+
+
+def test_level_to_int() -> None:
+    assert level_to_int(b"\x00") == 0
+    assert level_to_int(b"\x03") == 3
+    assert level_to_int(2) == 2
+
+
+def test_hub_drops_old_values() -> None:
+    async def main() -> None:
+        hub = Hub()
+        hub.publish_diagnostics("a")
+        q = hub.subscribe()
+        assert q.qsize() == 1  # 接続直後に最新値
+        hub.publish_diagnostics("b")
+        hub.publish_diagnostics("c")
+        assert [q.get_nowait(), q.get_nowait()] == ["b", "c"]  # maxsize=2 で "a" は捨てられる
+        assert hub.diag_age_sec() is not None
+        hub.unsubscribe(q)
+
+    asyncio.run(main())

@@ -5,4 +5,4 @@ cd "$(dirname "$0")"
 if [ -z "${ROS_DISTRO:-}" ]; then
   echo "警告: ROS_DISTRO が未設定です。診断の購読なしで起動します" >&2
 fi
-exec .venv/bin/python -m app.main "$@"
+exec python3 -m app.main "$@"

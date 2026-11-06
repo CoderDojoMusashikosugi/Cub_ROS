@@ -12,7 +12,7 @@
 2. **ROS が落ちても操作系が生きること。** プロセスの起動/停止は ROS 通信に載せず、OS(subprocess / systemd)を直接操作する。
 3. **任意コマンド実行 API を作らない。** 操作できるのは `config/managed_processes.yaml` に書いた id だけ(ホワイトリスト)。
 4. **認証を入れるまでは `127.0.0.1` のみ待受。** 操作系 API を LAN に露出させない。
-5. **既存資産を壊さない。** `/home/cub/colcon_ws` 配下は変更しない(`cub_diagnostics` などはそちら)。本アプリは `/home/cub/cub_console` だけで完結させ、colcon ビルドの対象にしない。
+5. **既存資産を壊さない。** 他の ROS パッケージ(`cub_diagnostics` など)は変更しない。本アプリは `ros/cub_console`(コンテナ内 `~/colcon_ws/src/cub/cub_console`)だけで完結させ、colcon ビルドの対象にしない(`package.xml` / `setup.py` を置かない)。起動用の launch と依存の宣言だけは `ros/cub_bringup` に置く。
 6. **外部ネットワークに依存しない。** ロボットはインターネットに繋がらない前提。CDN、Web フォント、地図タイルなどを読み込まない。JS/CSS は全てローカルに置く。
 
 ## アーキテクチャ
@@ -115,10 +115,9 @@ status:
 ## ディレクトリ構成
 
 ```
-/home/cub/cub_console/
+ros/cub_console/                (コンテナ内 ~/colcon_ws/src/cub/cub_console/)
 ├─ CLAUDE.md
 ├─ README.md                  起動手順と実測結果(短く)
-├─ requirements.txt / requirements-dev.txt
 ├─ app/
 │  ├─ __init__.py
 │  ├─ main.py                 FastAPI 本体(REST + WebSocket + 静的配信)
@@ -215,8 +214,8 @@ processes:
 ## 環境(Docker コンテナ内)
 
 - ROS 2 は **起動前に source 済みであること**。ディストリビューションは `echo $ROS_DISTRO` で確認し、決め打ちしない。
-- Python: `python3 -m venv --system-site-packages .venv` で作る(`rclpy` をシステム側から見せるため)。
-- 依存は `requirements.txt` に: `fastapi`, `uvicorn[standard]`, `pyyaml`(テスト用に `pytest`, `httpx` は `requirements-dev.txt`)。
+- Python: システムの `python3` で動かす(venv・pip は使わない。`rclpy` をそのまま使うため)。起動は `python` ではなく `python3`(NVIDIA の ROS イメージには `python` が無い)。
+- 依存は `ros/cub_bringup/package.xml` に rosdep キーで書く(`python3-fastapi`, `python3-uvicorn`, `python3-websockets`, `python3-yaml`。テスト用に `python3-pytest`, `python3-httpx`)。Docker イメージのビルド時に apt で入るので、Ubuntu 24.04 の apt 版(fastapi 0.101 / starlette 0.31 / pydantic 1.10)で動く書き方にする。
 - 実行ユーザは `cub`。root 実行が前提のコードは書かない。
 - **Docker の注意:** `127.0.0.1` 待受はコンテナのネットワークが `host` モードのときだけホストから見える。ブリッジ接続の場合は `CUB_CONSOLE_HOST=0.0.0.0` にしたうえで、`docker run -p 127.0.0.1:8080:8080` のようにホスト側を localhost に限定する。**どちらの構成かは作業前にユーザーへ確認する。**
 
@@ -235,7 +234,7 @@ processes:
 
 ## 完了の定義
 
-- `python -m py_compile app/*.py` と `pytest` が通る(node があれば `node --test tests/` も)。
+- `python3 -m py_compile app/*.py` と `pytest` が通る(node があれば `node --test tests/` も)。
 - `curl http://127.0.0.1:8080/api/health` が応答する。
 - フィクスチャを流すと、問題のあるグループが展開され、OK だけのグループは折りたたまれて表示される。STALE の葉が「古い値」と分かる。
 - 更新が来ても、展開状態・スクロール位置・テキスト選択が保たれる。
@@ -247,11 +246,11 @@ processes:
 - ROS 側への publish や service 呼び出し(`cmd_vel` など)。本アプリは購読のみ。
 - `SystemdBackend` の実装、ログ配信、パラメータ編集などの機能追加。
 - 外部ネットワークからの取得(CDN、Web フォント、地図タイル)と、ビルド工程を要するフロントエンド構成。
-- `colcon_ws` 配下の変更。
+- 本アプリ以外の ROS パッケージの変更(`cub_bringup` の launch と依存の宣言を除く)。
 
 ## コーディング規約
 
 - Python 3、型ヒントあり、標準ライブラリ優先。コメントは日本語でよい。
 - JavaScript は ES modules、依存なし。状態とDOM更新を分け、ツリー構築・値の解釈は DOM に触れない純関数にする。
 - 例外を握りつぶさない。ユーザー操作の失敗は HTTP ステータスで返す。
-- 新しい依存を足すときは理由を README に1行書く。
+- 新しい依存を足すときは `ros/cub_bringup/package.xml` に rosdep キーで書き、理由を README に1行書く。

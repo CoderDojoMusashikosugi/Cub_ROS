@@ -4,18 +4,18 @@ ROS 2 の診断(`/diagnostics_agg`)をブラウザで見やすく表示する We
 
 **プロセス管理(起動/停止/再起動)は枠組みを検討中のため、いったんアプリから外している**(下の「プロセス管理(休止中)」参照)。
 
-ホストの `docker/home/cub_console/` が、コンテナ内の `/home/cub/cub_console/` になる(colcon ビルドの対象外)。
+リポジトリの `ros/cub_console/` が、コンテナ内の `~/colcon_ws/src/cub/cub_console/` になる。`package.xml` を持たないので colcon ビルドの対象外(ソースのまま実行する)。
 
-## セットアップ(初回のみ・要インターネット)
+## 依存
+
+個別のセットアップは無い。依存(テスト用を含む)は `ros/cub_bringup/package.xml` に書いてあり、他の ROS パッケージと同じく Docker イメージのビルド時に `rosdep` で apt から入る。
+apt 版(Ubuntu 24.04: fastapi 0.101 / uvicorn 0.27 / starlette 0.31 / pydantic 1.10)で動く範囲で書くこと。
+
+依存が入っていない古いイメージを使っている場合は、コンテナ内で一度だけ次を実行する(コンテナを作り直すと消える):
 
 ```bash
-# ホストのリポジトリ直下から
-./docker/run_in_container.sh 'cd ~/cub_console && ./setup.sh'        # 実行用
-./docker/run_in_container.sh 'cd ~/cub_console && ./setup.sh --dev'  # テストも行う場合
+sudo apt update && rosdep update && rosdep install -i -y --from-paths ~/colcon_ws/src/cub/cub_bringup
 ```
-
-`.venv` は `docker/home` 側に作られるので、コンテナを作り直しても残る。
-今のイメージには `python3-venv`(ensurepip)が無いため、`setup.sh` は pip 無しで venv を作ってから get-pip.py で pip を入れる。
 
 ## 起動(launch)
 
@@ -26,14 +26,14 @@ ros2 launch cub_bringup common.launch.py      # ロボット本体
 ros2 launch cub_bringup cub_console.launch.py # cub_console(別端末で)
 ```
 
-`cub_bringup/launch/cub_console.launch.py` が `~/cub_console/run.sh` を起動する(アプリ本体は colcon ビルドの対象外。launch ファイルを追加・変更したときだけ `cbs cub_bringup` が必要)。
+`cub_bringup/launch/cub_console.launch.py` が `~/colcon_ws/src/cub/cub_console/run.sh` を起動する(アプリ本体は colcon ビルドの対象外。launch ファイルを追加・変更したときだけ `cbs cub_bringup` が必要)。
 
 | 引数 | 既定 | 意味 |
 |---|---|---|
 | `host` | `0.0.0.0` | 待受アドレス。`127.0.0.1` にするとこのマシンからのみ |
 | `allow` | `auto` | 接続を許可する CIDR。`auto` は起動時点の LAN インタフェース(Docker のブリッジ等を除く)のサブネット |
 | `port` | `8080` | 待受ポート |
-| `console_dir` | `~/cub_console` | アプリの場所 |
+| `console_dir` | `~/colcon_ws/src/cub/cub_console` | アプリの場所 |
 
 - Ctrl+C で止まる。アプリは `setsid` で別セッションにしてあり、launch からの SIGINT 1 回だけで正常終了する(端末の SIGINT と二重に届くと uvicorn が後始末を飛ばして強制終了するため)。
 - `allow:=auto` は起動時点のアドレスで決まる。Wi-Fi がつながる前に起動すると LAN が見つからず起動に失敗する(その場合は起動し直すか、`allow:=192.168.63.0/24` のように明示する)。Jetson では USB 接続用の `l4tbr0`(192.168.55.0/24)も対象になる。
@@ -41,7 +41,7 @@ ros2 launch cub_bringup cub_console.launch.py # cub_console(別端末で)
 ## 起動(直接)
 
 ```bash
-./docker/run_in_container.sh 'cd ~/cub_console && ./run.sh'
+./docker/run_in_container.sh 'cd ~/colcon_ws/src/cub/cub_console && ./run.sh'
 ```
 
 ブラウザで <http://127.0.0.1:8080/> を開く。コンテナは `network_mode: host` なので、`127.0.0.1` で待ち受ければホストからそのまま見える(LAN には出ない)。
@@ -55,7 +55,7 @@ ros2 launch cub_bringup cub_console.launch.py # cub_console(別端末で)
 ### スマホ・別 PC から見る(同じサブネットだけ許可)
 
 ```bash
-./docker/run_in_container.sh 'cd ~/cub_console && CUB_CONSOLE_HOST=0.0.0.0 CUB_CONSOLE_ALLOW=192.168.63.0/24 ./run.sh'
+./docker/run_in_container.sh 'cd ~/colcon_ws/src/cub/cub_console && CUB_CONSOLE_HOST=0.0.0.0 CUB_CONSOLE_ALLOW=192.168.63.0/24 ./run.sh'
 ```
 
 `http://<ロボットの IP>:8080/` を開く。**認証は無い**ので、許可したサブネットにいる人は誰でも画面を見られる。信頼できるネットワークでだけ使うこと。
@@ -71,9 +71,9 @@ LAN に出したくないときは、待受は変えずに SSH ポートフォ�
 
 ```bash
 # 端末 1: フィクスチャを /diagnostics_agg に 1 Hz で流す(--jitter で値を揺らす、--stop-after N で途絶を再現)
-./docker/run_in_container.sh 'cd ~/cub_console && .venv/bin/python tools/fake_diag_pub.py --jitter'
+./docker/run_in_container.sh 'cd ~/colcon_ws/src/cub/cub_console && python3 tools/fake_diag_pub.py --jitter'
 # 端末 2
-./docker/run_in_container.sh 'cd ~/cub_console && ./run.sh'
+./docker/run_in_container.sh 'cd ~/colcon_ws/src/cub/cub_console && ./run.sh'
 ```
 
 ロボット本体と同じ LAN で試すときは、両方に `export ROS_DOMAIN_ID=<空いている番号>` を付けて本物の診断と混ざらないようにする。
@@ -81,9 +81,9 @@ LAN に出したくないときは、待受は変えずに SSH ポートフォ�
 ## テスト
 
 ```bash
-./docker/run_in_container.sh 'cd ~/cub_console && .venv/bin/python -m py_compile app/*.py && .venv/bin/python -m pytest -q'
+./docker/run_in_container.sh 'cd ~/colcon_ws/src/cub/cub_console && python3 -m py_compile app/*.py && python3 -m pytest -q'
 # node があれば(コンテナには無いので、ホストで docker を使う例)
-docker run --rm --network none -v "$PWD/docker/home/cub_console":/w:ro -w /w node:22-alpine node --test tests/*.test.mjs
+docker run --rm --network none -v "$PWD/ros/cub_console":/w:ro -w /w node:22-alpine node --test tests/*.test.mjs
 ```
 
 Node 22 では `node --test tests/`(ディレクトリ指定)は動かないので、ファイルを glob で渡す。
@@ -122,6 +122,7 @@ API(`/api/processes`)と画面のパネルは外してある。`app/processes.py
 
 ## 依存を足した理由
 
-- `fastapi` / `uvicorn[standard]` … REST + WebSocket + 静的配信を 1 プロセスで行うため(`[standard]` は WebSocket 実装と uvloop)。
-- `pyyaml` … 設定ファイルとフィクスチャの読み込み。
-- `pytest` / `httpx`(開発用)… テストと FastAPI の TestClient。
+- `python3-fastapi` / `python3-uvicorn` … REST + WebSocket + 静的配信を 1 プロセスで行うため。
+- `python3-websockets` … uvicorn の WebSocket 実装。
+- `python3-yaml` … 設定ファイルとフィクスチャの読み込み。
+- `python3-pytest` / `python3-httpx`(テスト用)… テストと FastAPI の TestClient。

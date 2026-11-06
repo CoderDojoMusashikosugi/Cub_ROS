@@ -63,5 +63,4 @@ COLCON_IGNORE
 !docker/home/.fastrtps_whitelist.xml
 !docker/home/colcon_ws/src/cub/.gitkeep
 !docker/home/rosbag/.gitkeep
-!docker/home/cub_console/
 target.env
