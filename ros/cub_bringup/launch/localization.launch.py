@@ -3,15 +3,16 @@
 # 自律走行はしない。
 from launch import LaunchDescription
 from launch_ros.actions import Node, SetParameter
-from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
 from launch.substitutions import PathJoinSubstitution
 from launch_ros.substitutions import FindPackageShare
 from launch.conditions import IfCondition
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, EqualsSubstitution
 import os
 
 
-def generate_launch_description():
+def launch_setup(context):
+    simulation = LaunchConfiguration('simulation').perform(context)
     cub_target = os.getenv('CUB_TARGET', 'cub4')
     print("launch target:", cub_target)
 
@@ -27,7 +28,7 @@ def generate_launch_description():
         default = "/home/cub/maps/oudanhodoumade/mapoudanhodoumade_manual_crean.yaml")
 
 
-    return LaunchDescription([
+    return [
         declare_use_sim_time,
         SetParameter(name='use_sim_time', value=use_sim_time),
 
@@ -36,8 +37,9 @@ def generate_launch_description():
                 [FindPackageShare("cub_bringup"), "launch", "common.launch.py"]
             ),
             launch_arguments=[
-                ('use_sim_time', use_sim_time)
-            ]
+                ('use_sim_time', use_sim_time),
+                ('simulation', LaunchConfiguration('simulation')),
+            ],
         ),
 
         IncludeLaunchDescription(
@@ -48,7 +50,13 @@ def generate_launch_description():
                 ('map_localization', map_dir),
                 ('use_sim_time', use_sim_time)
             ],
-            condition=IfCondition("true" if cub_target == 'cub4' else "false")
+            condition=IfCondition("true" if (cub_target == 'cub4' and simulation == 'none') else "false")
+        ),
+        Node(
+            package='cub_bringup',
+            executable='odom_to_tf',
+            name='odom_to_tf',
+            condition=IfCondition(EqualsSubstitution(LaunchConfiguration('simulation'), 'godot'))
         ),
         Node(
             package='tf2_ros',
@@ -104,5 +112,11 @@ def generate_launch_description():
         #         [FindPackageShare("cub_navigation"), "launch", "gnss_as_localization.launch.py"]
         #     ),
         # ),
+    ]
 
+
+def generate_launch_description():
+    return LaunchDescription([
+        DeclareLaunchArgument('simulation', default_value='none', choices=['none', 'godot']),
+        OpaqueFunction(function=launch_setup),
     ])

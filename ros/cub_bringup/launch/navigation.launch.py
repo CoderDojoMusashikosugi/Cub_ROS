@@ -3,7 +3,7 @@
 # 自己位置推定もする。
 from launch import LaunchDescription
 from launch_ros.actions import Node
-from launch.actions import IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
 from launch.substitutions import PathJoinSubstitution
 from launch_ros.substitutions import FindPackageShare
 from launch.conditions import IfCondition
@@ -16,16 +16,18 @@ def generate_launch_description():
     print("launch target:", cub_target)
     map_dir = LaunchConfiguration(
         'map',
-        default = "/home/cub/maps/furo_kakunin/map.yaml")
+        default = "/home/cub/maps/1017_02/map.yaml")
         # default = "/home/cub/colcon_ws/src/cub/cub_navigation/maps/empty/map.yaml")
 
     return LaunchDescription([
+        DeclareLaunchArgument('simulation', default_value='none', choices=['none', 'godot']),
         IncludeLaunchDescription(
             PathJoinSubstitution(
                 [FindPackageShare("cub_bringup"), "launch", "localization.launch.py"] # ここでlocalizationを起動
             ),
             launch_arguments=[
-                ('map_localization', map_dir)
+                ('map_localization', map_dir),
+                ('simulation', LaunchConfiguration('simulation'))
             ],
         ),
 
@@ -34,7 +36,8 @@ def generate_launch_description():
                 [FindPackageShare("cub_navigation"), "launch", "cub_navigation.launch.py"]
             ),
             launch_arguments=[
-                ('map', map_dir)
+                ('map', map_dir),
+                ('simulation', LaunchConfiguration('simulation'))
             ],
         ),
     ])

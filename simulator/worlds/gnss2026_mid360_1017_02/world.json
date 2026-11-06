@@ -1,0 +1,141 @@
+{
+  "schema_version": 1,
+  "kind": "occupancy_extrusion",
+  "world_id": "gnss2026_mid360_1017_02",
+  "display_name": "GNSS 2026 Mid360 (1017_02)",
+  "bounds": {
+    "ros_min": [
+      -92.4275,
+      -100.706,
+      0.0
+    ],
+    "ros_max": [
+      623.5725,
+      323.694,
+      0.5
+    ],
+    "godot_min": [
+      -323.694,
+      0.0,
+      -623.5725
+    ],
+    "godot_max": [
+      100.706,
+      0.5,
+      92.4275
+    ],
+    "size_m": [
+      716.0,
+      424.4,
+      0.5
+    ]
+  },
+  "default_spawn": "start_a",
+  "spawns": {
+    "start_a": {
+      "display_name": "Start A (780, 1469)",
+      "pixel": [
+        780,
+        1469
+      ],
+      "robot": {
+        "x": 63.6725,
+        "y": 29.794,
+        "z": 0.0,
+        "yaw_deg": 180.0
+      },
+      "clients": [
+        {
+          "x": 65.6725,
+          "y": 29.794,
+          "z": 0.0,
+          "yaw_deg": 180.0
+        },
+        {
+          "x": 67.6725,
+          "y": 29.794,
+          "z": 0.0,
+          "yaw_deg": 180.0
+        },
+        {
+          "x": 69.6725,
+          "y": 29.794,
+          "z": 0.0,
+          "yaw_deg": 180.0
+        }
+      ]
+    },
+    "default": {
+      "display_name": "Default (780, 1469)",
+      "pixel": [
+        780,
+        1469
+      ],
+      "robot": {
+        "x": 63.6725,
+        "y": 29.794,
+        "z": 0.0,
+        "yaw_deg": 180.0
+      },
+      "clients": [
+        {
+          "x": 65.6725,
+          "y": 29.794,
+          "z": 0.0,
+          "yaw_deg": 180.0
+        },
+        {
+          "x": 67.6725,
+          "y": 29.794,
+          "z": 0.0,
+          "yaw_deg": 180.0
+        },
+        {
+          "x": 69.6725,
+          "y": 29.794,
+          "z": 0.0,
+          "yaw_deg": 180.0
+        }
+      ]
+    }
+  },
+  "source": {
+    "image": "source.png",
+    "original_pgm_name": "map_sim.pgm",
+    "original_pgm_sha256": "51a84e586ffac121234e7b678f22cb2100b37ef37d428aded3f43bee8b3cb95f",
+    "source_png_sha256": "c41aead754fa09ba22c52cec45eb8982163c38180f5f877400b6c9d127a33276",
+    "width": 3580,
+    "height": 2122,
+    "resolution": 0.2,
+    "origin": [
+      -92.4275,
+      -100.706,
+      0.0
+    ],
+    "occupied_values": [
+      0
+    ],
+    "free_gray_policy": "free",
+    "pixel_counts": {
+      "occupied_0": 55246,
+      "free_white_254": 7541126,
+      "free_gray_205": 388,
+      "free_other": 0
+    }
+  },
+  "extrusion": {
+    "generator_version": 1,
+    "floor_height": 0.0,
+    "floor_thickness": 0.3,
+    "wall_height": 0.5,
+    "chunk_cells": 64,
+    "chunks_file": "wall_chunks.json",
+    "chunks_sha256": "1f4e7a22f2aaaa7ac3b1705a9412fa1337e243af4f846e831c8737110acc81a1",
+    "capsule_clearance_radius_m": 0.28
+  },
+  "appearance": {
+    "floor_texture": "floor_texture.png",
+    "floor_texture_sha256": "db9a3a41e521cb6a3d6a88a42a3ad934a3cce6560331d1154cc0448f88569385"
+  },
+  "world_hash": "ab44dd4bdf13abf9c8d15b19af665edcceae512dedb170e05566791ca03b38f6"
+}

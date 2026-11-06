@@ -1,0 +1,11 @@
+waypoint_groups:
+  - group_name: "playground_forward"
+    require_input: true
+    waypoints:
+      - x: 0.0
+        y: 0.0
+        yaw: 0.0
+      - x: 3.0
+        y: 2.0
+        yaw: 0.5
+

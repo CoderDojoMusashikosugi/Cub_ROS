@@ -12,6 +12,14 @@ development files are required. The normal `cub_mapping` build enables the
 extension. On machines without GLIM, use `-DCUB_MAPPING_BUILD_GNSS=OFF` when
 building just the existing mapping tools.
 
+Use GTSAM 4.3 from the koide3 PPA (`libgtsam-notbb-dev`) to match the GLIM
+binaries. The local `gtsam-notbb` rule in `docker/rosdep.yaml` selects this
+package. ROS's `ros-jazzy-gtsam` is 4.2 and must not be installed alongside it:
+both provide `libgtsam.so.4`, so the older library can also be selected at
+runtime. If upgrading an existing container that has the ROS package, remove
+`ros-jazzy-gtsam`, run `sudo ldconfig`, and rebuild `cub_mapping` with
+`--cmake-clean-cache` to discard the previous GTSAM paths.
+
 ```bash
 ./docker/run_in_container.sh 'cd ~/colcon_ws && colcon build --packages-select cub_mapping cub4_bringup --symlink-install --cmake-args -DCUB_MAPPING_BUILD_GNSS=ON -DBUILD_TESTING=ON'
 ./docker/run_in_container.sh 'ros2 launch cub4_bringup glim_velodyne.launch.py rosbag:=/home/cub/rosbag2_2026_10_17-15_09_06_no_images'
