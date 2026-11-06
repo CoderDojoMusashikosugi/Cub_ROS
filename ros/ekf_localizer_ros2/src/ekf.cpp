@@ -47,6 +47,9 @@ EKF::EKF() : Node("EKF")
 	this->declare_parameter<int>("gps_high_quality_count_threshold", 3);
 	this->declare_parameter<double>("gps_respawn_distance_threshold", 3.0);
 	this->declare_parameter<double>("gps_respawn_max_distance", 50.0);
+	this->declare_parameter<bool>("gps_auto_init_enable", true);
+	this->declare_parameter<bool>("gps_auto_yaw_init_enable", true);
+	this->declare_parameter<double>("gps_init_yaw_min_distance", 0.5);
     this->declare_parameter<double>("MAX_ODOM_VELOCITY", 3.0);
     this->declare_parameter<double>("MAX_ODOM_ANGULAR_VELOCITY", 2.0);
     this->declare_parameter<double>("MAX_IMU_ANGULAR_VELOCITY", 2.0);
@@ -98,6 +101,9 @@ EKF::EKF() : Node("EKF")
 	this->get_parameter("gps_high_quality_count_threshold", gps_high_quality_count_threshold_);
 	this->get_parameter("gps_respawn_distance_threshold", gps_respawn_distance_threshold_);
 	this->get_parameter("gps_respawn_max_distance", gps_respawn_max_distance_);
+	this->get_parameter("gps_auto_init_enable", gps_auto_init_enable_);
+	this->get_parameter("gps_auto_yaw_init_enable", gps_auto_yaw_init_enable_);
+	this->get_parameter("gps_init_yaw_min_distance", gps_init_yaw_min_distance_);
 
     this->get_parameter("MAX_ODOM_VELOCITY", max_odom_velocity_);
     this->get_parameter("MAX_ODOM_ANGULAR_VELOCITY", max_odom_angular_velocity_);
@@ -156,7 +162,10 @@ EKF::EKF() : Node("EKF")
 	std::cout << "  GPS_QUALITY_COUNT_TH    : " << gps_high_quality_count_threshold_ << " times" << std::endl;
 	std::cout << "  GPS_RESPAWN_DIST_TH     : " << gps_respawn_distance_threshold_ << " m" << std::endl;
 	std::cout << "  GPS_RESPAWN_MAX_DIST    : " << gps_respawn_max_distance_ << " m" << std::endl;
-    std::cout <<"  GPS_RESPAWN_ENABLE      : " << gps_respawn_enable_ << std::endl;
+    std::cout << "  GPS_RESPAWN_ENABLE      : " << gps_respawn_enable_ << std::endl;
+    std::cout << "  GPS_AUTO_INIT_ENABLE    : " << gps_auto_init_enable_ << std::endl;
+    std::cout << "  GPS_AUTO_YAW_INIT_ENABLE: " << gps_auto_yaw_init_enable_ << std::endl;
+    std::cout << "  GPS_INIT_YAW_MIN_DIST   : " << gps_init_yaw_min_distance_ << " m" << std::endl;
 
     std::cout << "\n[MOTION UPDATE VALIDATION]" << std::endl;
     std::cout << "  MAX_ODOM_VELOCITY       : " << max_odom_velocity_ << " m/s" << std::endl;
@@ -262,6 +271,8 @@ void EKF::reset_ekf(double x, double y, double yaw)
     
     // 13. GPS高精度カウンタをリセット
     gps_high_quality_count_ = 0;
+    is_gps_pose_initialized_ = true;
+    is_gps_yaw_initialized_ = true;
     
     RCLCPP_INFO(this->get_logger(), "All history and timestamps cleared");
     RCLCPP_WARN(this->get_logger(), "  NDT and GPS measurements SUPPRESSED for %.1f seconds", measurement_suppress_duration_);
@@ -352,14 +363,18 @@ void EKF::odom_callback(const nav_msgs::msg::Odometry::ConstSharedPtr msg)
 			RCLCPP_ERROR(this->get_logger(), "Exception: [%s]", ex.what());
 			dt_ = 0.0;
 		}
-		motion_update_by_odom(dt_);
-		publish_ekf_pose();
+		if(dt_ > 1e-6){
+			motion_update_by_odom(dt_);
+			publish_ekf_pose();
+		}
 	}
 	last_time_odom_ = now_time_odom_;
 }
 
 void EKF::motion_update_by_odom(double dt)
 {
+    if(dt <= 1e-6) return;
+
     Eigen::VectorXd X_prev = X_;
     Eigen::MatrixXd P_prev = P_;
     
@@ -381,6 +396,10 @@ void EKF::motion_update_by_odom(double dt)
     // 制御入力
     double nu = odom_.twist.twist.linear.x;
     double omega = odom_.twist.twist.angular.z;
+
+    if(is_gps_pose_initialized_ && !is_gps_yaw_initialized_) {
+        odom_accum_since_gps_init_ += nu * dt;
+    }
     
     if(std::fabs(omega) < 1e-3) omega = 1e-10;
     
@@ -425,8 +444,7 @@ void EKF::motion_update_by_odom(double dt)
     P_ = G * P_ * G.transpose() + A * M * A.transpose();
     
     // NaN/Infチェック
-    if(std::isnan(X_(0)) || std::isnan(X_(1)) || std::isnan(X_(2)) ||
-       std::isinf(X_(0)) || std::isinf(X_(1)) || std::isinf(X_(2))) {
+    if(!X_.allFinite() || !P_.allFinite()) {
         X_ = X_prev;
         P_ = P_prev;
         return;
@@ -559,18 +577,26 @@ void EKF::imu_callback(const sensor_msgs::msg::Imu::ConstSharedPtr msg)
 			RCLCPP_ERROR(this->get_logger(), "Exception: [%s]", ex.what());
 			dt_ = 0.0;
 		}
-		motion_update_by_imu(dt_);
-		publish_ekf_pose();
+		if(dt_ > 1e-6){
+			motion_update_by_imu(dt_);
+			publish_ekf_pose();
+		}
 	}
 	last_time_imu_ = now_time_imu_;
 }
 
 void EKF::motion_update_by_imu(double dt)
 {
+    if(dt <= 1e-6) return;
+
     Eigen::VectorXd X_prev = X_;
     Eigen::MatrixXd P_prev = P_;
     
     double omega = imu_.angular_velocity.z;
+
+    if(is_gps_pose_initialized_ && !is_gps_yaw_initialized_) {
+        yaw_accum_since_gps_init_ += omega * dt;
+    }
     
     if(std::fabs(omega) < 1e-3) omega = 1e-10;
     
@@ -601,7 +627,7 @@ void EKF::motion_update_by_imu(double dt)
     P_ = G * P_ * G.transpose() + A * M * A.transpose();
     
     // NaN/Infチェック
-    if(std::isnan(X_(2)) || std::isinf(X_(2))) {
+    if(!X_.allFinite() || !P_.allFinite()) {
         X_ = X_prev;
         P_ = P_prev;
         return;
@@ -662,8 +688,7 @@ void EKF::measurement_update_3DoF()
         P_ = (I - K*H)*P_;
         
         // NaN/Infチェック
-        if(std::isnan(X_(0)) || std::isnan(X_(1)) || std::isnan(X_(2)) ||
-           std::isinf(X_(0)) || std::isinf(X_(1)) || std::isinf(X_(2))) {
+        if(!X_.allFinite() || !P_.allFinite()) {
             X_ = X_prev;
             P_ = P_prev;
             return;
@@ -692,7 +717,7 @@ void EKF::measurement_update_3DoF()
             return;
         }
         
-        if(yaw_change_deg > max_ndt_yaw_jump_deg_) {
+        if(yaw_change_deg > max_ndt_yaw_jump_deg_ && is_gps_yaw_initialized_) {
             std::cout << "  Yaw: " << std::fixed << std::setprecision(3) 
                       << X_prev(2) << " rad → " << X_(2) << " rad" << std::endl;
             X_ = X_prev;
@@ -700,6 +725,7 @@ void EKF::measurement_update_3DoF()
             return;
         }
         
+        is_gps_yaw_initialized_ = true;
         std::cout << "✓ NDT update accepted" << std::endl;
     }
 }
@@ -788,8 +814,9 @@ void EKF::publish_ekf_pose()
 	} else {
 		ekf_pose_.header.stamp = this->get_clock()->now();
 	}
-	if(std::isnan(X_(0) || std::isnan(X_(1)))){
-		std::cout << "ekf_pose val NAN!!!"<< std::endl;
+	if(std::isnan(X_(0)) || std::isnan(X_(1)) || std::isnan(X_(2)) ||
+	   std::isinf(X_(0)) || std::isinf(X_(1)) || std::isinf(X_(2))){
+		std::cout << "ekf_pose val NAN/INF!!!"<< std::endl;
 		return;
 	}
 	ekf_pose_.pose.position.x = X_(0);
@@ -1139,7 +1166,6 @@ void EKF::gps_pose_callback(const geometry_msgs::msg::PoseWithCovarianceStamped:
 {
     gps_pose_ = *msg;
     has_received_gps_ = true;
-    static bool first_callback_ = true;
 
     // 測定抑制中かチェック
     rclcpp::Time current_time = this->now();
@@ -1155,20 +1181,80 @@ void EKF::gps_pose_callback(const geometry_msgs::msg::PoseWithCovarianceStamped:
         }
     }
 
-    // 初回GPS受信時に自動初期化
-    if (first_callback_ && is_gps_fix_quality(*msg)) {
+    // 初回GPS受信時に自動初期化（RTK-FIXでなくてもgps_updaterを通過した有効な座標であれば初期位置を設定）
+    if (gps_auto_init_enable_ && !is_gps_pose_initialized_) {
         double x = msg->pose.pose.position.x;
         double y = msg->pose.pose.position.y;
         double z = msg->pose.pose.position.z;
-        
-        RCLCPP_INFO(this->get_logger(), 
-            "Auto-initializing EKF from GPS: x=%.3f, y=%.3f, z=%.3f", x, y, z);
-        
-        initialize(x, y, z, INIT_ROLL_, INIT_PITCH_, INIT_YAW_);
-        ndt_pose_.pose.position.z = z;
-        first_callback_ = false;
+        if (std::isfinite(x) && std::isfinite(y) && std::isfinite(z)) {
+            double init_dist = std::hypot(x - X_(0), y - X_(1));
+            RCLCPP_INFO(this->get_logger(),
+                "Auto-initializing EKF position from first GPS pose: (%.3f, %.3f, %.3f) [offset from INIT: %.2f m]",
+                x, y, z, init_dist);
+
+            double prev_x = X_(0);
+            double prev_y = X_(1);
+            X_(0) = x;
+            X_(1) = y;
+            update_odometry_reference(x - prev_x, y - prev_y);
+
+            double var_x = msg->pose.covariance[0];
+            double var_y = msg->pose.covariance[7];
+            P_(0, 0) = (std::isfinite(var_x) && var_x > 1e-6) ? var_x : INIT_SIGMA_;
+            P_(1, 1) = (std::isfinite(var_y) && var_y > 1e-6) ? var_y : INIT_SIGMA_;
+            // 初期ヨー角は不確かさが大きいため、NDTが収束した際に受け入れられるようヨー角共分散を広げておく
+            P_(2, 2) = std::max(P_(2, 2), th_direction_covariance_ * 2.0);
+
+            // ※ GPSのz座標は基準高度との差分で大きくズレている場合があるため、ndt_pose_.pose.position.zは上書きしない
+            gps_init_ref_x_ = x;
+            gps_init_ref_y_ = y;
+            gps_init_ref_z_ = z;
+            odom_accum_since_gps_init_ = 0.0;
+            yaw_accum_since_gps_init_ = 0.0;
+            is_gps_pose_initialized_ = true;
+
+            publish_ekf_pose();
+            has_received_gps_ = false;
+            return;
+        }
     }
-    
+
+    // GPSの移動軌跡から初期ヨー角を自動補正（NDT収束前に移動した場合）
+    if (gps_auto_init_enable_ && gps_auto_yaw_init_enable_ && is_gps_pose_initialized_ && !is_gps_yaw_initialized_) {
+        double x = msg->pose.pose.position.x;
+        double y = msg->pose.pose.position.y;
+        double z = msg->pose.pose.position.z;
+        if (std::isfinite(x) && std::isfinite(y)) {
+            double dx = x - gps_init_ref_x_;
+            double dy = y - gps_init_ref_y_;
+            double dist = std::hypot(dx, dy);
+            if (dist >= gps_init_yaw_min_distance_) {
+                if (std::abs(odom_accum_since_gps_init_) >= gps_init_yaw_min_distance_ * 0.3) {
+                    double gps_course = std::atan2(dy, dx);
+                    if (odom_accum_since_gps_init_ < 0.0) {
+                        gps_course = normalize_angle(gps_course + M_PI);
+                    }
+                    // 移動中の旋回量(yaw_accum)を加味して現在のヨー角を算出
+                    double est_yaw = normalize_angle(gps_course + 0.5 * yaw_accum_since_gps_init_);
+                    RCLCPP_INFO(this->get_logger(),
+                        "Auto-initializing EKF yaw from GPS movement (dist=%.2f m, odom=%.2f m): yaw=%.3f rad (%.1f deg)",
+                        dist, odom_accum_since_gps_init_, est_yaw, est_yaw * 180.0 / M_PI);
+                    X_(2) = est_yaw;
+                    P_(2, 2) = std::max(P_(2, 2), th_direction_covariance_ * 2.0);
+                    is_gps_yaw_initialized_ = true;
+                } else {
+                    // オドメトリが動いていないのにGPSだけ動いた場合（GPSドリフト）は基準点を更新
+                    gps_init_ref_x_ = x;
+                    gps_init_ref_y_ = y;
+                    if (std::isfinite(z)) {
+                        gps_init_ref_z_ = z;
+                    }
+                    odom_accum_since_gps_init_ = 0.0;
+                    yaw_accum_since_gps_init_ = 0.0;
+                }
+            }
+        }
+    }
     
     // GPSリスポーン機能が無効の場合は通常のGPS測定更新のみ
     if(!gps_respawn_enable_) {
@@ -1205,12 +1291,19 @@ void EKF::gps_pose_callback(const geometry_msgs::msg::PoseWithCovarianceStamped:
 void EKF::measurement_update_gps()
 {
     if(!has_received_gps_) return;
+
+    Eigen::VectorXd X_prev = X_;
+    Eigen::MatrixXd P_prev = P_;
     
     std::cout << "[DEBUG] GPS standard measurement update" << std::endl;
     
     // Extract GPS position
     double gps_x = gps_pose_.pose.pose.position.x;
     double gps_y = gps_pose_.pose.pose.position.y;
+    if(!std::isfinite(gps_x) || !std::isfinite(gps_y)) {
+        has_received_gps_ = false;
+        return;
+    }
     
     // Mahalanobis distance check (optional - for outlier rejection)
     Eigen::VectorXd gps_pos(2);
@@ -1223,9 +1316,14 @@ void EKF::measurement_update_gps()
     
     // Extract position covariance (2x2)
     Eigen::MatrixXd P_pos = P_.block<2,2>(0,0);
+    if(!P_pos.allFinite()) {
+        P_.setZero(STATE_SIZE_, STATE_SIZE_);
+        P_ = INIT_SIGMA_ * Eigen::MatrixXd::Identity(STATE_SIZE_, STATE_SIZE_);
+        P_pos = P_.block<2,2>(0,0);
+    }
     double det = P_pos.determinant();
     
-    if(std::abs(det) > 1e-12) {
+    if(std::isfinite(det) && std::abs(det) > 1e-12) {
         try {
             Eigen::MatrixXd P_pos_inv = P_pos.inverse();
             double mahalanobis_dist = std::sqrt(diff.transpose() * P_pos_inv * diff);
@@ -1234,7 +1332,7 @@ void EKF::measurement_update_gps()
                       << std::setprecision(3) << mahalanobis_dist << std::endl;
             
             // Reject if distance is too large (threshold can be adjusted)
-            if(mahalanobis_dist > 10.0) {
+            if(!std::isfinite(mahalanobis_dist) || mahalanobis_dist > 10.0) {
                 std::cout << "GPS measurement rejected (large Mahalanobis distance: " 
                           << std::fixed << std::setprecision(3) << mahalanobis_dist 
                           << ")" << std::endl;
@@ -1266,9 +1364,11 @@ void EKF::measurement_update_gps()
     R << gps_pose_.pose.covariance[0], gps_pose_.pose.covariance[1],
          gps_pose_.pose.covariance[6], gps_pose_.pose.covariance[7];
     
-    // Add minimum variance if GPS covariance is too small
-    if(R(0,0) < 1e-6) R(0,0) = SIGMA_GPS_ * SIGMA_GPS_;
-    if(R(1,1) < 1e-6) R(1,1) = SIGMA_GPS_ * SIGMA_GPS_;
+    // Add minimum variance if GPS covariance is too small or invalid
+    if(!std::isfinite(R(0,0)) || R(0,0) < 1e-6) R(0,0) = SIGMA_GPS_ * SIGMA_GPS_;
+    if(!std::isfinite(R(1,1)) || R(1,1) < 1e-6) R(1,1) = SIGMA_GPS_ * SIGMA_GPS_;
+    if(!std::isfinite(R(0,1))) R(0,1) = 0.0;
+    if(!std::isfinite(R(1,0))) R(1,0) = 0.0;
     
     // Innovation covariance S
     Eigen::MatrixXd S = H * P_ * H.transpose() + R;
@@ -1281,6 +1381,14 @@ void EKF::measurement_update_gps()
     
     // Covariance update
     P_ = (I - K * H) * P_;
+
+    // NaN/Infチェック
+    if(!X_.allFinite() || !P_.allFinite()) {
+        X_ = X_prev;
+        P_ = P_prev;
+        has_received_gps_ = false;
+        return;
+    }
     
     std::cout << "[DEBUG] GPS update: dx=" << std::fixed << std::setprecision(3) 
               << (K * Y)(0) << ", dy=" << (K * Y)(1) << std::endl;

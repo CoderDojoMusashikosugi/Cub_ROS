@@ -18,6 +18,7 @@
 // #include <pcl/filters/approximate_voxel_grid.h>
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/filters/passthrough.h>
+#include <pcl/filters/filter.h>
 // #include <pcl/filters/crop_box.h>
 #include <pcl/io/io.h>
 #include <pcl/io/pcd_io.h>
@@ -31,6 +32,7 @@
 #include <Eigen/Dense>
 // #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <fast_gicp/ndt/ndt_cuda.hpp>
+#include <cuda_runtime.h>
 #include <optional>
 #include <chrono>
 #include <memory>
@@ -55,6 +57,8 @@ private:
 
 
  	void init_map();
+	void reset_ndt();
+	void publish_local_map();
 
 	void set_pcl(pcl::PointCloud<pcl::PointXYZI>::Ptr input_pcl, pcl::PointCloud<pcl::PointXYZI>::Ptr& output_pcl, double x, double y, double z);
 	void crop_local_map(const PointCloudTypePtr& input_pcl, PointCloudTypePtr& output_pcl, double x, double y, double z, double range_xy, double range_z);
@@ -74,6 +78,7 @@ private:
     rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr ndt_pose_pub_;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr map_pub_;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr ndt_pc_pub_;
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr local_map_pub_;
 
 	std::unique_ptr<tf2_ros::Buffer> tfBuffer_;
     std::shared_ptr<tf2_ros::TransformListener> tfListener_;
@@ -95,10 +100,12 @@ private:
 	bool has_received_ekf_pose_ = false;
 	bool has_received_pc_ = false;
 	bool has_read_map_ = false;
+	bool has_converged_once_ = false;
 	bool is_first;
 	bool is_publish_map_;
 	bool is_pcl_offset_;
 	bool is_first_map_ = false;
+	bool publish_local_map_ = false;
 
 	// parameter
 	std::string pcd_file_path_;
@@ -108,6 +115,7 @@ private:
 	std::string ndt_pose_topic_name_;
 	std::string map_topic_name_;
 	std::string ndt_pc_topic_name_;
+	std::string local_map_topic_name_;
 	std::string map_frame_id_;
 
 
