@@ -26,7 +26,7 @@ topic_hz_checker:
       imu:
         topic: "/imu/data_raw"
         type: "sensor_msgs/msg/Imu"
-        expected_hz: 386.0
+        expected_hz: 240.0
         tolerance: 0.2
         window_size: 10
         qos:
@@ -124,12 +124,12 @@ linux_state:
 #       - "tj-thermal"
 #     warn_temperature: 65.0
 #     error_temperature: 80.0
-fix_status:
-  ros__parameters:
-    hardware_id: example
-    update_period: 1.0
-    topic: "/fix"
-    timeout: 2.0
+# fix_status:
+#   ros__parameters:
+#     hardware_id: example
+#     update_period: 1.0
+#     topic: "/fix"
+#     timeout: 2.0
 diagnostic_aggregator:
   ros__parameters:
     pub_rate: 1.0

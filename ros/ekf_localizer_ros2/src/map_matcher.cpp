@@ -11,6 +11,7 @@ MapMatcher::MapMatcher() : Node("MapMatcher")
 	this->declare_parameter<std::string>("pcd_file_path", "/home/cub/colcon_ws/src/cub/ekf_localizer/pcd/map_msakosu.pcd");
 	this->declare_parameter<std::string>("pc_topic_name", {"/velodyne_points"});
 	this->declare_parameter<std::string>("ekf_pose_topic_name", {"/test/ekf_pose"});
+	this->declare_parameter<std::string>("initialpose_topic_name", {"/initialpose"});
 	this->declare_parameter<std::string>("ndt_pose_topic_name", {"/test/ndt_pose"});
 	this->declare_parameter<std::string>("map_topic_name", {"map_out"});
 	this->declare_parameter<std::string>("ndt_pc_topic_name", {"/ndt_pc"});
@@ -40,6 +41,7 @@ MapMatcher::MapMatcher() : Node("MapMatcher")
 	this->get_parameter("pcd_file_path", pcd_file_path_);
 	this->get_parameter("pc_topic_name", pc_topic_name_);
 	this->get_parameter("ekf_pose_topic_name", ekf_pose_topic_name_);
+	this->get_parameter("initialpose_topic_name", initialpose_topic_name_);
 	this->get_parameter("ndt_pose_topic_name", ndt_pose_topic_name_);
 	this->get_parameter("map_topic_name", map_topic_name_);
 	this->get_parameter("ndt_pc_topic_name", ndt_pc_topic_name_);
@@ -73,6 +75,9 @@ MapMatcher::MapMatcher() : Node("MapMatcher")
     ekf_pose_sub_  = this->create_subscription<geometry_msgs::msg::PoseStamped>(
         ekf_pose_topic_name_, rclcpp::QoS(1).reliable(),
         std::bind(&MapMatcher::ekf_pose_callback, this, std::placeholders::_1));
+    initialpose_sub_ = this->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>(
+        initialpose_topic_name_, rclcpp::QoS(1).reliable(),
+        std::bind(&MapMatcher::initialpose_callback, this, std::placeholders::_1));
     // map_sub_  = this->create_subscription<sensor_msgs::msg::PointCloud2>(
     //     "/cloud_pcd/map", rclcpp::QoS(1).reliable(),
     //     std::bind(&MapMatcher::map_callback, this, std::placeholders::_1));
@@ -105,19 +110,37 @@ MapMatcher::~MapMatcher(){}
 void MapMatcher::reset_ndt()
 {
 	try {
+		ndt_.reset();
+		map_local_pcl_.reset();
+		has_local_map_ = false;
+		local_map_center_ = Eigen::Vector3d::Zero();
 		cudaGetLastError(); // 直前のCUDAエラーをクリア
+		cudaDeviceReset();  // CUDAコンテキストを破棄・再初期化して完全復旧
 		ndt_ = std::make_unique<fast_gicp::NDTCuda<PointType, PointType>>();
 		ndt_->setTransformationEpsilon(TRANS_EPSILON_);
 		ndt_->setResolution(RESOLUTION_);
 		ndt_->setMaximumIterations(static_cast<int>(MAX_ITERATION_));
 		ndt_->setNeighborSearchMethod(fast_gicp::NeighborSearchMethod::DIRECT7);
-		has_local_map_ = false;
-		map_local_pcl_.reset();
+		RCLCPP_INFO(this->get_logger(), "Successfully reset NDTCuda and CUDA device context");
 	} catch (const std::exception& e) {
 		RCLCPP_ERROR(this->get_logger(), "Failed to reset NDTCuda: %s", e.what());
 	} catch (...) {
 		RCLCPP_ERROR(this->get_logger(), "Failed to reset NDTCuda: unknown exception");
 	}
+}
+
+void MapMatcher::initialpose_callback(const geometry_msgs::msg::PoseWithCovarianceStamped::ConstSharedPtr& msg)
+{
+	RCLCPP_INFO(this->get_logger(), "📍 MapMatcher received initialpose: x=%.2f, y=%.2f",
+	            msg->pose.pose.position.x, msg->pose.pose.position.y);
+	ekf_pose_.header = msg->header;
+	ekf_pose_.pose = msg->pose.pose;
+	has_received_ekf_pose_ = true;
+	has_converged_once_ = false;
+	consecutive_failures_ = 0;
+	has_local_map_ = false;
+	reset_ndt();
+	update_local_map_if_needed(ekf_pose_.pose.position.x, ekf_pose_.pose.position.y, ekf_pose_.pose.position.z);
 }
 
 
@@ -278,11 +301,20 @@ void MapMatcher::matching(pcl::PointCloud<pcl::PointXYZI>::Ptr map_pcl,pcl::Poin
 		std::vector<int> nan_indices;
 		pcl::removeNaNFromPointCloud(*current_local_pcl, *current_local_pcl, nan_indices);
 
-		if(!map_local_pcl_ || map_local_pcl_->points.size() < 10 || current_local_pcl->points.size() < 10){
+		if(!has_local_map_ || !map_local_pcl_ || map_local_pcl_->points.size() < 100 || current_local_pcl->points.size() < 100){
 			if(!map_local_pcl_ || map_local_pcl_->points.empty()) std::cout << "map_local_pcl is empty" << std::endl;
-			else if(map_local_pcl_->points.size() < 10) std::cout << "map_local_pcl points too few: " << map_local_pcl_->points.size() << std::endl;
+			else if(map_local_pcl_->points.size() < 100) std::cout << "map_local_pcl points too few: " << map_local_pcl_->points.size() << std::endl;
 			if(current_local_pcl->points.empty()) std::cout << "current_local_pcl is empty" << std::endl;
-			else if(current_local_pcl->points.size() < 10) std::cout << "current_local_pcl points too few: " << current_local_pcl->points.size() << std::endl;
+			else if(current_local_pcl->points.size() < 100) std::cout << "current_local_pcl points too few: " << current_local_pcl->points.size() << std::endl;
+			return;
+		}
+
+		// 推定位置が切り出し中心から離れすぎていないか確認 (範囲外ならマッチングスキップ)
+		const Eigen::Vector3d cur_pos(ekf_pose_.pose.position.x, ekf_pose_.pose.position.y, ekf_pose_.pose.position.z);
+		if((cur_pos - local_map_center_).norm() > LIMIT_RANGE_){
+			RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
+				"Estimated pose is too far from local map center (dist: %.2f m > limit: %.2f m), skipping NDT matching",
+				(cur_pos - local_map_center_).norm(), LIMIT_RANGE_);
 			return;
 		}
 		// if(current_local_pcl->points.size() > map_local_pcl->points.size()){
@@ -344,6 +376,7 @@ void MapMatcher::matching(pcl::PointCloud<pcl::PointXYZI>::Ptr map_pcl,pcl::Poin
 			if(found_valid && !best_trans.isZero(1e-6)){
 				std::cout << "✓ Initial yaw search succeeded! Best FitnessScore: " << best_score << std::endl;
 				has_converged_once_ = true;
+				consecutive_failures_ = 0;
 				Eigen::Quaternionf quaternion(Eigen::Matrix3f(best_trans.block(0,0,3,3)));
 				quaternion.normalize();
 
@@ -368,6 +401,10 @@ void MapMatcher::matching(pcl::PointCloud<pcl::PointXYZI>::Ptr map_pcl,pcl::Poin
 
 		if(!ndt.hasConverged()){
 			std::cout << "Has not converged" << std::endl;
+			consecutive_failures_++;
+			if(consecutive_failures_ >= 10){
+				has_converged_once_ = false;
+			}
 			return;
 		}
 
@@ -391,6 +428,7 @@ void MapMatcher::matching(pcl::PointCloud<pcl::PointXYZI>::Ptr map_pcl,pcl::Poin
 				return;
 			}
 			has_converged_once_ = true;
+			consecutive_failures_ = 0;
 			Eigen::Quaternionf quaternion(Eigen::Matrix3f(translation.block(0,0,3,3)));
 			quaternion.normalize();
 
@@ -416,6 +454,10 @@ void MapMatcher::matching(pcl::PointCloud<pcl::PointXYZI>::Ptr map_pcl,pcl::Poin
 		}
 		else{
 			std::cout << "Fitness score is large " << std::endl;
+			consecutive_failures_++;
+			if(consecutive_failures_ >= 10){
+				has_converged_once_ = false;
+			}
 		}
 	} catch (const std::exception& e) {
 		RCLCPP_ERROR(this->get_logger(), "Exception during NDT matching: %s. Resetting NDTCuda.", e.what());
@@ -539,7 +581,7 @@ bool MapMatcher::update_local_map_if_needed(double x, double y, double z)
 	}
 	const auto t1 = std::chrono::steady_clock::now();
 
-	if(!map_local_pcl_->points.empty()){
+	if(map_local_pcl_ && map_local_pcl_->points.size() >= 100){
 		local_map_center_ = pos;
 		has_local_map_ = true;
 		if(!ndt_){
@@ -553,7 +595,7 @@ bool MapMatcher::update_local_map_if_needed(double x, double y, double z)
 	} else {
 		has_local_map_ = false;
 	}
-	std::cout << "Local map updated: " << map_local_pcl_->points.size() << " points (crop "
+	std::cout << "Local map updated: " << (map_local_pcl_ ? map_local_pcl_->points.size() : 0) << " points (crop "
 	          << std::chrono::duration<double, std::milli>(t1 - t0).count() << " ms)" << std::endl;
 	return true;
 }

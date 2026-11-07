@@ -143,19 +143,19 @@ def generate_launch_description():
         spresense_imu,
         
         # 手動操縦
-        # cub_commander,        
-        # joy_linux,
+        cub_commander,        
+        joy_linux,
 
         # OAK-D camera
-        # oak_d_launch,
+        #oak_d_launch,
 
         # Livox
-        # livox_group,
+        livox_group,
 
         # GNSS
         um982,
 
         # 3D LiDAR -> commmon.launch.pyでの起動に移動
-        # velodyne_driver_node,
-        # velodyne_transform_node,
+        velodyne_driver_node,
+        velodyne_transform_node,
     ])

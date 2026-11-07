@@ -9,6 +9,7 @@
 #include <sensor_msgs/msg/imu.hpp>
 #include <nav_msgs/msg/odometry.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
+#include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
 // #include <pcl/point_cloud.h>
 // #include <pcl/point_types.h>
 // #include <pcl/features/normal_3d.h>
@@ -54,6 +55,7 @@ private:
 	void orb_pc_callback(const sensor_msgs::msg::PointCloud2::ConstSharedPtr& msg);
 	void ekf_pose_callback(const geometry_msgs::msg::PoseStamped::ConstSharedPtr& msg);
 	void map_callback(const sensor_msgs::msg::PointCloud2::ConstSharedPtr& msg);
+	void initialpose_callback(const geometry_msgs::msg::PoseWithCovarianceStamped::ConstSharedPtr& msg);
 
 
  	void init_map();
@@ -75,6 +77,7 @@ private:
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr orb_pc_sub_;
     rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr ekf_pose_sub_;
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr map_sub_;
+    rclcpp::Subscription<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr initialpose_sub_;
     rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr ndt_pose_pub_;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr map_pub_;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr ndt_pc_pub_;
@@ -101,6 +104,7 @@ private:
 	bool has_received_pc_ = false;
 	bool has_read_map_ = false;
 	bool has_converged_once_ = false;
+	int consecutive_failures_ = 0;
 	bool is_first;
 	bool is_publish_map_;
 	bool is_pcl_offset_;
@@ -112,6 +116,7 @@ private:
 	std::string pc_topic_name_;
 	std::string orb_pc_topic_name_;
 	std::string ekf_pose_topic_name_;
+	std::string initialpose_topic_name_;
 	std::string ndt_pose_topic_name_;
 	std::string map_topic_name_;
 	std::string ndt_pc_topic_name_;

@@ -25,7 +25,7 @@ gps_updater:
     # GPS品質フィルタリング（基本的なチェック用）
     min_satellites: 6.0                       # 最小衛星数（使用していない場合は無視）
     max_hdop: 3.0                             # 最大HDOP（使用していない場合は無視）
-    max_covariance_threshold: 2.0            # 最大水平標準偏差 [m]
+    max_covariance_threshold: 0.15            # 最大水平標準偏差 [m]
                                               # この閾値より大きい場合はGPSデータを棄却
 
 # ========================================

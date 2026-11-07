@@ -58,6 +58,16 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument('simulation', default_value='none', choices=['none', 'godot']),
         OpaqueFunction(function=select_diagnostics),
+        # diagを見る Web コンソール
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                PathJoinSubstitution([
+                    FindPackageShare('cub_bringup'),
+                    'launch',
+                    'cub_console.launch.py',
+                ])
+            )
+        ),
         # wheel_odometryノード
         Node(
             package='wheel_odometry',
@@ -79,26 +89,26 @@ def generate_launch_description():
 
         # pointcloud to laser scan
         # こちらは、minipc_launch_at_boot.launch.pyへ移動したため、コメントアウト
-        # Node(
-        #     package='pointcloud_to_laserscan', executable='pointcloud_to_laserscan_node',
-        #     remappings=[('cloud_in', '/velodyne_points'),
-        #                 ('scan', '/scan')],
-        #     parameters=[{
-        #         'target_frame': '',
-        #         'transform_tolerance': 0.01,
-        #         'min_height': -0.15,
-        #         'max_height': 1.5,
-        #         'angle_min': -3.14,  # -M_PI
-        #         'angle_max': 3.14,  # M_PI
-        #         'angle_increment': 0.0087,  # M_PI/360.0
-        #         'scan_time': 0.3333,
-        #         'range_min': 0.1,
-        #         'range_max': 100.0,
-        #         'use_inf': True,
-        #         'inf_epsilon': 1.0
-        #     }],
-        #     name='pointcloud_to_laserscan'
-        # ),
+        Node(
+            package='pointcloud_to_laserscan', executable='pointcloud_to_laserscan_node',
+            remappings=[('cloud_in', '/velodyne_points'),
+                        ('scan', '/scan')],
+            parameters=[{
+                'target_frame': '',
+                'transform_tolerance': 0.01,
+                'min_height': -0.15,
+                'max_height': 1.5,
+                'angle_min': -3.14,  # -M_PI
+                'angle_max': 3.14,  # M_PI
+                'angle_increment': 0.0087,  # M_PI/360.0
+                'scan_time': 0.3333,
+                'range_min': 0.1,
+                'range_max': 100.0,
+                'use_inf': True,
+                'inf_epsilon': 1.0
+            }],
+            name='pointcloud_to_laserscan'
+        ),
 
         # 2Dのマッピングやナビゲーションを実行する際はこれを有効化、3Dでは無効化
         # Node(
@@ -153,14 +163,14 @@ def generate_launch_description():
         #     output='both',
         #     parameters=[{'use_sim_time': use_sim_time}, diag_config],
         # ),
-        Node(
-            package='cub_diagnostics',
-            executable='fix_status_node',
-            name='fix_status',
-            condition=IfCondition(EqualsSubstitution(LaunchConfiguration('simulation'), 'none')),
-            output='both',
-            parameters=[{'use_sim_time': use_sim_time}, diag_config],
-        ),
+        # Node(
+        #     package='cub_diagnostics',
+        #     executable='fix_status_node',
+        #     name='fix_status',
+        #     condition=IfCondition(EqualsSubstitution(LaunchConfiguration('simulation'), 'none')),
+        #     output='both',
+        #     parameters=[{'use_sim_time': use_sim_time}, diag_config],
+        # ),
         Node(
             package='diagnostic_aggregator',
             executable='aggregator_node',

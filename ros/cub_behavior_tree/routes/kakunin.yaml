@@ -2,6 +2,9 @@ waypoint_groups:
   - group_name: \"shiyakusyo\"
     require_input: true
     waypoints:
+      - x: 27.990898895263672
+        y: 32.672401428222656
+        yaw: 0
       - x: 15.259057998657227
         y: 45.871711730957031
         yaw: 1.7999998331069946
