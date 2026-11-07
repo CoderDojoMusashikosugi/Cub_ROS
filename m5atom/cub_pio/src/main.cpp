@@ -1,8 +1,13 @@
-// Reference Code https://www.hackster.io/amal-shaji/differential-drive-robot-using-ros2-and-esp32-aae289
+// Updated: 2026-10-29 01:38 JST - Disable onboard LED operations for MCUB2.
 
 #include <Arduino.h>
+#if defined(CUB_TARGET_CUB4) || defined(CUB_TARGET_MCUB)
 #include <M5Unified.h>
+#endif
+
 #include <micro_ros_platformio.h>
+#include <cmath>
+#include <cstdint>
 
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -22,10 +27,13 @@
 #include <DDT_Motor_M15M06.h>
 #elif defined(CUB_TARGET_MCUB)
 #include <Dynamixel2Arduino.h>
+#elif defined(CUB_TARGET_MCUB2)
+#include <ddsm_ctrl/ddsm_ctrl.h>
 #endif
 
 // for control LED
 #include <FastLED.h>
+#if defined(CUB_TARGET_CUB4) || defined(CUB_TARGET_MCUB)
 #define LED_DATA_PIN 27
 #define NUM_LEDS 25
 #define LANE_LED_DATA_PIN 26
@@ -33,6 +41,7 @@
 
 #define EMERGENCY_MONITOR (GPIO_NUM_19)
 #define DISPLAY_SWITCH (GPIO_NUM_39)
+#endif
 
 #define DEBUG
 
@@ -84,9 +93,10 @@ int last_num_sign[2] = {0,0};
 const int16_t SPEED_MAX = 115;  //DDSM115 115rpm = max11
 const int16_t SPEED_MIN = -115;
 
-#elif defined(CUB_TARGET_MCUB)
+#elif defined(CUB_TARGET_MCUB) || defined(CUB_TARGET_MCUB2)
 size_t domain_id = 1; // ros Domain ID
 
+#ifdef CUB_TARGET_MCUB
 // for dynamixel valiable
 /* DRIVE_MODE*/
 const uint8_t ADDR_DRIVE_MODE = 10;
@@ -99,6 +109,43 @@ const uint8_t TX_SERVO = 33;
 const float DXL_PROTOCOL_VERSION = 2.0; //プロトコルのバージョン
 const uint8_t DXL1_ID = 1;
 const uint8_t DXL2_ID = 2;
+
+#elif defined(CUB_TARGET_MCUB2)
+constexpr uint8_t DDSM_LEFT_ID = 1; // 左モータのDDSM210 ID
+constexpr uint8_t DDSM_RIGHT_ID = 2;  // 右モータのDDSM210 ID
+constexpr uint8_t DDSM_RX_PIN = 18; // DDSM210のRXピン番号
+constexpr uint8_t DDSM_TX_PIN = 19; // DDSM210のTXピン番号
+constexpr int DDSM_LEFT_FORWARD_SIGN = 1; // 左モータの前進方向の符号
+constexpr int DDSM_RIGHT_FORWARD_SIGN = -1; // 右モータの前進方向の符号
+constexpr int16_t DDSM_MAX_COMMAND = 1000;  // DDSM210の最大速度指令値
+constexpr uint8_t DDSM_VELOCITY_ACCELERATION = 5;  // DDSM210の速度指令時の加速度設定値
+constexpr uint8_t DDSM_VELOCITY_MODE = 0x02;  // DDSM210の速度モードの値
+constexpr uint8_t DDSM_ERROR_MASK = 0x12; // DDSM210のエラーコードのマスク値
+constexpr uint8_t DDSM_MODE_SWITCH_RETRIES = 3; // モード切替のリトライ回数
+constexpr uint16_t DDSM_MODE_SWITCH_VERIFY_DELAY_MS = 20; // モード切替後のモード確認までの待機時間(ms)
+constexpr uint8_t DDSM_FEEDBACK_FAILURE_LIMIT = 5;  // control_motor 30ms周期で約150ms
+HardwareSerial& DDSM_SERIAL = Serial1;  // DDSM210用のシリアルポート
+DDSM_CTRL ddsm; // DDSM210用の制御クラスのインスタンス
+bool send_ddsm_velocity_command(uint8_t motor_id, int16_t command); // DDSM210に速度指令を送信する関数の宣言
+
+struct DdsmWheelPosition {
+  int64_t previous_native_count = 0;
+  int64_t accumulated_count = 0;
+  uint32_t previous_time_ms = 0;
+  bool initialized = false;
+};
+
+DdsmWheelPosition left_ddsm_position;
+DdsmWheelPosition right_ddsm_position;
+bool ddsm_initialized = false;
+bool ddsm_mode_verified = false;
+bool ddsm_mode_warning_reported = false;
+uint8_t ddsm_feedback_failure_count = 0;
+bool ddsm_command_feedback_error = false;
+bool ddsm_command_error_reported = false;
+bool ddsm_position_feedback_error = false;
+bool ddsm_position_error_reported = false;
+#endif
 #endif
 
 // Mutexの宣言
@@ -136,16 +183,19 @@ volatile enum robo_modes{
   } while (0)
 
 // for LED valiable
+#if defined(CUB_TARGET_CUB4) || defined(CUB_TARGET_MCUB)
 CRGB leds[NUM_LEDS];
 CRGB lane_led[NUM_LANE_LEDS];
+#endif
 
 // for PS5 valiable
 #include <ps5Controller.h>
 // #include <EspEasyTask.h>
 
 void connect_dualsense(){
-  // ps5.begin("4C:B9:9B:98:1E:9B"); //replace with your MAC address
-  ps5.begin("4C:B9:9B:64:76:1A"); //replace with your MAC address
+// ps5.begin("4C:B9:9B:98:1E:9B"); //replace with your MAC address
+// ps5.begin("4C:B9:9B:64:76:1A"); //replace with your MAC address
+  ps5.begin("50:EE:32:33:DB:18"); //replace with your MAC address
 }
 
 void debug_message(const char* format, ...);
@@ -155,13 +205,17 @@ void debug_message(const char* format, ...);
 
 // Error handle loop
 void error_loop(rcl_ret_t temp_rc) {
+#if defined(CUB_TARGET_CUB4) || defined(CUB_TARGET_MCUB)
   leds[24] = CRGB::Red;
   FastLED.show();
+#endif
   vTaskDelay(1000 / portTICK_PERIOD_MS);
 
   rcl_reset_error();
+#if defined(CUB_TARGET_CUB4) || defined(CUB_TARGET_MCUB)
   leds[24] = CRGB::Black;
   FastLED.show();
+#endif
 }
 
 void IRAM_ATTR set_emergency(){
@@ -196,6 +250,7 @@ void debug_message(const char* format, ...) {
   #endif
 }
 
+#if defined(CUB_TARGET_CUB4) || defined(CUB_TARGET_MCUB)
 void imu_timer_callback(rcl_timer_t * imu_timer, int64_t last_call_time) {
   RCLC_UNUSED(last_call_time);
 
@@ -220,6 +275,7 @@ void imu_timer_callback(rcl_timer_t * imu_timer, int64_t last_call_time) {
     RCSOFTCHECK(rcl_publish(&imu_publisher, &imu_msg, NULL));
   }
 }
+#endif
 
 #ifdef CUB_TARGET_CUB4
 void motor_exec(){
@@ -412,6 +468,129 @@ void initialize_dynamixel() {
   }
   delay(5);
 }
+#elif defined(CUB_TARGET_MCUB2)
+bool set_ddsm_velocity_mode(uint8_t motor_id) {
+  for (uint8_t attempt = 0; attempt < DDSM_MODE_SWITCH_RETRIES; ++attempt) {
+    ddsm.ddsm_change_mode(motor_id, DDSM_VELOCITY_MODE);
+    delay(DDSM_MODE_SWITCH_VERIFY_DELAY_MS);
+    if (ddsm.ddsm_get_mode(motor_id) == DDSM_VELOCITY_MODE) {
+      return true;
+    }
+    delay(TIME_BETWEEN_CMD);
+  }
+  return false;
+}
+
+bool set_ddsm_velocity_modes() {
+  const bool left_ready = set_ddsm_velocity_mode(DDSM_LEFT_ID);
+  delay(TIME_BETWEEN_CMD);
+  const bool right_ready = set_ddsm_velocity_mode(DDSM_RIGHT_ID);
+  return left_ready && right_ready;
+}
+
+void initialize_ddsm210() {
+  DDSM_SERIAL.begin(DDSM_BAUDRATE, SERIAL_8N1, DDSM_RX_PIN, DDSM_TX_PIN);
+  ddsm.pSerial = &DDSM_SERIAL;
+  ddsm.set_ddsm_type(TYPE_DDSM210);
+  ddsm.clear_ddsm_buffer();
+
+  // DDSM_DDSM210と同様に、モード確認に失敗しても速度0指令の周期送信を続ける。
+  ddsm_initialized = true;
+  ddsm_mode_verified = set_ddsm_velocity_modes();
+  delay(TIME_BETWEEN_CMD);
+  send_ddsm_velocity_command(DDSM_LEFT_ID, 0);
+  delay(TIME_BETWEEN_CMD);
+  send_ddsm_velocity_command(DDSM_RIGHT_ID, 0);
+  // MCUB2にはオンボードLEDがないため、DDSM状態のLED表示は行わない。
+  // if (!left_stopped || !right_stopped) {
+  //   leds[5] = CRGB::Red;
+  // } else {
+  //   leds[5] = ddsm_mode_verified ? CRGB::Green : CRGB::Yellow;
+  // }
+  // FastLED.show();
+}
+
+bool update_ddsm_wheel_position(uint8_t motor_id, int forward_sign,
+                                DdsmWheelPosition& tracker, int32_t& output) {
+  ddsm.ddsm_get_info(motor_id);
+  if (ddsm.last_feedback_ok != 1 || !ddsm.last_rx_valid ||
+      ddsm.last_rx_data[0] != motor_id || ddsm.last_rx_data[1] != 0x74) {
+    return false;
+  }
+
+  const int64_t native_count = static_cast<int64_t>(ddsm.mileage) * 32768LL + ddsm.ddsm_pos;
+  const uint32_t now = millis();
+  if (!tracker.initialized) {
+    tracker.previous_native_count = native_count;
+    tracker.previous_time_ms = now;
+    tracker.initialized = true;
+  } else {
+    const uint32_t elapsed_ms = now - tracker.previous_time_ms;
+    const int64_t delta = native_count - tracker.previous_native_count;
+    tracker.previous_native_count = native_count;
+    tracker.previous_time_ms = now;
+
+    const double physically_possible_delta =
+        (DDSM_MAX_COMMAND / 10.0) * 32768.0 * elapsed_ms / 60000.0 * 1.5 + 1024.0;
+    if (elapsed_ms <= 1000 &&
+        delta <= physically_possible_delta && delta >= -physically_possible_delta) {
+      tracker.accumulated_count += delta * forward_sign;
+    }
+  }
+
+  const uint32_t wrapped_count = static_cast<uint32_t>(tracker.accumulated_count);
+  output = wrapped_count <= INT32_MAX
+               ? static_cast<int32_t>(wrapped_count)
+               : static_cast<int32_t>(static_cast<int64_t>(wrapped_count) - 4294967296LL);
+  return true;
+}
+
+bool send_ddsm_velocity_command(uint8_t motor_id, int16_t command) {
+  ddsm.ddsm_ctrl(motor_id, command, DDSM_VELOCITY_ACCELERATION, 0);
+  return ddsm.last_feedback_ok == 1 && ddsm.last_rx_valid &&
+         ddsm.last_rx_data[0] == motor_id && ddsm.last_rx_data[1] == 0x64 &&
+         (ddsm.fault_code & DDSM_ERROR_MASK) == 0;
+}
+
+// ID1とID2への指令が交互に続くと、ID1が応答しなくなる現象への対処(実機の切り分け試験で確認)。
+// 実在しないID宛のフレームを応答待ちなしで1つ挟むと、ID1が正常に応答する。
+constexpr uint8_t DDSM_DUMMY_ID = 5;
+void send_ddsm_dummy_frame() {
+  uint8_t pkt[10] = {DDSM_DUMMY_ID, 0x64, 0, 0, 0x01, 0x02, DDSM_VELOCITY_ACCELERATION, 0, 0, 0};
+  uint8_t crc = 0;
+  for (int i = 0; i < 9; i++) {
+    crc ^= pkt[i];
+    for (int k = 0; k < 8; k++) crc = (crc & 1) ? (crc >> 1) ^ 0x8C : crc >> 1;
+  }
+  pkt[9] = crc;
+  DDSM_SERIAL.write(pkt, sizeof(pkt));
+  DDSM_SERIAL.flush();
+  delay(2);
+  while (DDSM_SERIAL.available() > 0) DDSM_SERIAL.read();
+}
+
+void set_ddsm_position_fault(const char* message) {
+  if (!ddsm_position_feedback_error) {
+    // MCUB2にはオンボードLEDがないため、LED表示は行わない。
+    ddsm_position_feedback_error = true;
+  }
+  if (uros_state == AGENT_CONNECTED && !ddsm_position_error_reported) {
+    debug_message(message);
+    ddsm_position_error_reported = true;
+  }
+}
+
+void clear_ddsm_position_fault() {
+  if (!ddsm_position_feedback_error) {
+    return;
+  }
+  // MCUB2にはオンボードLEDがないため、LED表示は行わない。
+  ddsm_position_feedback_error = false;
+  if (uros_state == AGENT_CONNECTED && ddsm_position_error_reported) {
+    debug_message("DDSM210 position feedback recovered");
+  }
+  ddsm_position_error_reported = false;
+}
 #endif
 
 // caluclate velocity for each dinamixel from twist value
@@ -427,6 +606,13 @@ const float cub_d = 62.5;  // [mm] distance between center and wheel
 const float motor_vel_unit = 0.229;  //[rpm]
 const float diameter = 40; // [mm] diameter of wheel
 const float ang_res = 0.088; // [deg/pluse] motor pluse resolution
+int32_t l_motor_pos = 0;
+int32_t r_motor_pos = 0;
+#elif defined(CUB_TARGET_MCUB2)
+const float cub_d = 76.0;  // [mm] distance between center and wheel
+const float motor_vel_unit = 0.1;  //[rpm/count]
+const float diameter = 72.6; // [mm] diameter of wheel
+const float ang_res = 360.0 / 32768.0; // [deg/count] DDSM210 position resolution
 int32_t l_motor_pos = 0;
 int32_t r_motor_pos = 0;
 #endif
@@ -471,6 +657,30 @@ void wh_pos_timer_callback() {
   }
   wheel_positions_msg.data.data[0] = left_wheel_position;
   wheel_positions_msg.data.data[1] = right_wheel_position;
+
+#elif defined(CUB_TARGET_MCUB2)
+  if (!ddsm_initialized) {
+    return;
+  }
+  if (!xSemaphoreTake(mutex, pdMS_TO_TICKS(100))) {
+    set_ddsm_position_fault("DDSM210 position mutex timeout");
+    return;
+  }
+  send_ddsm_dummy_frame();
+  delay(TIME_BETWEEN_CMD);
+  const bool left_valid = update_ddsm_wheel_position(
+      DDSM_LEFT_ID, DDSM_LEFT_FORWARD_SIGN, left_ddsm_position, l_motor_pos);
+  delay(TIME_BETWEEN_CMD);
+  const bool right_valid = update_ddsm_wheel_position(
+      DDSM_RIGHT_ID, DDSM_RIGHT_FORWARD_SIGN, right_ddsm_position, r_motor_pos);
+  xSemaphoreGive(mutex);
+  if (!left_valid || !right_valid) {
+    set_ddsm_position_fault("DDSM210 position feedback failed");
+    return;
+  }
+  clear_ddsm_position_fault();
+  wheel_positions_msg.data.data[0] = l_motor_pos;
+  wheel_positions_msg.data.data[1] = r_motor_pos;
 #endif
 
   // メッセージのパブリッシュ
@@ -482,6 +692,7 @@ void control_motor(const geometry_msgs__msg__Twist* arg_twist) {
   double l_vel_m = arg_twist->linear.x - cub_d * arg_twist->angular.z / 1000.0; // [m/s]
   double r_vel_r = r_vel_m / (diameter / 1000.0 / 2.0); // [rad/s]
   double l_vel_r = l_vel_m / (diameter / 1000.0 / 2.0); // [rad/s]
+
   #ifdef CUB_TARGET_CUB4
   int r_goal_vel = (int)(r_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit); // right goal velocity[rpm] # TODO: check whether need to add dvidid by motor_velocity_unit
   int l_goal_vel = (int)(l_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit); // left goal velocity[rpm]
@@ -495,6 +706,7 @@ void control_motor(const geometry_msgs__msg__Twist* arg_twist) {
   int lf_goal_vel = (int)(lf_goal_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit);
   
   vehicle_run(l_goal_vel, rf_goal_vel, lf_goal_vel, r_goal_vel);
+
   #elif defined(CUB_TARGET_MCUB)
   int32_t r_goal_vel = (int32_t)(r_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit); // right goal velocity
   int32_t l_goal_vel = (int32_t)(l_vel_r / (2 * M_PI) * 60.0 / motor_vel_unit); // left goal velocity
@@ -530,6 +742,69 @@ void control_motor(const geometry_msgs__msg__Twist* arg_twist) {
     FastLED.show();
   #endif // DEBUG
   }
+  #elif defined(CUB_TARGET_MCUB2)
+  if (uros_state == AGENT_CONNECTED && !ddsm_mode_verified && !ddsm_mode_warning_reported) {
+    debug_message("DDSM210 velocity mode not verified; commands continue");
+    ddsm_mode_warning_reported = true;
+  }
+  if (ddsm_initialized && xSemaphoreTake(mutex, pdMS_TO_TICKS(10))) {
+    double l_goal_vel_rpm = l_vel_r / (2.0 * M_PI) * 60.0;
+    double r_goal_vel_rpm = r_vel_r / (2.0 * M_PI) * 60.0;
+    if (!std::isfinite(l_goal_vel_rpm) || !std::isfinite(r_goal_vel_rpm)) {
+      l_goal_vel_rpm = 0.0;
+      r_goal_vel_rpm = 0.0;
+    }
+
+    const double peak_rpm = std::fmax(std::fabs(l_goal_vel_rpm), std::fabs(r_goal_vel_rpm));
+    if (peak_rpm > DDSM_MAX_COMMAND * motor_vel_unit) {
+      const double scale = (DDSM_MAX_COMMAND * motor_vel_unit) / peak_rpm;
+      l_goal_vel_rpm *= scale;
+      r_goal_vel_rpm *= scale;
+    }
+
+    const int16_t l_goal_vel = static_cast<int16_t>(
+        std::lround(l_goal_vel_rpm / motor_vel_unit * DDSM_LEFT_FORWARD_SIGN)); // DDSM210 command [0.1 rpm/count]
+    const int16_t r_goal_vel = static_cast<int16_t>(
+        std::lround(r_goal_vel_rpm / motor_vel_unit * DDSM_RIGHT_FORWARD_SIGN)); // DDSM210 command [0.1 rpm/count]
+    if (ddsm_command_feedback_error) {
+      send_ddsm_dummy_frame();
+      delay(TIME_BETWEEN_CMD);
+      const bool left_stop_ok = send_ddsm_velocity_command(DDSM_LEFT_ID, 0);
+      delay(TIME_BETWEEN_CMD);
+      const bool right_stop_ok = send_ddsm_velocity_command(DDSM_RIGHT_ID, 0);
+      if (l_goal_vel == 0 && r_goal_vel == 0 && left_stop_ok && right_stop_ok) {
+        // モーター電源再投入などでモードが戻っている可能性があるため再設定する。
+        delay(TIME_BETWEEN_CMD);
+        ddsm_mode_verified = set_ddsm_velocity_modes();
+        ddsm_mode_warning_reported = false;
+        ddsm_command_feedback_error = false;
+        ddsm_feedback_failure_count = 0;
+        if (uros_state == AGENT_CONNECTED && ddsm_command_error_reported) {
+          debug_message("DDSM210 velocity feedback recovered");
+        }
+        ddsm_command_error_reported = false;
+      }
+    } else {
+      send_ddsm_dummy_frame();
+      delay(TIME_BETWEEN_CMD);
+      const bool left_ok = send_ddsm_velocity_command(DDSM_LEFT_ID, l_goal_vel);
+      delay(TIME_BETWEEN_CMD);
+      const bool right_ok = send_ddsm_velocity_command(DDSM_RIGHT_ID, r_goal_vel);
+      if (left_ok && right_ok) {
+        ddsm_feedback_failure_count = 0;
+      } else if (++ddsm_feedback_failure_count >= DDSM_FEEDBACK_FAILURE_LIMIT) {
+        send_ddsm_velocity_command(DDSM_LEFT_ID, 0);
+        delay(TIME_BETWEEN_CMD);
+        send_ddsm_velocity_command(DDSM_RIGHT_ID, 0);
+        ddsm_command_feedback_error = true;
+        if (uros_state == AGENT_CONNECTED && !ddsm_command_error_reported) {
+          debug_message("DDSM210 velocity feedback failed; zero commands sent");
+          ddsm_command_error_reported = true;
+        }
+      }
+    }
+    xSemaphoreGive(mutex);
+  }
   #endif // CUB_TARGET
   if (uros_state == AGENT_CONNECTED) {
     wh_pos_timer_callback();
@@ -545,7 +820,9 @@ void twist_callback(const void * msgin)
 
 void motor_control_loop(void *pvParameters = nullptr) 
 {
+#if defined(CUB_TARGET_CUB4) || defined(CUB_TARGET_MCUB)
   attachInterrupt(EMERGENCY_MONITOR, set_emergency, RISING);
+#endif
   // attachInterrupt(DISPLAY_SWITCH, set_pushed, FALLING);
   while(1) {
     switch (robo_mode)
@@ -602,13 +879,19 @@ void remote_control_loop(void *pvParameters){
     }
   #ifdef CUB_TARGET_CUB4
     float default_linear = 1.2;
+    float default_angular = 2.0;
   #elif defined(CUB_TARGET_MCUB)
     float default_linear = 0.3;
-  #endif
     float default_angular = 2.0;
+  #elif defined(CUB_TARGET_MCUB2)
+    float default_linear = 0.3;
+    float default_angular = 2.0;
+  #endif
     if (ps5.isConnected()) {
       if (robo_mode == IDLE) robo_mode = REMOTE_CTRL;
+#if defined(CUB_TARGET_CUB4) || defined(CUB_TARGET_MCUB)
       leds[2] = CRGB::Green;
+#endif
 
       ps5.setLed(0, 255, 0);
       ps5.setFlashRate(100, 100);
@@ -633,7 +916,9 @@ void remote_control_loop(void *pvParameters){
         remote_twist_msg = vehicle_stop_msg();
       }
     } else {
+#if defined(CUB_TARGET_CUB4) || defined(CUB_TARGET_MCUB)
       leds[2] = CRGB::Red;
+#endif
     
       if (uros_state == AGENT_CONNECTED) robo_mode = AUTONOMOUS;
       else robo_mode = IDLE;
@@ -753,10 +1038,12 @@ void destroy_entities() {
 
 void setup() {
   robo_mode = IDLE;
+#if defined(CUB_TARGET_CUB4) || defined(CUB_TARGET_MCUB)
   pinMode(EMERGENCY_MONITOR, INPUT);
   // pinMode(DISPLAY_SWITCH, INPUT_PULLUP);
   gpio_pulldown_dis(EMERGENCY_MONITOR);
   // gpio_pulldown_dis(DISPLAY_SWITCH);
+#endif
   
 #ifdef CUB_TARGET_MCUB
   auto cfg = M5.config();
@@ -770,7 +1057,8 @@ void setup() {
   set_microros_serial_transports(Serial);
   delay(2000);
 
-  // initialize LED
+  // initialize LED (MCUB2 has no onboard LED)
+#if defined(CUB_TARGET_CUB4) || defined(CUB_TARGET_MCUB)
   FastLED.addLeds<WS2812, LED_DATA_PIN, GRB>(leds, NUM_LEDS);
 #ifdef CUB_TARGET_CUB4
   FastLED.addLeds<NEOPIXEL, LANE_LED_DATA_PIN>(lane_led, NUM_LANE_LEDS);
@@ -782,6 +1070,7 @@ void setup() {
   leds[0] = CRGB::White;
   FastLED.show();
   delay(10);
+#endif
 
 #ifdef CUB_TARGET_CUB4
   for(int i=0;i<4;i++){
@@ -789,6 +1078,8 @@ void setup() {
   }
 #elif defined(CUB_TARGET_MCUB)
   initialize_dynamixel();
+#elif defined(CUB_TARGET_MCUB2)
+  initialize_ddsm210();
 #endif
 
   // メッセージの初期化
@@ -801,6 +1092,10 @@ void setup() {
   wheel_positions_msg.data.capacity = 2;
   wheel_positions_msg.data.size = 2;
   wheel_positions_msg.data.data = (int32_t*) malloc(2 * sizeof(int32_t));
+#elif defined(CUB_TARGET_MCUB2)
+  wheel_positions_msg.data.capacity = 2;
+  wheel_positions_msg.data.size = 2;
+  wheel_positions_msg.data.data = (int32_t*) malloc(2 * sizeof(int32_t));
 #endif
 
   xTaskCreatePinnedToCore(motor_control_loop, "motor_control_loop", 4048, NULL, 3, NULL, PRO_CPU_NUM);
@@ -808,6 +1103,7 @@ void setup() {
 }
 
 void loop() {
+#if defined(CUB_TARGET_CUB4) || defined(CUB_TARGET_MCUB)
   if (digitalRead(EMERGENCY_MONITOR) == HIGH) {
   // if (false) {  // for temporary disable emergency stop
     debug_message("Emergency stop triggered");
@@ -823,6 +1119,10 @@ void loop() {
   } else {
     if ((robo_mode == EMERGENCY) && (!ps5.Cross())) robo_mode = IDLE;
   }
+#else
+  // mcub2は物理非常停止GPIOが未定のため、PS5のCross解放でのみ復帰する。
+  if ((robo_mode == EMERGENCY) && (!ps5.Cross())) robo_mode = IDLE;
+#endif
 
   if (robo_mode == EMERGENCY){
     delay(100);
@@ -830,20 +1130,26 @@ void loop() {
   }
 
   if (robo_mode == REMOTE_CTRL) {
+#if defined(CUB_TARGET_CUB4) || defined(CUB_TARGET_MCUB)
     leds[4] = CRGB::Yellow;
+#endif
 #ifdef CUB_TARGET_CUB4
     fill_solid(lane_led, NUM_LANE_LEDS, CRGB::Yellow);
 #endif
   } else if (robo_mode == AUTONOMOUS) {
+#if defined(CUB_TARGET_CUB4) || defined(CUB_TARGET_MCUB)
     if(subscribe_twist_msg.angular.y == 0.0) leds[4] = CRGB::Green;
     else leds[4] = CRGB::Yellow;
+#endif
 #ifdef CUB_TARGET_CUB4
     // 使ってないangularのyについて、速度指令の出所が自律なら0、手動なら0以外にする。
     if(subscribe_twist_msg.angular.y == 0.0) fill_solid(lane_led, NUM_LANE_LEDS, CRGB::Green);
     else fill_solid(lane_led, NUM_LANE_LEDS, CRGB::Yellow);
 #endif
   } else if (robo_mode == IDLE) {
+#if defined(CUB_TARGET_CUB4) || defined(CUB_TARGET_MCUB)
     leds[4] = CRGB::Blue;
+#endif
 #ifdef CUB_TARGET_CUB4
     fill_solid(lane_led, NUM_LANE_LEDS, CRGB::Blue);
 #endif
@@ -879,6 +1185,7 @@ void loop() {
       break;
   }
 
+#if defined(CUB_TARGET_CUB4) || defined(CUB_TARGET_MCUB)
   EVERY_N_MILLISECONDS(200) {
     if (uros_state == AGENT_CONNECTED) {
       leds[0] = CRGB::Green;
@@ -887,6 +1194,7 @@ void loop() {
     }
     FastLED.show();
   }
+#endif
   // if (dsp_sw_pushed && digitalRead(DISPLAY_SWITCH == LOW)) {
   //   RCSOFTCHECK(rcl_publish(&proceed_publisher, &empty_msg, NULL))
   //   dsp_sw_pushed = false;
