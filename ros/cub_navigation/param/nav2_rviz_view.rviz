@@ -7,10 +7,6 @@ Panels:
         - /Global Options1
         - /TF1/Frames1
         - /TF1/Tree1
-        - /Controller1
-        - /Controller1/Local Costmap1
-        - /PointCloud21
-        - /Pose1
       Splitter Ratio: 0.5833333134651184
     Tree Height: 405
   - Class: rviz_common/Selection
@@ -141,23 +137,22 @@ Visualization Manager:
       Show Names: false
       Tree:
         map:
-          base_link:
-            base_footprint:
-              {}
-            gnss_main_link:
-              {}
-            gnss_sub_link:
-              {}
-            imu_link:
-              {}
-            livox_frame:
-              {}
-            oak_parent_frame:
-              {}
-            velodyne:
-              {}
           odom:
-            {}
+            base_link:
+              base_footprint:
+                {}
+              gnss_main_link:
+                {}
+              gnss_sub_link:
+                {}
+              imu_link:
+                {}
+              livox_frame:
+                {}
+              oak_parent_frame:
+                {}
+              velodyne:
+                {}
       Update Interval: 0
       Value: true
     - Alpha: 1
@@ -441,10 +436,10 @@ Visualization Manager:
             Filter size: 10
             History Policy: Keep Last
             Reliability Policy: Reliable
-            Value: /local_plan
+            Value: /optimal_trajectory
           Value: true
         - Class: rviz_default_plugins/MarkerArray
-          Enabled: false
+          Enabled: true
           Name: Trajectories
           Namespaces:
             {}
@@ -453,8 +448,8 @@ Visualization Manager:
             Durability Policy: Volatile
             History Policy: Keep Last
             Reliability Policy: Reliable
-            Value: /marker
-          Value: false
+            Value: /trajectories
+          Value: true
         - Alpha: 1
           Class: rviz_default_plugins/Polygon
           Color: 25; 255; 0
@@ -500,6 +495,19 @@ Visualization Manager:
             Value: /local_costmap/voxel_marked_cloud
           Use Fixed Frame: true
           Use rainbow: true
+          Value: true
+        - Alpha: 1
+          Class: rviz_default_plugins/Polygon
+          Color: 25; 255; 0
+          Enabled: true
+          Name: VelocityPolygon
+          Topic:
+            Depth: 5
+            Durability Policy: Volatile
+            Filter size: 10
+            History Policy: Keep Last
+            Reliability Policy: Reliable
+            Value: /velocity_polygon
           Value: true
       Enabled: true
       Name: Controller
@@ -558,7 +566,7 @@ Visualization Manager:
       Enabled: true
       Name: MarkerArray
       Namespaces:
-        "": true
+        {}
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -872,7 +880,7 @@ Visualization Manager:
   Value: true
   Views:
     Current:
-      Angle: -0.1199999749660492
+      Angle: 0
       Class: rviz_default_plugins/TopDownOrtho
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
@@ -906,5 +914,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1854
-  X: 66
-  Y: 32
+  X: 34
+  Y: 0
