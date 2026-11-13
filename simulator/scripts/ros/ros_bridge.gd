@@ -2,6 +2,10 @@ extends Node
 ## One host owns this connection. Never substitute local input for a missing ROS command.
 
 signal status_changed(message: String)
+## Emitted when ROS asks to move the primary robot (map frame, metres / radians).
+signal teleport_requested(ros_x: float, ros_y: float, ros_yaw: float)
+
+const TELEPORT_TOPIC := "/sim/teleport"
 
 var url := "ws://127.0.0.1:9090"
 var command_timeout := 0.3
@@ -68,6 +72,7 @@ func _process(_delta: float) -> void:
 			_send({"op": "advertise", "topic": "/scan", "type": "sensor_msgs/msg/LaserScan", "queue_size": 1})
 			_send({"op": "advertise", "topic": "/proceed_to_next_group", "type": "std_msgs/msg/Empty", "queue_size": 1})
 			_send({"op": "subscribe", "topic": "/cmd_vel_atom", "type": "geometry_msgs/msg/Twist", "queue_length": 1})
+			_send({"op": "subscribe", "topic": TELEPORT_TOPIC, "type": "geometry_msgs/msg/PoseStamped", "queue_length": 1})
 			# Start with all buttons released; normal input polling resumes next tick.
 			_send({"op": "publish", "topic": "/joy", "msg":
 				preload("res://scripts/ros/joy_input.gd").neutral()})
@@ -122,7 +127,12 @@ func _send(message: Dictionary) -> void:
 
 
 func _receive(packet: Dictionary) -> void:
-	if packet.get("op") != "publish" or packet.get("topic") != "/cmd_vel_atom":
+	if packet.get("op") != "publish":
+		return
+	if packet.get("topic") == TELEPORT_TOPIC:
+		_receive_teleport(packet.get("msg"))
+		return
+	if packet.get("topic") != "/cmd_vel_atom":
 		return
 	var message: Variant = packet.get("msg")
 	if not message is Dictionary or not message.get("linear") is Dictionary or not message.get("angular") is Dictionary:
@@ -138,6 +148,31 @@ func _receive(packet: Dictionary) -> void:
 	angular = clampf(float(turn), -TAU, TAU)
 	_received_at = Time.get_ticks_msec()
 	received_commands += 1
+
+
+func _receive_teleport(message: Variant) -> void:
+	if not message is Dictionary or not message.get("pose") is Dictionary:
+		return
+	var pose: Dictionary = message.pose
+	if not pose.get("position") is Dictionary or not pose.get("orientation") is Dictionary:
+		return
+	var values := [
+		pose.position.get("x"), pose.position.get("y"),
+		pose.orientation.get("x", 0.0), pose.orientation.get("y", 0.0),
+		pose.orientation.get("z", 0.0), pose.orientation.get("w", 1.0),
+	]
+	for value: Variant in values:
+		if not (value is float or value is int) or not is_finite(float(value)):
+			push_warning("Ignoring %s: non-numeric pose." % TELEPORT_TOPIC)
+			return
+	var qx := float(values[2])
+	var qy := float(values[3])
+	var qz := float(values[4])
+	var qw := float(values[5])
+	var yaw := atan2(2.0 * (qw * qz + qx * qy), 1.0 - 2.0 * (qy * qy + qz * qz))
+	# Drop any velocity command issued before the jump.
+	_clear_command()
+	teleport_requested.emit(float(values[0]), float(values[1]), yaw)
 
 
 func command_fresh() -> bool:

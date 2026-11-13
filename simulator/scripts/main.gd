@@ -67,6 +67,7 @@ func _ready() -> void:
 	session.world_changed.connect(_on_session_world_changed)
 	add_child(session)
 	ros_bridge = RosBridgeScript.new()
+	ros_bridge.teleport_requested.connect(_teleport_primary_from_ros)
 	add_child(ros_bridge)
 
 	available_worlds = WorldRegistryScript.list_worlds()
@@ -433,6 +434,27 @@ func _warp_local_actor_to_map_center() -> bool:
 	# Publish the local actor's new pose on the next physics tick (and odometry for the host).
 	_publish_elapsed = 0.05
 	return true
+
+
+## Moves the primary robot on a /sim/teleport request (map frame; ROS yaw equals Godot rotation.y).
+func _teleport_primary_from_ros(ros_x: float, ros_y: float, ros_yaw: float) -> void:
+	if not session.is_host or not session.ready_to_play:
+		push_warning("Cannot teleport: only a running host owns the primary robot.")
+		return
+	var actor: Node3D = actors.get(session.local_actor_id)
+	if not is_instance_valid(actor):
+		push_warning("Cannot teleport: primary robot is not spawned.")
+		return
+	var check: Dictionary = world.validate_spawn_ros(ros_x, ros_y)
+	if not bool(check.get("ok", false)):
+		push_warning("Cannot teleport: " + str(check.get("error", "Invalid destination.")))
+		return
+	var ground_z := float(check.get("ground_z", 0.0))
+	actor.rotation.y = ros_yaw
+	actor.teleport_to(LidarScript.ros_to_godot(Vector3(ros_x, ros_y, ground_z + 0.1)))
+	# Publish the new pose and odometry on the next physics tick.
+	_publish_elapsed = 0.05
+	print("Teleported primary robot to (%.2f, %.2f, yaw %.2f rad)" % [ros_x, ros_y, ros_yaw])
 
 
 func _update_hud() -> void:

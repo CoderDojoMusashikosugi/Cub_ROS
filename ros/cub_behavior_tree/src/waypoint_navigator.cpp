@@ -1,7 +1,7 @@
 #include <rclcpp/rclcpp.hpp>
-#include <rclcpp/parameter_client.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
 #include <nav2_msgs/action/navigate_to_pose.hpp>
+#include <nav2_msgs/msg/speed_limit.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
@@ -16,6 +16,7 @@
 #include <memory>
 #include <mutex>
 #include <condition_variable>
+#include <cstdint>
 
 using NavigateToPose = nav2_msgs::action::NavigateToPose;
 using namespace std::chrono_literals;
@@ -41,9 +42,20 @@ public:
     current_group_index_(0),
     current_waypoint_index_(0),
     is_waiting_for_input_(true), // 起動時にユーザー入力待ちにする
-    current_xy_goal_tolerance_(std::numeric_limits<double>::quiet_NaN()),
     follow_mode_enabled_(false)
   {
+    // 停止地点以外のwaypointでは、Nav2の到達判定を待たずに手前で次のゴールを送って上書き(preempt)する。
+    // ゴール完了時にcontroller_serverがMPPIをリセットして減速・停止するのを避けるため。
+    // Nav2の到達判定(goal checkerのxy_goal_tolerance)はnav2のパラメータファイルで停止地点向けの値に固定する。
+    enable_pass_through_ = this->declare_parameter<bool>("enable_pass_through", true);
+    // 通過扱いのwaypointまでの直線距離がこの値[m]を切ったら次のwaypointへ切り替える
+    pass_through_distance_ = this->declare_parameter<double>("pass_through_distance", 3.0);
+    // 最後のwaypoint(停止地点)へ向かうときの速度上限[m/s]。0以下で無効。
+    final_approach_speed_ = this->declare_parameter<double>("final_approach_speed", 0.3);
+    // 最後のwaypointまでの直線距離がこの値[m]を切ったら速度を落とす
+    final_approach_distance_ = this->declare_parameter<double>("final_approach_distance", 3.0);
+    speed_limit_pub_ = this->create_publisher<nav2_msgs::msg::SpeedLimit>("/speed_limit", 10);
+
     navigate_to_pose_client_ = rclcpp_action::create_client<NavigateToPose>(this, "navigate_to_pose");
 
     proceed_subscription_ = this->create_subscription<std_msgs::msg::Empty>(
@@ -59,13 +71,6 @@ public:
     tf_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
     tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 
-    parameters_client_ = std::make_shared<rclcpp::AsyncParametersClient>(this, "controller_server");
-    if (!parameters_client_->wait_for_service(2s)) {
-      RCLCPP_WARN(this->get_logger(), "controller_server parameter service not available at startup.");
-    } else {
-      set_goal_checker_tolerance(kDefaultGoalTolerance);
-    }
-
     if (!load_yaml(yaml_file_)) {
       RCLCPP_ERROR(this->get_logger(), "Failed to load YAML file.");
       rclcpp::shutdown();
@@ -77,9 +82,6 @@ public:
   }
 
 private:
-  static constexpr double kPreciseGoalTolerance = 0.4;
-  static constexpr double kDefaultGoalTolerance = 3.0;
-
   std::string yaml_file_;
   std::vector<WaypointGroup> waypoint_groups_;
   size_t current_group_index_;
@@ -87,21 +89,28 @@ private:
   bool is_waiting_for_input_;
 
   rclcpp_action::Client<NavigateToPose>::SharedPtr navigate_to_pose_client_;
-  rclcpp::AsyncParametersClient::SharedPtr parameters_client_;
   rclcpp::Subscription<std_msgs::msg::Empty>::SharedPtr proceed_subscription_;
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr follow_mode_pub_;
+  rclcpp::Publisher<nav2_msgs::msg::SpeedLimit>::SharedPtr speed_limit_pub_;
+  double final_approach_speed_{0.3};  // require_inputグループの最後のwaypoint(停止地点)に近づいたときの速度上限[m/s]。0以下で無効。
+  double final_approach_distance_{2.0}; // require_inputグループの最後のwaypoint(停止地点)までの直線距離がこの値[m]を切ったら速度を落とす
+  bool final_approach_slowdown_active_{false};
   rclcpp::TimerBase::SharedPtr resend_timer_;
 
   std::mutex mutex_;
   std::condition_variable cv_;
 
-  double current_xy_goal_tolerance_;
   bool follow_mode_enabled_;
   std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
   Waypoint resend_waypoint_;
   bool has_resend_waypoint_{false};
   bool resend_follow_mode_{false};
+
+  bool enable_pass_through_{true};
+  double pass_through_distance_{3.0};
+  // 送信したゴールの通し番号。上書きされた古いゴールのコールバックを無視するために使う。
+  uint64_t goal_seq_{0};
 
   enum class ResendDecision
   {
@@ -125,37 +134,55 @@ private:
     }
   }
 
-  void set_goal_checker_tolerance(double tolerance)
+  // 現在のwaypointが入力待ちの停止地点(require_inputグループの最後)か。減速対象はここだけ。
+  bool is_final_waypoint() const
   {
-    if (!parameters_client_) {
-      return;
+    if (current_group_index_ >= waypoint_groups_.size()) {
+      return false;
     }
+    const WaypointGroup & group = waypoint_groups_[current_group_index_];
+    return group.require_input && current_waypoint_index_ + 1 == group.waypoints.size();
+  }
 
-    if (!std::isnan(current_xy_goal_tolerance_) &&
-        std::fabs(current_xy_goal_tolerance_ - tolerance) < 1e-6) {
-      return;
+  // controller_serverの速度上限を設定する。limit<=0で上限解除。
+  // MPPIはゴール終了時のリセットで速度上限が解除されるため、ゴール受理のたびに送り直す。
+  void publish_speed_limit(double limit)
+  {
+    nav2_msgs::msg::SpeedLimit msg;
+    msg.header.stamp = this->now();
+    msg.header.frame_id = "map";
+    msg.percentage = false;
+    msg.speed_limit = limit > 0.0 ? limit : 0.0;  // 0.0はNav2で「上限なし」
+    speed_limit_pub_->publish(msg);
+    if (limit > 0.0) {
+      RCLCPP_INFO(this->get_logger(), "Speed limit set to %.2f m/s for the final waypoint", limit);
     }
+  }
 
-    if (!parameters_client_->service_is_ready() && !parameters_client_->wait_for_service(1s)) {
-      RCLCPP_WARN(this->get_logger(), "controller_server parameter service not ready, cannot set goal tolerance yet.");
-      return;
+  // 到達を待たずに次のwaypointへ上書きしてよいwaypointか(入力待ちの停止地点・ルート最後以外)
+  bool is_pass_through_waypoint() const
+  {
+    if (current_group_index_ >= waypoint_groups_.size()) {
+      return false;
     }
-
-    parameters_client_->set_parameters(
-      {rclcpp::Parameter("general_goal_checker.xy_goal_tolerance", tolerance)},
-      [this, tolerance](auto future) {
-        try {
-          const auto & results = future.get();
-          if (results.empty() || !results[0].successful) {
-            RCLCPP_WARN(this->get_logger(), "Failed to set goal checker xy tolerance to %.2f", tolerance);
-            return;
-          }
-          current_xy_goal_tolerance_ = tolerance;
-          RCLCPP_INFO(this->get_logger(), "Goal checker xy tolerance set to %.2f", tolerance);
-        } catch (const std::exception & e) {
-          RCLCPP_WARN(this->get_logger(), "Error while setting goal checker tolerance: %s", e.what());
-        }
-      });
+    const WaypointGroup & group = waypoint_groups_[current_group_index_];
+    if (current_waypoint_index_ >= group.waypoints.size()) {
+      return false;
+    }
+    if (current_waypoint_index_ + 1 < group.waypoints.size()) {
+      return true;
+    }
+    if (group.require_input) {
+      return false;
+    }
+    // 入力不要グループの最後: 後続グループに続きのwaypointがあれば通過扱い(空グループは読み飛ばす)。
+    // ルート全体の最後なら通過扱いにせず、Nav2の到達判定(xy_goal_tolerance)でゴールさせる。
+    for (size_t i = current_group_index_ + 1; i < waypoint_groups_.size(); ++i) {
+      if (!waypoint_groups_[i].waypoints.empty()) {
+        return true;
+      }
+    }
+    return false;
   }
 
   bool load_yaml(const std::string & filepath)
@@ -206,10 +233,6 @@ private:
 
     WaypointGroup & current_group = waypoint_groups_[current_group_index_];
 
-    const double goal_tolerance =
-      current_group.require_input ? kPreciseGoalTolerance : kDefaultGoalTolerance;
-    set_goal_checker_tolerance(goal_tolerance);
-
     if (current_waypoint_index_ >= current_group.waypoints.size()) {
       if (current_group.require_input) {
         publish_follow_mode(false);
@@ -226,14 +249,7 @@ private:
       return;
     }
 
-    const bool is_last_in_group = current_waypoint_index_ == current_group.waypoints.size() - 1;
-    const bool enable_follow_mode = current_group.require_input && is_last_in_group;
-
-    if (current_group.require_input) {
-      send_navigate_to_pose(current_group.waypoints[current_waypoint_index_], enable_follow_mode);
-      return;
-    }
-
+    // 追従モードは使わず、全waypointを通常のナビゲーションで走る
     publish_follow_mode(false);
     send_navigate_to_pose(current_group.waypoints[current_waypoint_index_], false);
   }
@@ -256,11 +272,30 @@ private:
     auto goal_msg = NavigateToPose::Goal();
     goal_msg.pose = pose;
 
+    // 上書き(preempt)された古いゴールのコールバックは通し番号で無視する
+    const uint64_t seq = ++goal_seq_;
+
     rclcpp_action::Client<NavigateToPose>::SendGoalOptions options;
-    options.goal_response_callback = 
-      std::bind(&WaypointNavigator::navigate_to_pose_goal_response_callback, this, std::placeholders::_1);
-    options.result_callback = 
-      std::bind(&WaypointNavigator::navigate_to_pose_result_callback, this, std::placeholders::_1);
+    options.goal_response_callback =
+      [this, seq](rclcpp_action::ClientGoalHandle<NavigateToPose>::SharedPtr goal_handle) {
+        if (seq == goal_seq_) {
+          navigate_to_pose_goal_response_callback(goal_handle);
+        }
+      };
+    options.feedback_callback =
+      [this, seq](
+      rclcpp_action::ClientGoalHandle<NavigateToPose>::SharedPtr,
+      const std::shared_ptr<const NavigateToPose::Feedback> feedback) {
+        if (seq == goal_seq_) {
+          navigate_to_pose_feedback_callback(feedback);
+        }
+      };
+    options.result_callback =
+      [this, seq](const rclcpp_action::ClientGoalHandle<NavigateToPose>::WrappedResult & result) {
+        if (seq == goal_seq_) {
+          navigate_to_pose_result_callback(result);
+        }
+      };
 
     navigate_to_pose_client_->async_send_goal(goal_msg, options);
   }
@@ -294,6 +329,50 @@ private:
     }
 
     RCLCPP_INFO(this->get_logger(), "NavigateToPose goal accepted by the server, waiting for result...");
+
+    // 新しいゴールでは速度上限を解除し、最後のwaypointに近づいたらフィードバックで上限をかける
+    final_approach_slowdown_active_ = false;
+    publish_speed_limit(0.0);
+  }
+
+  void navigate_to_pose_feedback_callback(const std::shared_ptr<const NavigateToPose::Feedback> feedback)
+  {
+    if (is_waiting_for_input_ || has_resend_waypoint_ ||
+      current_group_index_ >= waypoint_groups_.size() ||
+      current_waypoint_index_ >= waypoint_groups_[current_group_index_].waypoints.size())
+    {
+      return;
+    }
+    const WaypointGroup & current_group = waypoint_groups_[current_group_index_];
+    const Waypoint & wp = current_group.waypoints[current_waypoint_index_];
+    const double dist = std::hypot(
+      feedback->current_pose.pose.position.x - wp.x,
+      feedback->current_pose.pose.position.y - wp.y);
+
+    // 通過地点: 手前まで来たら現在のゴールを完了させずに次のゴールで上書きする
+    if (enable_pass_through_ && is_pass_through_waypoint()) {
+      if (dist <= pass_through_distance_) {
+        RCLCPP_INFO(
+          this->get_logger(),
+          "Within %.2f m of waypoint %zu in group '%s'; passing through to the next waypoint.",
+          dist, current_waypoint_index_ + 1, current_group.group_name.c_str());
+        current_waypoint_index_++;
+        send_next_goal();
+      }
+      return;
+    }
+
+    // 停止地点: 近づいたら速度を落とす
+    if (final_approach_slowdown_active_ || final_approach_speed_ <= 0.0 || !is_final_waypoint()) {
+      return;
+    }
+    if (dist > final_approach_distance_) {
+      return;
+    }
+    final_approach_slowdown_active_ = true;
+    RCLCPP_INFO(
+      this->get_logger(), "Within %.2f m of the final waypoint; slowing down.", dist);
+    publish_speed_limit(final_approach_speed_);
   }
 
   void navigate_to_pose_result_callback(const rclcpp_action::ClientGoalHandle<NavigateToPose>::WrappedResult & result)
@@ -304,8 +383,8 @@ private:
     if (decision != ResendDecision::None) {
       WaypointGroup & current_group = waypoint_groups_[current_group_index_];
       Waypoint wp = current_group.waypoints[current_waypoint_index_];
-      const bool enable_follow_mode =
-        decision == ResendDecision::ResendWithFollow && current_group.require_input;
+      // 追従モードは使わないため、再送も通常のナビゲーションで行う
+      const bool enable_follow_mode = false;
       RCLCPP_WARN(
         this->get_logger(),
         "Robot is still away from the last waypoint of group '%s'. "
