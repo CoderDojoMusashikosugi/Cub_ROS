@@ -17,6 +17,7 @@ def generate_launch_description():
     map_dir = LaunchConfiguration(
         'map',
         default = "/home/cub/maps/1017_02/map.yaml")
+        # default = "/home/cub/maps/map_shiminkan_20261114_115056/map.yaml")
         # default = "/home/cub/colcon_ws/src/cub/cub_navigation/maps/empty/map.yaml")
 
     return LaunchDescription([
