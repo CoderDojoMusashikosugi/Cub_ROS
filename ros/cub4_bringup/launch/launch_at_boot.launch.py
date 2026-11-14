@@ -31,6 +31,21 @@ def generate_launch_description():
         output='screen',
     )
 
+    # M5Dial: USB NCMでDialからの受信が止まったら、USBバスリセットで復旧させる
+    dial_ncm_watchdog = Node(
+        package='cub4_bringup',
+        executable='dial_ncm_watchdog.py',
+        name='dial_ncm_watchdog',
+        parameters=[{
+            'stall_timeout_sec': 30.0,    # 受信がこの秒数止まったら異常と判定
+            'reset_cooldown_sec': 120.0,  # リセット後、次のリセットまで待つ時間(連続失敗で倍々に延長)
+            'dry_run': False,             # Trueなら検知とログのみでリセットしない
+        }],
+        respawn=True,
+        respawn_delay=3.0,
+        output='screen',
+    )
+
     spresense_imu = Node(
         package='cub4_bringup',
         executable='spresense_imu_node',
@@ -141,6 +156,7 @@ def generate_launch_description():
         
         # M5Dial
         micro_ros_agent_dial,
+        dial_ncm_watchdog,
 
         # spresense IMUノード
         spresense_imu,
