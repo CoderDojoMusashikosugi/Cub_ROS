@@ -26,7 +26,7 @@ public:
             std::chrono::seconds(10),
             std::bind(&JsonLineVisualizer::publishLineMarkers, this));
 
-        RCLCPP_INFO(this->get_logger(), "Json Line Visualizer initialized. Publishing every 10 seconds.");
+        RCLCPP_DEBUG(this->get_logger(), "Json Line Visualizer initialized. Publishing every 10 seconds.");
     }
 
 private:
@@ -54,7 +54,7 @@ private:
                 }
             }
 
-            printf("size: %d\n",waypoints_.size());
+            RCLCPP_DEBUG(this->get_logger(), "Loaded %zu waypoints.", waypoints_.size());
 
         return true;
         }
@@ -98,7 +98,7 @@ private:
 
         // Publish the line marker
         marker_pub_->publish(marker);
-        RCLCPP_INFO(this->get_logger(), "Published line marker connecting %zu waypoints to RViz.", waypoints_.size());
+        RCLCPP_DEBUG(this->get_logger(), "Published line marker connecting %zu waypoints to RViz.", waypoints_.size());
     }
 };
 

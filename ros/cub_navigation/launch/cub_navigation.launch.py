@@ -80,7 +80,8 @@ def launch_setup(context):
         Node(
             package='cub_navigation',
             executable='waypoint_visualizer',
-            parameters=[{'json_file': waypoints_file}]
+            parameters=[{'json_file': waypoints_file}],
+            ros_arguments=['--log-level', 'json_line_visualizer:=info'],
         ),
 
 
