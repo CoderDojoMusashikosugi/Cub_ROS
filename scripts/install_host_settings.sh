@@ -213,6 +213,15 @@ if [ -d "$CH341_DIR" ]; then
     fi
 fi
 
+# Disable nv-l4t-usb-device-mode (USB-C device mode: 192.168.55.1 network, serial console, L4T-README).
+# At boot, its script bridges whatever interface is named "usb0" into l4tbr0. The M5Dial's cdc_ncm
+# interface can briefly be "usb0" before udev renames it, so it gets bridged and cannot get a DHCP address.
+# Flashing via recovery mode is not affected by this service.
+if systemctl cat nv-l4t-usb-device-mode.service >/dev/null 2>&1; then
+    systemctl disable nv-l4t-usb-device-mode.service
+    echo "[INFO] Disabled nv-l4t-usb-device-mode (takes effect after reboot)."
+fi
+
 # udev rules for serial devices and PPS permissions
 echo 'KERNEL=="ttyUSB*",  ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6001", SYMLINK+="ttyATOM"' > /etc/udev/rules.d/99-atom.rules
 # echo 'KERNEL=="ttyACM*",  ATTRS{idVendor}=="1546", ATTRS{idProduct}=="01a9", SYMLINK+="ttyGPS"' > /etc/udev/rules.d/99-gps.rules
