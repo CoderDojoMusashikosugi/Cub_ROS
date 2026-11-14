@@ -138,6 +138,7 @@ diagnostic_aggregator:
               "velodyne_packets",
               # "fix", # これだとfix topic statusも含まれてしまう
               "GPS Fix Status",
+              "Joystick Driver Status",
             ]
             regex: [
               "^ublox_gps_node: fix$" # これならfixだけ取れる
