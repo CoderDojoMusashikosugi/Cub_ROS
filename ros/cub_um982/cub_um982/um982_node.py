@@ -18,19 +18,19 @@ import sys
 import threading
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 
 import rclpy
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
-from rclpy.time import Time
 from sensor_msgs.msg import NavSatFix, NavSatStatus
 from geometry_msgs.msg import PoseWithCovarianceStamped
 from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus, KeyValue
 
 # Import backend library from submodule or installed package
 try:
-    from cub_um982.extended_client import ExtendedUM982Client, NtripStats
+    from cub_um982.extended_client import AntennaGgaState, ExtendedUM982Client, NtripStats
+    from cub_um982.usb_reset import UsbDeviceInfo, reset_usb_device
     from um982.types import PositionData
 except ImportError:
     import sys
@@ -59,7 +59,8 @@ except ImportError:
             sys.path.insert(0, str(candidate))
             break
 
-    from cub_um982.extended_client import ExtendedUM982Client, NtripStats
+    from cub_um982.extended_client import AntennaGgaState, ExtendedUM982Client, NtripStats
+    from cub_um982.usb_reset import UsbDeviceInfo, reset_usb_device
     from um982.types import PositionData
 
 
@@ -155,6 +156,46 @@ def build_navsatfix_message(
     return fix_msg
 
 
+def _fmt(value, fmt: str) -> str:
+    return fmt.format(value) if value is not None else "N/A"
+
+
+def classify_antenna_status(
+    link_problem: Optional[str],
+    gga_state: Optional[AntennaGgaState],
+    now: float,
+    timeout: float,
+    sentence: str = 'GGA',
+) -> Tuple[bytes, str]:
+    """
+    Decide the diagnostic level of one antenna.
+
+    - STALE: cannot communicate with the UM982 (link_problem is set)
+    - ERROR: communicating, but no {sentence} output or no position (no coordinates)
+    - WARN:  position available but not RTK Fix
+    - OK:    RTK Fix
+
+    Args:
+        link_problem: Why the receiver cannot be communicated with, or None.
+        gga_state: Latest GGA/GGAH state of the antenna, or None if never received.
+        now: Current time.monotonic().
+        timeout: Seconds after which the GGA/GGAH state is considered outdated.
+        sentence: Sentence name used in messages ('GGA' or 'GGAH').
+    """
+    if link_problem is not None:
+        return DiagnosticStatus.STALE, f"No communication with UM982 ({link_problem})"
+    if gga_state is None or now - gga_state.time > timeout:
+        return (
+            DiagnosticStatus.ERROR,
+            f"No {sentence} output from UM982; check receiver output configuration",
+        )
+    if not gga_state.has_position:
+        return DiagnosticStatus.ERROR, "No position fix; check antenna sky view / cabling"
+    if gga_state.rtk_state == 'rtk_fix':
+        return DiagnosticStatus.OK, "RTK Fix"
+    return DiagnosticStatus.WARN, f"Position available, not RTK Fix ({gga_state.rtk_state})"
+
+
 class UM982Node(Node):
     """ROS2 driver node for Unicore UM982 GNSS receiver."""
 
@@ -168,6 +209,13 @@ class UM982Node(Node):
         self.output_rate = self.declare_parameter('output_rate', 10).value
         self.configure_on_start = self.declare_parameter('configure_on_start', True).value
         self.enable_rmc = self.declare_parameter('enable_rmc', False).value
+        self.write_timeout = self.declare_parameter('write_timeout', 1.0).value
+
+        # Link recovery parameters
+        self.serial_watchdog_timeout = self.declare_parameter('serial_watchdog_timeout', 5.0).value
+        self.usb_reset_enabled = self.declare_parameter('usb_reset_enabled', True).value
+        self.usb_reset_after_failures = self.declare_parameter('usb_reset_after_failures', 2).value
+        self.usb_reset_min_interval = self.declare_parameter('usb_reset_min_interval', 30.0).value
 
         # RTK / NTRIP parameters
         self.enable_ntrip = self.declare_parameter('enable_ntrip', False).value
@@ -196,7 +244,7 @@ class UM982Node(Node):
         self.hardware_id = self.declare_parameter('hardware_id', 'um982').value
         self.diagnostic_update_period = self.declare_parameter('diagnostic_update_period', 1.0).value
         self.diagnostic_timeout = self.declare_parameter('diagnostic_timeout', 2.0).value
-        self.diagnostic_status_name = self.declare_parameter('diagnostic_status_name', 'UM982 Status').value
+        self.diagnostic_name_prefix = self.declare_parameter('diagnostic_name_prefix', 'UM982').value
 
         # Publishers
         self.pose_pub = self.create_publisher(PoseWithCovarianceStamped, '~/pose', 10)
@@ -207,12 +255,16 @@ class UM982Node(Node):
         # Internal state
         self._lock = threading.Lock()
         self._last_pos: Optional[PositionData] = None
-        self._last_rx_time: Optional[Time] = None
-        self._last_sec_pos: Optional[PositionData] = None
-        self._last_sec_rx_time: Optional[Time] = None
         self._prev_rtk_state: str = 'unknown'
         self._connection_error_msg: Optional[str] = None
         self.client: Optional[ExtendedUM982Client] = None
+
+        # Link recovery state
+        self._consecutive_failures = 0
+        self._reconnect_count = 0
+        self._usb_reset_count = 0
+        self._last_usb_reset_time: Optional[float] = None  # time.monotonic()
+        self._last_link_error: Optional[str] = None
 
         # Start diagnostic timer
         self.diag_timer = self.create_timer(
@@ -258,6 +310,7 @@ class UM982Node(Node):
                 baud=self.baudrate,
                 timeout=self.serial_timeout,
                 output_rate=self.output_rate,
+                write_timeout=self.write_timeout if self.write_timeout > 0 else None,
             )
             client.set_position_callback(self._on_position_callback)
             client.set_secondary_position_callback(self._on_secondary_position_callback)
@@ -291,20 +344,98 @@ class UM982Node(Node):
             self.client = client
             self._connection_error_msg = None
         except Exception as e:
+            self._connection_error_msg = f"Failed to connect to {self.port}: {e}"
+            self.get_logger().warn(f"{self._connection_error_msg}. Will retry...")
             # Make sure partially started threads/serial port are released
             # so that retries do not accumulate reader threads.
             if client is not None:
-                try:
-                    client.stop()
-                except Exception:
-                    pass
-            self._connection_error_msg = f"Failed to connect to {self.port}: {e}"
-            self.get_logger().warn(f"{self._connection_error_msg}. Will retry...")
+                usb_device = client.usb_device
+                self._stop_client(client)
+                # The port opened but initialization failed (e.g. configuration
+                # write timed out on a stalled link): count it as a link failure
+                # so that USB reset escalation also covers this case.
+                if usb_device is not None:
+                    self._consecutive_failures += 1
+                    self._last_link_error = str(e)
+                    self._maybe_reset_usb(usb_device)
 
     def _check_connection(self):
-        """Retry connection if not currently connected."""
-        if self.client is None:
+        """Supervise the serial link: detect failures, recover, or retry connecting."""
+        client = self.client
+        if client is None:
             self._try_connect()
+            return
+
+        problem = client.get_health_problem(self.serial_watchdog_timeout)
+        if problem is None:
+            if self._consecutive_failures and client.last_line_time is not None:
+                self.get_logger().info(
+                    f"UM982 link recovered after {self._consecutive_failures} failure(s)."
+                )
+                self._consecutive_failures = 0
+            return
+
+        self._handle_link_failure(client, problem)
+
+    def _handle_link_failure(self, client: ExtendedUM982Client, reason: str):
+        """Tear down a broken client; the next timer tick reconnects."""
+        self._consecutive_failures += 1
+        self._reconnect_count += 1
+        self._last_link_error = reason
+        self._connection_error_msg = (
+            f"UM982 link lost ({reason}); reconnecting "
+            f"(consecutive failures: {self._consecutive_failures})"
+        )
+        self.get_logger().error(f"{self._connection_error_msg}. Closing {self.port}...")
+
+        usb_device = client.usb_device
+        self.client = None
+        self._stop_client(client)
+        self._maybe_reset_usb(usb_device)
+
+    def _stop_client(self, client: ExtendedUM982Client):
+        """
+        Stop a client. If its threads cannot be stopped (e.g. stuck in a system
+        call), exit the process so that launch respawns a clean node.
+        """
+        try:
+            stopped = client.stop()
+        except Exception as e:
+            self.get_logger().warn(f"Error while stopping UM982 client: {e}")
+            stopped = True
+        if not stopped:
+            self.get_logger().fatal(
+                "UM982 client threads did not terminate; exiting so the node can be respawned."
+            )
+            raise SystemExit(1)
+
+    def _maybe_reset_usb(self, usb_device: Optional[UsbDeviceInfo]):
+        """Escalate to a USB port reset after repeated link failures."""
+        if not self.usb_reset_enabled or usb_device is None:
+            return
+        if self._consecutive_failures < self.usb_reset_after_failures:
+            return
+        now = time.monotonic()
+        if (self._last_usb_reset_time is not None
+                and now - self._last_usb_reset_time < self.usb_reset_min_interval):
+            self.get_logger().info(
+                f"Skipping USB reset of {usb_device.describe()}: last reset was "
+                f"{now - self._last_usb_reset_time:.0f}s ago "
+                f"(min interval {self.usb_reset_min_interval:.0f}s)."
+            )
+            return
+
+        self._last_usb_reset_time = now
+        self.get_logger().warn(
+            f"Resetting USB device {usb_device.describe()} after "
+            f"{self._consecutive_failures} consecutive link failures..."
+        )
+        try:
+            node = reset_usb_device(usb_device)
+            self._usb_reset_count += 1
+            self.get_logger().warn(f"USB reset of {node} succeeded; waiting for re-enumeration.")
+        except Exception as e:
+            self.get_logger().error(f"USB reset of {usb_device.describe()} failed: {e}")
 
     def _on_position_callback(self, pos: PositionData):
         """Called when a new primary antenna position/heading packet is parsed."""
@@ -325,7 +456,6 @@ class UM982Node(Node):
 
         with self._lock:
             self._last_pos = pos
-            self._last_rx_time = now
 
         now_msg = now.to_msg()
 
@@ -377,10 +507,6 @@ class UM982Node(Node):
         """Called when a new secondary/slave antenna position packet is parsed."""
         now = self.get_clock().now()
 
-        with self._lock:
-            self._last_sec_pos = pos
-            self._last_sec_rx_time = now
-
         if self.publish_secondary_fix and pos.is_valid:
             fix_msg = build_navsatfix_message(pos, self.secondary_frame_id, now.to_msg())
             self.fix_secondary_pub.publish(fix_msg)
@@ -429,136 +555,87 @@ class UM982Node(Node):
             return False
         return (time.time() - client.last_no_fix_time) <= max(self.diagnostic_timeout, 2.0)
 
+    def _link_problem(self, now: float) -> Optional[str]:
+        """Return why the UM982 cannot be communicated with, or None if data is flowing."""
+        client = self.client
+        if client is None:
+            return self._connection_error_msg or "not connected"
+        problem = client.get_health_problem(self.serial_watchdog_timeout)
+        if problem is not None:
+            return problem
+        if client.last_line_time is None:
+            return "waiting for first data"
+        age = now - client.last_line_time
+        if age > self.diagnostic_timeout:
+            return f"no data for {age:.1f}s"
+        return None
+
+    def _build_antenna_status(
+        self, name: str, secondary: bool, link_problem: Optional[str], now: float
+    ) -> DiagnosticStatus:
+        """Build the diagnostic status of one antenna (main and secondary share the same rules)."""
+        client = self.client
+        state = client.get_gga_state(secondary) if client else None
+        level, message = classify_antenna_status(
+            link_problem, state, now, self.diagnostic_timeout,
+            'GGAH' if secondary else 'GGA',
+        )
+        gga = state.gga if state else None
+        # Heading is measured by the antenna pair (latest HEADINGA)
+        pos = client.get_position() if client else None
+        no_fix_count = (client.secondary_no_fix_count if secondary else client.no_fix_count) if client else 0
+        line_age = now - client.last_line_time if client and client.last_line_time is not None else None
+
+        stat = DiagnosticStatus()
+        stat.name = name
+        stat.hardware_id = self.hardware_id
+        stat.level = level
+        stat.message = message
+        stat.values = [
+            KeyValue(key="RTK State", value=state.rtk_state if state else "N/A"),
+            KeyValue(key="Has Position", value=str(state.has_position if state else False)),
+            KeyValue(key="Satellites", value=_fmt(gga.num_sats if gga else None, "{}")),
+            KeyValue(key="HDOP", value=_fmt(gga.hdop if gga else None, "{:.2f}")),
+            KeyValue(key="Correction Age (s)", value=_fmt(gga.diff_age if gga else None, "{:.1f}")),
+            KeyValue(key="Latitude", value=_fmt(gga.lat if gga else None, "{:.8f}")),
+            KeyValue(key="Longitude", value=_fmt(gga.lon if gga else None, "{:.8f}")),
+            KeyValue(key="Altitude (m)", value=_fmt(gga.alt if gga else None, "{:.2f}")),
+            KeyValue(key="Heading (deg)", value=_fmt(pos.heading if pos else None, "{:.2f}")),
+            KeyValue(key="Heading StdDev (deg)", value=_fmt(pos.heading_stddev if pos else None, "{:.3f}")),
+            KeyValue(key="Pitch (deg)", value=_fmt(pos.pitch if pos else None, "{:.2f}")),
+            KeyValue(key="Pitch StdDev (deg)", value=_fmt(pos.pitch_stddev if pos else None, "{:.3f}")),
+            KeyValue(key="Baseline (m)", value=_fmt(pos.baseline_m if pos else None, "{:.3f}")),
+            KeyValue(key="No Fix Count", value=str(no_fix_count)),
+            KeyValue(key="Last GGA Age (s)", value=_fmt(now - state.time if state else None, "{:.2f}")),
+            KeyValue(key="Last Line Age (s)", value=_fmt(line_age, "{:.2f}")),
+            KeyValue(key="Serial Reconnects", value=str(self._reconnect_count)),
+            KeyValue(key="USB Resets", value=str(self._usb_reset_count)),
+            KeyValue(key="Last Link Error", value=str(self._last_link_error or "None")),
+        ]
+        return stat
+
     def _publish_diagnostics(self):
         """Periodically publish diagnostics compatible with cub_diagnostics."""
-        now = self.get_clock().now()
-        now_msg = now.to_msg()
-
-        with self._lock:
-            pos = self._last_pos
-            last_rx = self._last_rx_time
-            sec_pos = self._last_sec_pos
-            last_sec_rx = self._last_sec_rx_time
-
-        time_since_rx = (
-            (now - last_rx).nanoseconds / 1e9 if last_rx is not None else 999.0
-        )
-        time_since_sec_rx = (
-            (now - last_sec_rx).nanoseconds / 1e9 if last_sec_rx is not None else 999.0
-        )
-
+        now = time.monotonic()
         diag_array = DiagnosticArray()
-        diag_array.header.stamp = now_msg
+        diag_array.header.stamp = self.get_clock().now().to_msg()
 
         # ----------------------------------------------------
-        # 1. Receiver & Positioning Diagnostics
+        # 1. Antenna Diagnostics (main / secondary use the same rules)
         # ----------------------------------------------------
-        stat = DiagnosticStatus()
-        stat.name = self.diagnostic_status_name
-        stat.hardware_id = self.hardware_id
-
-        if self._connection_error_msg is not None:
-            stat.level = DiagnosticStatus.ERROR
-            stat.message = self._connection_error_msg
-        elif pos is None or time_since_rx > self.diagnostic_timeout:
-            stat.level = DiagnosticStatus.ERROR
-            if self._receiver_has_no_fix():
-                stat.message = (
-                    "Receiver has no position fix (empty GGA). "
-                    "Check antenna sky view / cabling"
-                )
-            else:
-                stat.message = f"No data from UM982 (timeout: {time_since_rx:.1f}s)"
-        elif not pos.is_valid and self._receiver_has_no_fix():
-            stat.level = DiagnosticStatus.WARN
-            stat.message = "Primary antenna has no position fix; check sky view / cabling"
-        else:
-            if pos.rtk_state == 'rtk_fix':
-                stat.level = DiagnosticStatus.OK
-                stat.message = "RTK Fix acquired (cm-level)"
-            elif pos.rtk_state == 'rtk_float':
-                stat.level = DiagnosticStatus.WARN
-                stat.message = "RTK Float solution (dm-level)"
-            elif pos.rtk_state == 'dgps':
-                stat.level = DiagnosticStatus.WARN
-                stat.message = "DGPS solution"
-            elif pos.rtk_state == 'standalone':
-                stat.level = DiagnosticStatus.WARN
-                stat.message = "Single point positioning"
-            else:
-                stat.level = DiagnosticStatus.ERROR
-                stat.message = f"Invalid/Unknown fix state: {pos.rtk_state}"
-
-        stat.values = [
-            KeyValue(key="RTK State", value=str(pos.rtk_state if pos else "NO_DATA")),
-            KeyValue(key="Is RTK Fix", value=str(pos.is_rtk_fix if pos else False)),
-            KeyValue(key="Is Valid", value=str(pos.is_valid if pos else False)),
-            KeyValue(key="Satellites", value=str(pos.num_sats if pos and pos.num_sats is not None else 0)),
-            KeyValue(key="HDOP", value=f"{pos.hdop:.2f}" if pos and pos.hdop is not None else "N/A"),
-            KeyValue(key="Correction Age (s)", value=f"{pos.diff_age:.1f}" if pos and pos.diff_age is not None else "N/A"),
-            KeyValue(key="Baseline (m)", value=f"{pos.baseline_m:.3f}" if pos and pos.baseline_m is not None else "N/A"),
-            KeyValue(key="Heading (deg)", value=f"{pos.heading:.2f}" if pos and pos.heading is not None else "N/A"),
-            KeyValue(key="Heading StdDev (deg)", value=f"{pos.heading_stddev:.3f}" if pos and pos.heading_stddev is not None else "N/A"),
-            KeyValue(key="Pitch (deg)", value=f"{pos.pitch:.2f}" if pos and pos.pitch is not None else "N/A"),
-            KeyValue(key="Pitch StdDev (deg)", value=f"{pos.pitch_stddev:.3f}" if pos and pos.pitch_stddev is not None else "N/A"),
-            KeyValue(key="Primary Latitude", value=f"{pos.lat:.8f}" if pos and pos.lat is not None else "N/A"),
-            KeyValue(key="Primary Longitude", value=f"{pos.lon:.8f}" if pos and pos.lon is not None else "N/A"),
-            KeyValue(key="Primary Altitude (m)", value=f"{pos.alt:.2f}" if pos and pos.alt is not None else "N/A"),
-            KeyValue(key="Secondary Satellites", value=str(sec_pos.num_sats if sec_pos and sec_pos.num_sats is not None else "N/A")),
-            KeyValue(key="Secondary RTK State", value=str(sec_pos.rtk_state if sec_pos else "N/A")),
-            KeyValue(key="Secondary Latitude", value=f"{sec_pos.lat:.8f}" if sec_pos and sec_pos.lat is not None else "N/A"),
-            KeyValue(key="Secondary Longitude", value=f"{sec_pos.lon:.8f}" if sec_pos and sec_pos.lon is not None else "N/A"),
-            KeyValue(key="Secondary Time Since (s)", value=f"{time_since_sec_rx:.1f}"),
-            KeyValue(key="Speed (m/s)", value=f"{pos.speed_mps:.2f}" if pos and pos.speed_mps is not None else "N/A"),
-            KeyValue(key="Time since last data (s)", value=f"{time_since_rx:.2f}"),
-        ]
-        diag_array.status.append(stat)
-
+        link_problem = self._link_problem(now)
+        diag_array.status.append(self._build_antenna_status(
+            f"{self.diagnostic_name_prefix} Main Antenna", False, link_problem, now))
         if self.publish_secondary_fix:
-            secondary_stat = DiagnosticStatus()
-            secondary_stat.name = f'{self.diagnostic_status_name} Secondary Antenna'
-            secondary_stat.hardware_id = self.hardware_id
-            client = self.client
-            no_fix_time = client.last_secondary_no_fix_time if client else None
-            recent_no_fix = (
-                no_fix_time is not None
-                and time.time() - no_fix_time <= max(self.diagnostic_timeout, 2.0)
-            )
-            if recent_no_fix and (sec_pos is None or not sec_pos.is_valid
-                                  or time_since_sec_rx > self.diagnostic_timeout):
-                secondary_stat.level = DiagnosticStatus.WARN
-                secondary_stat.message = (
-                    'Secondary antenna data received, but no position fix; '
-                    'check sky view / cabling'
-                )
-            elif sec_pos is None or time_since_sec_rx > self.diagnostic_timeout:
-                secondary_stat.level = DiagnosticStatus.ERROR
-                secondary_stat.message = (
-                    'No secondary antenna data (GGAH timeout); '
-                    'enable GPGGAH output on the connected port'
-                )
-            elif not sec_pos.is_valid:
-                secondary_stat.level = DiagnosticStatus.WARN
-                secondary_stat.message = 'Secondary antenna has no position fix'
-            else:
-                secondary_stat.level = (
-                    DiagnosticStatus.OK if sec_pos.is_rtk_fix else DiagnosticStatus.WARN
-                )
-                secondary_stat.message = f'Secondary antenna: {sec_pos.rtk_state}'
-            secondary_stat.values = [
-                KeyValue(key='RTK State', value=str(sec_pos.rtk_state if sec_pos else 'NO_DATA')),
-                KeyValue(key='Satellites', value=str(sec_pos.num_sats if sec_pos else 'N/A')),
-                KeyValue(key='Time since last data (s)', value=f'{time_since_sec_rx:.2f}'),
-                KeyValue(key='No Fix Count', value=str(client.secondary_no_fix_count if client else 0)),
-            ]
-            diag_array.status.append(secondary_stat)
+            diag_array.status.append(self._build_antenna_status(
+                f"{self.diagnostic_name_prefix} Secondary Antenna", True, link_problem, now))
 
         # ----------------------------------------------------
         # 2. NTRIP & RTCM Diagnostics (if enabled)
         # ----------------------------------------------------
         if self.enable_ntrip and self.client:
             ntrip_stat = DiagnosticStatus()
-            ntrip_stat.name = "UM982 NTRIP"
+            ntrip_stat.name = f"{self.diagnostic_name_prefix} NTRIP"
             ntrip_stat.hardware_id = self.hardware_id
 
             stats = self.client.get_ntrip_stats()

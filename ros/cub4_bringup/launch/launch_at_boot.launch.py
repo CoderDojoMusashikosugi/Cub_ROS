@@ -123,6 +123,9 @@ def generate_launch_description():
         name='um982_node',
         output='screen',
         parameters = [um982_params_file],
+        # シリアル処理のスレッドが止められない場合はノードが終了するので再起動する
+        respawn=True,
+        respawn_delay=3.0,
     )
 
     # LIDARのGroupAction

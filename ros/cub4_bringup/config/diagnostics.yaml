@@ -3,26 +3,7 @@ topic_hz_checker:
     hardware_id: cub4
     update_period: 1.0
     topics:
-      fix:
-        topic: "/um982_node/fix"
-        type: "sensor_msgs/msg/NavSatFix"
-        expected_hz: 10.0
-        tolerance: 0.2
-        window_size: 10
-        qos:
-          reliability: best_effort
-          durability: volatile
-          depth: 100
-      fix_secondary:
-        topic: "/um982_node/fix_secondary"
-        type: "sensor_msgs/msg/NavSatFix"
-        expected_hz: 10.0
-        tolerance: 0.2
-        window_size: 10
-        qos:
-          reliability: best_effort
-          durability: volatile
-          depth: 100
+      # UM982 (/um982_node/fix, fix_secondary) は um982_node 自身の diagnostics で監視する
       imu:
         topic: "/imu/data_raw"
         type: "sensor_msgs/msg/Imu"
@@ -43,6 +24,16 @@ topic_hz_checker:
           reliability: best_effort
           durability: volatile
           depth: 100
+      dial:
+        topic: "/dial/button"
+        type: "std_msgs/msg/Bool"
+        expected_hz: 10.0
+        tolerance: 0.2
+        window_size: 10
+        qos:
+          reliability: best_effort
+          durability: volatile
+          depth: 10
       # realsense:
       #   topic: "/camera/camera/color/camera_info"
       #   type: "sensor_msgs/msg/CameraInfo"
@@ -151,6 +142,16 @@ diagnostic_aggregator:
             regex: [
               "^ublox_gps_node: fix$" # これならfixだけ取れる
             ]
+          gnss:
+            type: diagnostic_aggregator/GenericAnalyzer
+            path: GNSS
+            startswith: ["UM982"]
+            # 一度も受信していなくても STALE として表示する（um982_node 未起動の検出）
+            expected: [
+              "UM982 Main Antenna",
+              "UM982 Secondary Antenna",
+            ]
+            timeout: 5.0  # この秒数更新がなければ STALE（um982_node 停止の検出）
           linux:
             type: diagnostic_aggregator/GenericAnalyzer
             path: Linux

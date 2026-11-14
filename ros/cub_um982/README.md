@@ -7,7 +7,7 @@ Unicore UM982 デュアルアンテナ GNSS 受信機用 ROS 2 ドライバパ�
 - **デュアルアンテナ姿勢出力**: 角度情報（Heading / Pitch）を `geometry_msgs/msg/PoseWithCovarianceStamped` でパブリッシュ（REP-103 ENU 準拠、標準偏差に基づく分散付き）。
 - **RTK 測位**: NTRIP クライアントを内包し、単独測位から RTK Float / RTK Fix までのステータスを判別。
 - **NavSatFix 出力**: `sensor_msgs/msg/NavSatFix` で経緯度・高度をパブリッシュ。
-- **cub_diagnostics 連携**: `/diagnostics` に `UM982 Status` をパブリッシュし、RTK 状態（Fix/Float/Standalone/Timeout）や衛星数、精度指標を監視可能。
+- **cub_diagnostics 連携**: `/diagnostics` に主・副アンテナそれぞれのステータス（`UM982 Main Antenna` / `UM982 Secondary Antenna`）と `UM982 NTRIP` をパブリッシュし、通信状態・RTK 状態や衛星数、精度指標を監視可能。
 
 ---
 
@@ -31,6 +31,25 @@ Unicore UM982 デュアルアンテナ GNSS 受信機用 ROS 2 ドライバパ�
 - `output_rate`: 出力レート Hz (デフォルト: `10`)
 - `configure_on_start`: 起動時に受信機へ設定コマンドを自動送信するか (デフォルト: `true`)
 - `enable_rmc`: RMC センテンス出力を有効にするか (デフォルト: `false`)
+- `write_timeout`: シリアル書き込みのタイムアウト秒。`0` で無制限 (デフォルト: `1.0`)
+
+### シリアル接続の自動復旧
+- `serial_watchdog_timeout`: この秒数だけ受信が途絶えたら接続異常とみなして再接続する。`0` で無効 (デフォルト: `5.0`)
+- `usb_reset_enabled`: 再接続を繰り返しても復旧しない場合に USB リセットを行うか (デフォルト: `true`)
+- `usb_reset_after_failures`: USB リセットを行うまでの連続失敗回数 (デフォルト: `2`)
+- `usb_reset_min_interval`: USB リセットの最小間隔秒 (デフォルト: `30.0`)
+
+ノードは 2 秒ごとに次の異常を監視し、検出したらポートを閉じて `port` を開き直します。
+
+- シリアルの読み書きでエラーが発生した（USB の抜けなどによる `EIO`、書き込みタイムアウトなど）
+- `serial_watchdog_timeout` の間、受信機から 1 行も届かない（USB-シリアル変換の STALL など、エラーにならない停止）
+
+`usb_reset_after_failures` 回続けて復旧しない場合、開いていた tty の USB デバイス（UM982 では CH340）だけを `USBDEVFS_RESET` でリセットします。
+同じハブの他のデバイスには影響しません。ハブ自体や、開いた時と ID が異なるデバイスはリセットしません。
+リセット後は tty が作り直されるため、`port` には udev のシンボリックリンク（`/dev/ttyUM982`）を指定してください。
+
+シリアル処理のスレッドが停止できない場合はノードを終了し、launch の `respawn` で再起動します。
+再接続回数・USB リセット回数・最後のエラーは `/diagnostics` の各アンテナのステータスに出力されます。
 
 ### NTRIP / RTK 設定
 - `enable_ntrip`: NTRIP 補正を有効にするか (デフォルト: `false`)
@@ -52,7 +71,18 @@ Unicore UM982 デュアルアンテナ GNSS 受信機用 ROS 2 ドライバパ�
 - `hardware_id`: ハードウェア ID (デフォルト: `um982`)
 - `diagnostic_update_period`: パブリッシュ周期 (デフォルト: `1.0` 秒)
 - `diagnostic_timeout`: データ途絶判定タイムアウト (デフォルト: `2.0` 秒)
-- `diagnostic_status_name`: ステータス名 (デフォルト: `"UM982 Status"`)
+- `diagnostic_name_prefix`: ステータス名の接頭辞。`<prefix> Main Antenna` / `<prefix> Secondary Antenna` / `<prefix> NTRIP` になる (デフォルト: `"UM982"`)
+
+### Diagnostics のレベル
+
+主アンテナ（GGA）と副アンテナ（GGAH）は同じ規則で、別々のステータスとして判定します。
+
+| レベル | 状態 |
+|---|---|
+| STALE | UM982 と通信できない（未接続・再接続中・`diagnostic_timeout` 秒受信なし）。ノード未起動時は aggregator の `expected` / `timeout` で STALE になる |
+| ERROR | 通信はできているが、GGA/GGAH が `diagnostic_timeout` 秒届かない（出力設定の問題）、または座標が取れていない（衛星を捕捉していても未測位なら ERROR） |
+| WARN | 座標は取れているが RTK Fix ではない（単独測位・DGPS・RTK Float など） |
+| OK | RTK Fix |
 
 ---
 
@@ -99,8 +129,8 @@ Unicore UM982 デュアルアンテナ GNSS 受信機用 ROS 2 ドライバパ�
 ```
 
 屋内などで未測位の場合、`$GNGGAH` を受信していても緯度・経度が空欄になるため、
-`fix_secondary` は配信されません。`/diagnostics` の `UM982 Status Secondary Antenna`
-で「データを受信したが未測位（WARN）」と「GGAH が届いていない（ERROR）」を確認できます。
+`fix_secondary` は配信されません。`/diagnostics` の `UM982 Secondary Antenna` のメッセージで
+「未測位（No position fix）」と「GGAH が届いていない（No GGAH output）」を区別できます（どちらも ERROR）。
 衛星数0・測位品質0は未測位です。方位も `SOL_COMPUTED` の解が成立した場合のみ配信します。
 
 起動時には接続中のポートへ `GPGGA 0.1`、`GPGGAH 0.1`、`HEADINGA 0.1` などを送信します
@@ -112,7 +142,8 @@ Unicore UM982 デュアルアンテナ GNSS 受信機用 ROS 2 ドライバパ�
 
 ## cub_diagnostics との連携
 
-`cub_diagnostics/config/example.yaml` などの `diagnostic_aggregator` 設定に以下のように追加することで、Sensors グループに UM982 のステータスが集約されます:
+`diagnostic_aggregator` 設定に以下のように追加することで、GNSS グループに UM982 のステータスが集約されます（`cub4_bringup/config/diagnostics.yaml` で設定済み）。
+`expected` によりノード未起動時も STALE として表示され、`timeout` 秒更新がないと STALE になります:
 
 ```yaml
 diagnostic_aggregator:
@@ -122,14 +153,15 @@ diagnostic_aggregator:
         type: diagnostic_aggregator/AnalyzerGroup
         path: Robot
         analyzers:
-          sensors:
+          gnss:
             type: diagnostic_aggregator/GenericAnalyzer
-            path: Sensors
-            contains: [
-              "TopicMonitor",
-              "GPS Fix Status",
-              "UM982 Status",   # ← これを追加
+            path: GNSS
+            startswith: ["UM982"]
+            expected: [
+              "UM982 Main Antenna",
+              "UM982 Secondary Antenna",
             ]
+            timeout: 5.0
 ```
 
 ## UM982の設定
