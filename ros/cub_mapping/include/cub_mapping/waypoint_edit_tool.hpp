@@ -17,18 +17,15 @@
 #include <rviz_common/viewport_mouse_event.hpp>
 #include <rviz_common/render_panel.hpp>
 #include <rviz_common/properties/float_property.hpp>
-#include <rviz_common/properties/enum_property.hpp>
-#include <rviz_common/properties/string_property.hpp>
 #include <rviz_common/properties/color_property.hpp>
-#include <rviz_common/properties/bool_property.hpp>
 #include <rviz_rendering/objects/arrow.hpp>
+#include <std_msgs/msg/int32.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
 
 #include "cub_mapping/srv/add_waypoint.hpp"
-#include "cub_mapping/srv/create_group.hpp"
 #include "cub_mapping/srv/delete_waypoint.hpp"
-#include "cub_mapping/srv/get_group_list.hpp"
 #include "cub_mapping/srv/insert_waypoint.hpp"
+#include "cub_mapping/srv/move_waypoint.hpp"
 
 #include <OgreVector3.h>
 
@@ -40,15 +37,28 @@ class SceneNode;
 namespace cub_mapping
 {
 
+/// Topic on which the Waypoint Editor panel publishes the target group index
+constexpr char kCurrentGroupTopic[] = "waypoint_editor/current_group";
+
 /**
  * @brief RViz2 tool for interactive waypoint editing
  *
  * This tool allows users to place and edit waypoints for navigation:
  * - Mouse movement: Position the waypoint cursor
+ *   (existing waypoint under the cursor is highlighted)
  * - Mouse scroll: Adjust waypoint orientation (yaw)
- * - Left click: Place waypoint at end of current group
+ * - Left click on empty space: Place waypoint at end of current group
  * - Shift + Left click: Insert waypoint after nearest existing waypoint
+ * - Left drag on a waypoint: Move it (right click while dragging cancels)
+ * - Right click on a waypoint: Delete it
  * - Press 'w' to activate tool
+ *
+ * The target group for add/insert is selected in the Waypoint Editor panel
+ * (received on kCurrentGroupTopic).
+ *
+ * The tool is modeless and uses no keyboard bindings, because letter keys
+ * collide with other RViz tools' shortcuts and Esc always returns to the
+ * default tool.
  */
 class WaypointEditTool : public rviz_common::Tool
 {
@@ -67,22 +77,14 @@ public:
 
 private Q_SLOTS:
   void updateProperties();
-  void updateCurrentGroup();
 
 private:
-  // Editing modes
-  enum EditMode {
-    MODE_ADD_WAYPOINT,    // Default: Click to add waypoints
-    MODE_DELETE_WAYPOINT, // Click to delete waypoint
-    MODE_SELECT,          // Click to select waypoint
-    MODE_MOVE_POSITION,   // Drag to move waypoint
-    MODE_ROTATE_ORIENTATION  // Drag/scroll to rotate waypoint
-  };
-
   // Visualization methods
   void createVisualization();
   void destroyVisualization();
   void updatePreviewArrow();
+  void setPreviewArrowPose(const Ogre::Vector3 & position, float yaw, bool highlight);
+  void setPreviewVisible(bool visible);
 
   // Interaction helpers
   bool getGroundPlaneIntersection(
@@ -92,9 +94,11 @@ private:
   // Service communication
   void addWaypointToCurrentGroup();
   void insertWaypointAfterNearest();
-  void deleteWaypointAtPosition(const Ogre::Vector3 & position);
-  void requestGroupList();
-  void updateGroupList();
+  void deleteWaypoint(int group_idx, int wp_idx);
+  void updateHover();
+  void startDrag(int group_idx, int wp_idx);
+  void finishDrag(const Ogre::Vector3 & position);
+  void cancelDrag();
 
   // Helper to find nearest waypoint
   bool findNearestWaypoint(
@@ -114,15 +118,15 @@ private:
   rclcpp::Client<srv::AddWaypoint>::SharedPtr add_waypoint_client_;
   rclcpp::Client<srv::InsertWaypoint>::SharedPtr insert_waypoint_client_;
   rclcpp::Client<srv::DeleteWaypoint>::SharedPtr delete_waypoint_client_;
-  rclcpp::Client<srv::CreateGroup>::SharedPtr create_group_client_;
-  rclcpp::Client<srv::GetGroupList>::SharedPtr get_group_list_client_;
+  rclcpp::Client<srv::MoveWaypoint>::SharedPtr move_waypoint_client_;
 
   // Subscriber for waypoint visualization
   rclcpp::Subscription<visualization_msgs::msg::MarkerArray>::SharedPtr
     waypoint_markers_sub_;
+  // Subscriber for target group selected in the Waypoint Editor panel
+  rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr current_group_sub_;
 
   // Interaction state
-  EditMode current_mode_;
   Ogre::Vector3 cursor_position_;
   float preview_yaw_;
   int current_group_index_;
@@ -132,6 +136,7 @@ private:
     int group_index;
     int waypoint_index;
     Ogre::Vector3 position;
+    float yaw;
   };
   std::vector<WaypointMarkerData> waypoint_positions_;
 
@@ -140,18 +145,31 @@ private:
   std::unique_ptr<rviz_rendering::Arrow> preview_arrow_;
 
   // Properties (appear in RViz Tool Properties panel)
-  rviz_common::properties::EnumProperty * edit_mode_property_;
-  rviz_common::properties::EnumProperty * group_selection_property_;
   rviz_common::properties::FloatProperty * default_yaw_property_;
-  rviz_common::properties::StringProperty * waypoint_file_property_;
   rviz_common::properties::ColorProperty * preview_color_property_;
+  rviz_common::properties::ColorProperty * highlight_color_property_;
   rviz_common::properties::FloatProperty * arrow_scale_property_;
 
   // State
   bool active_;
   bool preview_visible_;
-  bool group_list_initialized_;
-  size_t last_known_group_count_;
+
+  // Drag state (Move Position mode)
+  bool dragging_;
+  int drag_group_index_;
+  int drag_waypoint_index_;
+  float drag_yaw_;
+  bool drag_moved_;
+  Ogre::Vector3 drag_start_position_;
+
+  // Waypoint currently under the cursor (-1 if none)
+  int hover_group_index_;
+  int hover_waypoint_index_;
+
+  // Pick radius for hovering / dragging / deleting existing waypoints [m]
+  static constexpr float kPickRadius = 0.5f;
+  // Minimum cursor travel to treat a press as a drag [m]
+  static constexpr float kDragThreshold = 0.05f;
 };
 
 }  // namespace cub_mapping

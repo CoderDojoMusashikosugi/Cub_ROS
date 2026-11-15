@@ -1,5 +1,8 @@
 # Request: Empty
 ---
-# Response: List of group names
+# Response: List of groups and editor state
 string[] group_names
 bool[] require_input_flags
+int32[] waypoint_counts     # Number of waypoints in each group
+string file_path            # Current waypoint YAML file path (empty = none)
+bool modified               # True if there are unsaved changes

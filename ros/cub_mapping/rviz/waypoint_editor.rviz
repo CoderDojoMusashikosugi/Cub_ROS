@@ -19,6 +19,8 @@ Panels:
       - /Current View1
     Name: Views
     Splitter Ratio: 0.5
+  - Class: cub_mapping/WaypointEditorPanel
+    Name: WaypointEditorPanel
 Visualization Manager:
   Class: ""
   Displays:
@@ -147,11 +149,9 @@ Visualization Manager:
         Value: /clicked_point
     - Class: cub_mapping/WaypointEditTool
       Arrow Scale: 0.5
-      Current Group: Group 0
       Default Yaw: 0.0
-      Edit Mode: Add Waypoint
+      Highlight Color: 255; 140; 0
       Preview Color: 0; 255; 255
-      Waypoint File: ""
   Transformation:
     Current:
       Class: rviz_default_plugins/TF

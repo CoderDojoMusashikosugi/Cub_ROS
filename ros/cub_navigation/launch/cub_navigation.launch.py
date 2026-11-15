@@ -106,7 +106,7 @@ def generate_launch_description():
 
     waypoints_dir = LaunchConfiguration(
         'waypoints',
-        default="/home/cub/colcon_ws/src/cub/cub_behavior_tree/routes/kakunin.yaml")
+        default="/home/cub/colcon_ws/src/cub/cub_behavior_tree/routes/tc26_1017_all.yaml")
 
     return LaunchDescription([
         DeclareLaunchArgument(

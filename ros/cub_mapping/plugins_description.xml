@@ -13,8 +13,18 @@
          base_class_type="rviz_common::Tool">
     <description>
       Interactive tool for creating and editing navigation waypoints.
-      Press 'w' to activate. Move mouse to position waypoint, scroll wheel to adjust orientation.
-      Left-click to place waypoint. Press 'a' for Add mode, 's' for Select, 'm' for Move, 'r' for Rotate.
+      Press 'w' to activate. Scroll wheel to adjust orientation.
+      Left-click to add, Shift+left-click to insert after nearest,
+      left-drag a waypoint to move it, right-click a waypoint to delete it.
+      Use together with the WaypointEditorPanel to select the target group.
+    </description>
+  </class>
+  <class name="cub_mapping/WaypointEditorPanel"
+         type="cub_mapping::WaypointEditorPanel"
+         base_class_type="rviz_common::Panel">
+    <description>
+      Panel for managing waypoint groups (create / rename / delete / require_input),
+      selecting the target group of WaypointEditTool, and saving / loading waypoint files.
     </description>
   </class>
 </library>

@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 
-# 地図の保存には ros2 service call /save_waypoints std_srvs/srv/Trigger
-# グループ作成には ros2 service call /create_group cub_mapping/srv/CreateGroup '{group_name: \"Test Path\", require_input: false}'
+# グループ作成・保存・読み込みは RViz の WaypointEditorPanel から行える。
+# CLIの場合:
+#   ros2 service call /save_waypoints std_srvs/srv/Trigger
+#   ros2 service call /create_group cub_mapping/srv/CreateGroup "{group_name: 'Test Path', require_input: false}"
 
 import os
 from ament_index_python.packages import get_package_share_directory
@@ -16,19 +18,19 @@ def generate_launch_description():
     # Launch arguments
     waypoint_file_arg = DeclareLaunchArgument(
         'waypoint_file',
-        default_value='/home/cub/colcon_ws/src/cub/cub_behavior_tree/routes/furo_waypoints.yaml',
+        default_value='/home/cub/colcon_ws/src/cub/cub_behavior_tree/routes/tc26_1017_all.yaml',
         description='Path to waypoint YAML file to load (empty = no auto-load)'
     )
 
     map_file_arg = DeclareLaunchArgument(
         'map_file',
-        default_value='/home/cub/maps/20251126_123706/map.yaml',
+        default_value='/home/cub/maps/1017_02/map.yaml',
         description='Path to 2D map YAML file for nav2 map_server (empty = no map)'
     )
 
     pcd_file_arg = DeclareLaunchArgument(
         'pcd_file',
-        default_value='/home/cub/maps/map_tc25_gnss_0_3.pcd',
+        default_value='/home/cub/maps/1017_02/1017_mid360_0_1.pcd',
         description='Optional: Path to PCD file for 3D visualization'
     )
 
