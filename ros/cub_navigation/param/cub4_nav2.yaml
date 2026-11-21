@@ -490,19 +490,79 @@ controller_server_rclcpp_node:
   ros__parameters:
     use_sim_time: False
 
-collision_monitor:
+# collision_monitorは2段構成にしている。
+#   velocity_smoother -> cmd_vel_smoothed -> collision_monitor_limit -> cmd_vel_limited -> collision_monitor -> cmd_vel
+# 停止ポリゴンは制限後の(実際に出る)速度で決定出来るようにしている。
+collision_monitor_limit:
   ros__parameters:
     use_sim_time: False
     base_frame_id: "base_link"
     odom_frame_id: "odom"
     cmd_vel_in_topic: "cmd_vel_smoothed"
+    cmd_vel_out_topic: "cmd_vel_limited"
+    state_topic: "collision_monitor_limit_state"
+    transform_tolerance: 0.5
+    source_timeout: 0.0
+    base_shift_correction: True
+    stop_pub_timeout: 2.0
+    polygons: ["LimitNear", "LimitMid", "LimitFar"]
+    LimitFar:          # 遠め: 弱い制限
+      type: "polygon"
+      action_type: "limit"
+      points: "[[3.0, 0.20], [3.0, -0.20], [-0.30, -0.60], [-0.30, 0.60]]"
+      linear_limit: 0.8    # [m/s]
+      angular_limit: 6.28   # [rad/s]
+      min_points: 6
+      visualize: True
+      enabled: True
+      polygon_pub_topic: "polygon_slow_far"
+    LimitMid:         # 近め: 強い制限
+      type: "polygon"
+      action_type: "limit"
+      points: "[[1.5, 0.60], [1.5, -0.60], [-0.30, -0.60], [-0.30, 0.60]]"
+      linear_limit: 0.5    # [m/s]
+      angular_limit: 6.28   # [rad/s]
+      min_points: 6
+      visualize: True
+      enabled: True
+      polygon_pub_topic: "polygon_slow_mid"
+    LimitNear:         # 近め: 強い制限
+      type: "polygon"
+      action_type: "limit"
+      points: "[[0.6, 0.34], [0.6, -0.34], [-0.3, -0.34], [-0.3, 0.34]]"
+      linear_limit: 0.19    # [m/s]
+      angular_limit: 6.28   # [rad/s]
+      min_points: 6
+      visualize: True
+      enabled: True
+      polygon_pub_topic: "polygon_slow_near"
+    observation_sources: ["scan", "scan_livox"]
+    scan:
+      type: "scan"
+      topic: "/scan"
+      min_height: 0.15
+      max_height: 2.0
+      enabled: True
+    scan_livox:
+      type: "scan"
+      topic: "/scan_livox"
+      min_height: 0.15
+      max_height: 2.0
+      enabled: True
+# 停止を担当する後段
+collision_monitor:
+  ros__parameters:
+    use_sim_time: False
+    base_frame_id: "base_link"
+    odom_frame_id: "odom"
+    cmd_vel_in_topic: "cmd_vel_limited"
     cmd_vel_out_topic: "cmd_vel"
     state_topic: "collision_monitor_state"
     transform_tolerance: 0.5
     source_timeout: 0.0
     base_shift_correction: True
     stop_pub_timeout: 2.0
-    polygons: ["VelocityPolygonStop", "LimitNear", "LimitFar"]
+    polygons: ["VelocityPolygonStop"]
     VelocityPolygonStop:
       type: "velocity_polygon"
       action_type: "stop"
@@ -548,27 +608,6 @@ collision_monitor:
         linear_max: 1.0
         theta_min: -2.0
         theta_max: 2.0
-    # 障害物との距離に応じた段階的な速度制限。全polygonのうち最も遅くなるものが採用される。
-    LimitFar:          # 遠め: 弱い制限
-      type: "polygon"
-      action_type: "limit"
-      points: "[[3.0, 0.20], [3.0, -0.20], [-0.30, -0.60], [-0.30, 0.60]]"
-      linear_limit: 0.8    # [m/s]
-      angular_limit: 6.28   # [rad/s]
-      min_points: 6
-      visualize: True
-      enabled: True
-      polygon_pub_topic: "polygon_slow_far"
-    LimitNear:         # 近め: 強い制限 (TODO: 一旦LimitFarと同じ領域。調整時に狭める)
-      type: "polygon"
-      action_type: "limit"
-      points: "[[1.5, 0.60], [1.5, -0.60], [-0.30, -0.60], [-0.30, 0.60]]"
-      linear_limit: 0.5    # [m/s]
-      angular_limit: 6.28   # [rad/s]
-      min_points: 6
-      visualize: True
-      enabled: True
-      polygon_pub_topic: "polygon_slow_near"
     observation_sources: ["scan", "scan_livox"]
     scan:
       type: "scan"
