@@ -19,7 +19,7 @@ def generate_launch_description():
         package='micro_ros_agent',
         executable='micro_ros_agent',
         name='micro_ros_agent_wheel',
-        arguments=["serial", "--dev", "/dev/ttyATOM", "-b", "115200", "-v6"]
+        arguments=["serial", "--dev", "/dev/ttyATOM", "-b", "115200", "-v2"]
     )
 
     # M5Dial: USB NCM上のUDPで接続。シリアル用Agentとは別プロセス。
