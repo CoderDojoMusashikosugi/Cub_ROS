@@ -20,6 +20,10 @@ USBのGET_STATUS要求への応答と、ハブのポート状態を見てリセ�
 
 IMUのリセットで直らない場合(受信が戻らない、または再認識されない)は、ハブのリセットへ進む。
 ハブのリセットでは、同じハブに繋がる他の機器も一瞬切断される。
+
+first_reset='hub' にすると、上の表で「IMUをリセット」になる場合も、最初からハブをリセットする。
+CP2102N単体のUSBリセットの後に、CP2102NがUSBの要求に応答しなくなる例があったため。
+ただし、ハブにIMU以外の機器が繋がっている場合は、それらを巻き込まないようにIMUのリセットから始める。
 /imu/data_rawの配信者(spresense_imu_node)がいない間は、ノードが止まっているだけなのでリセットしない。
 
 コンテナ内(privileged, パスワード無しsudo)で動かす前提。
@@ -150,27 +154,33 @@ def port_number(usb_device):
         return None
 
 
-def full_speed_siblings(hub_device, exclude):
-    """ハブ直下のフルスピード/ロースピード機器(=ハブのTTを経由する機器)のsysfsパス一覧。"""
+def hub_children(hub_device, exclude):
+    """ハブ直下に繋がっているUSB機器(速度を問わない)のsysfsパス一覧。excludeは除く。"""
     hub_name = os.path.basename(hub_device)
-    siblings = []
+    children = []
     for path in sorted(glob.glob(os.path.join(hub_device, f'{hub_name}.*'))):
         name = os.path.basename(path)
         if ':' in name or path == exclude:
             continue
-        if read_text(os.path.join(path, 'speed')) in ('1.5', '12'):
-            siblings.append(path)
-    return siblings
+        children.append(path)
+    return children
+
+
+def full_speed_siblings(hub_device, exclude):
+    """ハブ直下のフルスピード/ロースピード機器(=ハブのTTを経由する機器)のsysfsパス一覧。"""
+    return [path for path in hub_children(hub_device, exclude)
+            if read_text(os.path.join(path, 'speed')) in ('1.5', '12')]
 
 
 def choose_action(imu_present, imu_ok, hub_ok, sibling_results, port_connected, last_action,
-                  hub_reset_enabled):
+                  hub_reset_enabled, prefer_hub=False):
     """リセット対象を決める。戻り値は ('imu'|'hub'|'none', 理由)。
 
     imu_present は、IMUがUSB機器として認識されているか。
     imu_ok/hub_ok/sibling_results の各値は usb_probe() の結果 (True/False/None)。
     port_connected は hub_port_connected() の結果 (True/False/None)。IMUが認識されている間は使わない。
     last_action は、前回のリセットで復旧しなかった場合のその対象 ('imu'|'hub'|None)。
+    prefer_hub が True なら、IMUのリセットの代わりに最初からハブをリセットする。
     """
     if hub_ok is False:
         return 'none', 'parent hub is not responding; physical action required'
@@ -188,6 +198,8 @@ def choose_action(imu_present, imu_ok, hub_ok, sibling_results, port_connected, 
         if hub_reset_enabled:
             return 'hub', f'previous {last_action} reset did not recover the IMU'
         return 'imu', f'previous {last_action} reset did not recover the IMU (hub reset disabled)'
+    if prefer_hub and hub_reset_enabled:
+        return 'hub', 'first_reset=hub and the IMU is the only device on the hub'
     if imu_ok is False and sibling_results and all(r is False for r in sibling_results):
         if hub_reset_enabled:
             return 'hub', 'IMU and all full-speed devices on the hub are not responding (hub TT stuck)'
@@ -207,6 +219,11 @@ class ImuUsbWatchdog(Node):
         self.reset_cooldown_sec = self.declare_parameter('reset_cooldown_sec', 120.0).value
         self.max_reset_cooldown_sec = self.declare_parameter('max_reset_cooldown_sec', 1800.0).value
         self.hub_reset_enabled = self.declare_parameter('hub_reset_enabled', True).value
+        # 'imu': IMUのリセットから始める, 'hub': 最初からハブをリセットする(ハブにIMUしか無い時だけ)
+        self.first_reset = self.declare_parameter('first_reset', 'imu').value
+        if self.first_reset not in ('imu', 'hub'):
+            self.get_logger().warn(f'Unknown first_reset "{self.first_reset}", using "imu"')
+            self.first_reset = 'imu'
         self.dry_run = self.declare_parameter('dry_run', False).value
         self.now = time.monotonic  # テストで差し替えられるように
 
@@ -237,7 +254,7 @@ class ImuUsbWatchdog(Node):
         self.get_logger().info(
             f'Watching {self.topic} from {self.serial_port}: stall_timeout={self.stall_timeout_sec}s, '
             f'cooldown={self.reset_cooldown_sec}s, hub_reset={self.hub_reset_enabled}, '
-            f'dry_run={self.dry_run}')
+            f'first_reset={self.first_reset}, dry_run={self.dry_run}')
 
     def on_data(self, _msg):
         self.last_data = self.now()
@@ -371,8 +388,14 @@ class ImuUsbWatchdog(Node):
         siblings = full_speed_siblings(self.hub_device, self.usb_device)
         sibling_results = [usb_probe(s) for s in siblings]
         port_connected = None if present else hub_port_connected(self.hub_device, self.port)
+        # ハブに他の機器が繋がっていれば、巻き込まないようにハブ優先をやめる
+        others = hub_children(self.hub_device, self.usb_device)
+        prefer_hub = self.first_reset == 'hub' and not others
         action, why = choose_action(present, imu_ok, hub_ok, sibling_results, port_connected,
-                                    self.last_action, self.hub_reset_enabled and self.hub_resettable())
+                                    self.last_action, self.hub_reset_enabled and self.hub_resettable(),
+                                    prefer_hub)
+        if self.first_reset == 'hub' and others:
+            why += f' (first_reset=hub skipped: {len(others)} other device(s) on the hub)'
         probe_summary = ', '.join(
             [f'imu={imu_ok if present else "missing"}', f'hub={hub_ok}'] +
             ([] if present else [f'port{self.port}_connected={port_connected}']) +

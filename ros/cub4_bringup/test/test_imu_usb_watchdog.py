@@ -44,6 +44,22 @@ def test_choose_action(args, expected):
     assert reason
 
 
+@pytest.mark.parametrize('args, expected', [
+    # (imu_present, imu_ok, hub_ok, siblings, port_connected, last_action, hub_reset_enabled, prefer_hub)
+    ((True, True, True, [], None, None, True, True), 'hub'),      # 最初からハブ
+    ((True, False, True, [True], None, None, True, True), 'hub'),  # IMU単体の無応答でもハブ
+    ((True, True, True, [], None, None, False, True), 'imu'),     # ハブ不可ならIMU
+    ((True, True, False, [], None, None, True, True), 'none'),    # ハブが無応答
+    ((True, True, True, [], None, 'hub', True, True), 'hub'),     # 直らなければ再びハブ
+    ((False, False, True, [], False, None, True, True), 'none'),  # 抜かれている時は何もしない
+    ((False, False, True, [], True, None, True, True), 'hub'),    # 未認識はこれまで通りハブ
+])
+def test_choose_action_prefer_hub(args, expected):
+    action, reason = wd.choose_action(*args)
+    assert action == expected
+    assert reason
+
+
 # ---------------------------------------------------------------- sysfs helpers
 
 def make_usb_device(path, busnum, devnum, speed='12'):
@@ -93,6 +109,13 @@ def test_full_speed_siblings(sysfs):
     siblings = wd.full_speed_siblings(sysfs.hub, sysfs.imu)
     # 自分自身とハイスピード機器(1-2.3.3)は含めない
     assert siblings == [sysfs.acm]
+
+
+def test_hub_children(sysfs):
+    children = wd.hub_children(sysfs.hub, sysfs.imu)
+    # 自分自身とインターフェース(1-2.3.1:1.0等)は含めず、速度は問わない
+    assert children == [sysfs.acm, os.path.join(sysfs.hub, '1-2.3.3')]
+    assert wd.hub_children(os.path.join(sysfs.hub, '1-2.3.3'), None) == []
 
 
 # ---------------------------------------------------------------- USB requests
@@ -148,7 +171,7 @@ def env(tmp_path, monkeypatch):
     node.now = clock
     node.baseline = node.last_check = clock.t
     state = {'present': True, 'publishers': 1, 'imu_ok': True, 'hub_ok': True,
-             'port_connected': True}
+             'port_connected': True, 'others': []}
     resets = []
 
     node.find_imu = lambda: str(imu) if state['present'] else None
@@ -156,6 +179,7 @@ def env(tmp_path, monkeypatch):
     monkeypatch.setattr(wd, 'usb_probe',
                         lambda dev: state['hub_ok'] if dev == str(hub) else state['imu_ok'])
     monkeypatch.setattr(wd, 'full_speed_siblings', lambda h, e: [])
+    monkeypatch.setattr(wd, 'hub_children', lambda h, e: list(state['others']))
     monkeypatch.setattr(wd, 'hub_port_connected', lambda h, p: state['port_connected'])
 
     def fake_start_reset(device):
@@ -267,6 +291,59 @@ def test_reenumeration_restarts_stall_timer(env):
     assert env.resets == []                 # 再認識から30s経っていない
     advance(env, 11)
     assert env.resets == [env.imu]
+
+
+def test_first_reset_hub_resets_hub_first(env):
+    env.node.first_reset = 'hub'
+    advance(env, 0)
+    advance(env, 31)
+    assert env.resets == [env.hub]          # IMUを飛ばして最初からハブ
+    assert env.node.last_action == 'hub'
+
+
+def test_first_reset_hub_backoff(env):
+    env.node.first_reset = 'hub'
+    advance(env, 0)
+    advance(env, 31)
+    advance(env, 31)
+    assert env.resets == [env.hub]          # ハブの後は120s待つ(IMUの後のように30sで進まない)
+    advance(env, 90)
+    assert env.resets == [env.hub, env.hub]
+
+
+def test_first_reset_hub_skipped_with_other_devices(env):
+    env.node.first_reset = 'hub'
+    env.state['others'] = ['/sys/devices/usb1/1-2/1-2.3/1-2.3.2']  # 同じハブに別の機器
+    advance(env, 0)
+    advance(env, 31)
+    assert env.resets == [env.imu]          # 巻き込まないようにIMUから
+    advance(env, 31)
+    assert env.resets == [env.imu, env.hub]  # 直らなければこれまで通りハブへ
+
+
+def test_first_reset_recovery_then_hub_again(env):
+    env.node.first_reset = 'hub'
+    advance(env, 0)
+    advance(env, 31)
+    advance(env, 5, data=True)              # 復旧
+    assert env.node.consecutive_resets == 0
+    advance(env, 150)
+    assert env.resets == [env.hub, env.hub]  # 次の停止でも最初からハブ
+
+
+def test_first_reset_parameter(env):
+    from rclpy.parameter import Parameter
+    assert env.node.first_reset == 'imu'    # 既定はこれまで通りIMUから
+    node = wd.ImuUsbWatchdog(parameter_overrides=[Parameter('first_reset', value='bogus')])
+    try:
+        assert node.first_reset == 'imu'    # 不正な値はIMUからにする
+    finally:
+        node.destroy_node()
+    node = wd.ImuUsbWatchdog(parameter_overrides=[Parameter('first_reset', value='hub')])
+    try:
+        assert node.first_reset == 'hub'
+    finally:
+        node.destroy_node()
 
 
 def test_start_reset_dry_run(env, monkeypatch):

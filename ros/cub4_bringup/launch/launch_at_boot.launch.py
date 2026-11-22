@@ -71,6 +71,9 @@ def generate_launch_description():
             'stall_timeout_sec': 30.0,    # 受信がこの秒数止まったら異常と判定
             'reset_cooldown_sec': 120.0,  # リセット後、次のリセットまで待つ時間(連続失敗で倍々に延長)
             'hub_reset_enabled': True,    # ハブごとのリセットを許可(同じハブの他の機器も一瞬切断される)
+            # 最初からハブをリセットする。CP2102N単体のリセットの後にCP2102Nが応答しなくなる例があったため。
+            # ハブにIMU以外の機器が繋がっている時は、巻き込まないようにIMUのリセットから始める
+            'first_reset': 'hub',
             'dry_run': False,             # Trueなら検知とログのみでリセットしない
         }],
         respawn=True,
