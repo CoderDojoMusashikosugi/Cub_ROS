@@ -5,6 +5,10 @@
 services:
   cub_ros:
     runtime: nvidia
+    environment:
+      - LD_LIBRARY_PATH=/opt/nvidia/l4t-gpu-libs/nvgpu:/usr/local/nvidia/lib:/usr/local/nvidia/lib64
 
   cub_ros_vnc:
     runtime: nvidia
+    environment:
+      - LD_LIBRARY_PATH=/opt/nvidia/l4t-gpu-libs/nvgpu:/usr/local/nvidia/lib:/usr/local/nvidia/lib64
