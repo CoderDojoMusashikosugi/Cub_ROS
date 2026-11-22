@@ -48,15 +48,34 @@ def generate_launch_description():
         output='screen',
     )
 
+    imu_serial_port = "/dev/ttyMULIMU"
     spresense_imu = Node(
         package='cub4_bringup',
         executable='spresense_imu_node',
         name='spresense_imu_node',
         parameters=[{
-            'serial_port': "/dev/ttyMULIMU",
+            'serial_port': imu_serial_port,
             'baud_rate': 230400,
         }],
         output='screen'
+    )
+
+    # spresense IMU: /imu/data_rawが止まったら、USBバスリセットで復旧させる
+    # IMUのリセットで直らない、USBの認識に失敗している、またはハブのTTが詰まっている場合はハブごとリセットする
+    imu_usb_watchdog = Node(
+        package='cub4_bringup',
+        executable='imu_usb_watchdog.py',
+        name='imu_usb_watchdog',
+        parameters=[{
+            'serial_port': imu_serial_port,  # spresense_imu_nodeと同じポート(USB機器の特定に使う)
+            'stall_timeout_sec': 30.0,    # 受信がこの秒数止まったら異常と判定
+            'reset_cooldown_sec': 120.0,  # リセット後、次のリセットまで待つ時間(連続失敗で倍々に延長)
+            'hub_reset_enabled': True,    # ハブごとのリセットを許可(同じハブの他の機器も一瞬切断される)
+            'dry_run': False,             # Trueなら検知とログのみでリセットしない
+        }],
+        respawn=True,
+        respawn_delay=3.0,
+        output='screen',
     )
 
     joy_dev = "/dev/input/js0"
@@ -162,6 +181,7 @@ def generate_launch_description():
 
         # spresense IMUノード
         spresense_imu,
+        imu_usb_watchdog,
         
         # 手動操縦
         cub_commander,        
