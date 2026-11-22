@@ -32,6 +32,7 @@ def generate_launch_description():
     )
 
     # M5Dial: USB NCMでDialからの受信が止まったら、USBバスリセットで復旧させる
+    # Dialのリセットで直らない、またはハブのTTが詰まっている場合はハブごとリセットする
     dial_ncm_watchdog = Node(
         package='cub4_bringup',
         executable='dial_ncm_watchdog.py',
@@ -39,6 +40,7 @@ def generate_launch_description():
         parameters=[{
             'stall_timeout_sec': 30.0,    # 受信がこの秒数止まったら異常と判定
             'reset_cooldown_sec': 120.0,  # リセット後、次のリセットまで待つ時間(連続失敗で倍々に延長)
+            'hub_reset_enabled': True,    # ハブごとのリセットを許可(同じハブのUM982等も一瞬切断される)
             'dry_run': False,             # Trueなら検知とログのみでリセットしない
         }],
         respawn=True,
