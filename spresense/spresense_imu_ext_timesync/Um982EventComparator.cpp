@@ -18,6 +18,9 @@ constexpr size_t EVENT_LINE_SIZE = 192;
 Stream* um982_serial = nullptr;
 UtcAtMicrosFunction utc_converter = nullptr;
 
+uint8_t event_input_pin = 0;
+bool event_interrupt_attached = false;
+
 volatile uint32_t interrupt_capture_us = 0;
 volatile bool interrupt_pending = false;
 volatile uint32_t previous_interrupt_us = 0;
@@ -195,6 +198,19 @@ void printComparison() {
   }
 }
 
+// The FALLING interrupt is attached only while the input is HIGH (button
+// released), as before. Instead of waiting for HIGH in setup(), which blocked
+// forever while the input was held LOW, this is retried from
+// updateUm982EventComparison() until it succeeds.
+void tryAttachEventInterrupt() {
+  if (event_interrupt_attached || digitalRead(event_input_pin) == LOW) {
+    return;
+  }
+
+  attachInterrupt(digitalPinToInterrupt(event_input_pin), onEventFall, FALLING);
+  event_interrupt_attached = true;
+}
+
 }  // namespace
 
 void beginUm982EventComparison(Stream& gnss_serial,
@@ -202,14 +218,13 @@ void beginUm982EventComparison(Stream& gnss_serial,
                                UtcAtMicrosFunction utc_at_micros) {
   um982_serial = &gnss_serial;
   utc_converter = utc_at_micros;
+  event_input_pin = event_pin;
 
   pinMode(event_pin, INPUT_PULLUP);
-  // Serial.println("Release the EVENT button to make D4 HIGH.");
-  while (digitalRead(event_pin) == LOW) {
-    delay(1);
+  tryAttachEventInterrupt();
+  if (!event_interrupt_attached) {
+    Serial.println("[EVENT] D4 is LOW at startup; the EVENT input is enabled once it goes HIGH.");
   }
-
-  attachInterrupt(digitalPinToInterrupt(event_pin), onEventFall, FALLING);
 
   // EVENTFLAGA supplies the receiver timestamp for each EVENT edge. GGA is
   // required by the UM982 specification. These settings are not saved to
@@ -252,6 +267,8 @@ void feedUm982EventByte(char received) {
 }
 
 void updateUm982EventComparison() {
+  tryAttachEventInterrupt();
+
   noInterrupts();
   bool captured = interrupt_pending;
   uint32_t captured_us = interrupt_capture_us;

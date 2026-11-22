@@ -220,6 +220,7 @@ private:
 
     serial_fd_ = fd;
     data_buffer_.clear();
+    text_line_.clear();
     was_gnss_synced_ = false;
     was_drdy_logged_ = false;
     was_drdy_active_ = false;
@@ -240,6 +241,7 @@ private:
     close_serial();
 
     data_buffer_.clear();
+    text_line_.clear();
     was_gnss_synced_ = false;
     was_drdy_logged_ = false;
     was_drdy_active_ = false;
@@ -339,13 +341,15 @@ private:
         // No header found; retain only the last (sizeof(HEADER) - 1) bytes
         size_t keep = sizeof(HEADER) - 1;
         if (data_buffer_.size() > keep) {
+          feed_text_bytes(data_buffer_.data(), data_buffer_.size() - keep);
           data_buffer_.erase(data_buffer_.begin(), data_buffer_.end() - keep);
         }
         break;
       }
 
-      // Discard any garbage bytes before the header
+      // Bytes before the header are status text or garbage
       if (header_start_pos > 0) {
+        feed_text_bytes(data_buffer_.data(), header_start_pos);
         data_buffer_.erase(data_buffer_.begin(), data_buffer_.begin() + header_start_pos);
       }
 
@@ -373,6 +377,33 @@ private:
 
       // Remove the processed packet from buffer
       data_buffer_.erase(data_buffer_.begin(), data_buffer_.begin() + PACKET_SIZE);
+    }
+  }
+
+  // The firmware prints ASCII status lines ("[BOOT] ...", "[IMU] ...",
+  // "[EVENT] ...") between packets. Bytes outside packets are collected here
+  // and complete printable lines are logged. Other bytes, such as boot ROM
+  // output at a different baud rate, discard the partial line.
+  void feed_text_bytes(const uint8_t* bytes, size_t len) {
+    constexpr size_t MIN_TEXT_LINE_LENGTH = 4;
+    constexpr size_t MAX_TEXT_LINE_LENGTH = 200;
+
+    for (size_t i = 0; i < len; ++i) {
+      const uint8_t c = bytes[i];
+      if (c == '\n') {
+        if (text_line_.size() >= MIN_TEXT_LINE_LENGTH) {
+          RCLCPP_INFO(this->get_logger(), "[spresense] %s", text_line_.c_str());
+        }
+        text_line_.clear();
+      } else if (c == '\r') {
+        continue;
+      } else if (c >= 0x20 && c < 0x7F) {
+        if (text_line_.size() < MAX_TEXT_LINE_LENGTH) {
+          text_line_.push_back(static_cast<char>(c));
+        }
+      } else {
+        text_line_.clear();
+      }
     }
   }
 
@@ -476,6 +507,7 @@ private:
 
   int serial_fd_{-1};
   std::vector<uint8_t> data_buffer_;
+  std::string text_line_;
   rclcpp::TimerBase::SharedPtr timer_;
   rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_raw_pub_;
   rclcpp::Publisher<sensor_msgs::msg::Temperature>::SharedPtr temp_pub_;

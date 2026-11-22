@@ -18,7 +18,10 @@
  ****************************************************************************/
 
 #include <Arduino.h>
+#include <LowPower.h>
 #include <TinyGPS++.h>
+#include <Watchdog.h>
+#include <stdarg.h>
 #include <time.h>
 #include <poll.h>
 #include <inttypes.h>
@@ -67,6 +70,22 @@ constexpr int32_t DRDY_DELAY_OFFSET_US = 0;
 #define ACCEL_RANGE         16
 #define GYRO_RANGE          500
 #define FIFO_THRESHOLD      1
+
+// Startup and recovery
+//
+// Opening the host serial port asserts DTR, and DTR power-cycles this board
+// through the PMIC. The host node (spresense_imu_node) reopens the port after
+// 5 s without receiving any byte, so a board that stays silent is reset by the
+// host. The limits below keep every wait bounded and stop printing once the
+// IMU cannot be started, so that host reset still happens.
+constexpr int      IMU_INIT_ATTEMPTS         = 5;     // open + configure tries per (re)initialization
+constexpr uint32_t IMU_RETRY_DELAY_MS        = 200;   // pause between tries
+constexpr int      IMU_FIRST_SAMPLE_TIMEOUT_MS = 200; // per-sample wait while dropping the first 50 ms
+constexpr uint32_t IMU_STALL_TIMEOUT_MS      = 250;   // no sample for this long in loop() -> reinitialize
+constexpr int      IMU_MAX_QUICK_RECOVERIES  = 3;     // reinitializations in a row before giving up...
+constexpr uint32_t IMU_HEALTHY_STREAM_MS     = 10000; // ...unless the previous start streamed this long
+constexpr uint32_t WATCHDOG_TIMEOUT_MS       = 3000;  // hardware watchdog: reboot if blocked this long
+constexpr uint32_t WATCHDOG_KICK_INTERVAL_MS = 100;
 
 // Status Bitmask Definitions
 constexpr uint8_t STATUS_CLOCK_SYNCHRONIZED = 0x01; // Bit 0: Currently synchronized
@@ -170,7 +189,96 @@ const uint8_t DAYS_IN_MONTH[] = {
 
 static cxd5602pwbimu_data_t g_data[MAX_NFIFO];
 static int g_devfd = -1;
-static bool g_logging_active = true;
+static uint32_t g_last_imu_sample_ms = 0;
+static uint32_t g_imu_started_ms = 0;
+static int g_quick_recoveries = 0;
+
+static bool g_watchdog_armed = false;
+static uint32_t g_last_watchdog_kick_ms = 0;
+
+/****************************************************************************
+ * Status Text and Watchdog
+ ****************************************************************************/
+
+// Status lines share the serial link with the binary IMU packets. They are
+// plain ASCII, so they never contain the 0xAA 0xBB 0xCC 0xDD header, and they
+// are written between packets. The host logs them and skips them.
+static void logLine(const char* format, ...)
+{
+  char line[160];
+  va_list args;
+  va_start(args, format);
+  vsnprintf(line, sizeof(line), format, args);
+  va_end(args);
+  Serial.println(line);
+}
+
+static const char* bootCauseName(bootcause_e cause)
+{
+  switch (cause)
+    {
+      case POR_SUPPLY: return "power on (supply)";
+      case POR_NORMAL: return "power on";
+      case WDT_REBOOT: return "watchdog or self reboot";
+      case WDT_RESET:  return "chip watchdog";
+      default:         return "other";
+    }
+}
+
+static void kickWatchdog()
+{
+  if (!g_watchdog_armed)
+    {
+      return;
+    }
+  Watchdog.kick();
+  g_last_watchdog_kick_ms = millis();
+}
+
+// Arms the watchdog unless this boot was caused by a watchdog (or self)
+// reboot. If the board hangs again right after a watchdog reboot, it stays
+// silent and the host resets it through DTR, which also power-cycles the
+// IMU add-on. Rebooting over and over would keep printing the boot lines,
+// and the host would never time out.
+static void armWatchdog(bootcause_e cause)
+{
+  if (cause == WDT_REBOOT || cause == WDT_RESET)
+    {
+      logLine("[BOOT] watchdog not armed after a watchdog reboot");
+      return;
+    }
+
+  Watchdog.begin();
+  Watchdog.start(WATCHDOG_TIMEOUT_MS);
+  g_watchdog_armed = true;
+  g_last_watchdog_kick_ms = millis();
+  logLine("[BOOT] watchdog armed (%lu ms)",
+          static_cast<unsigned long>(WATCHDOG_TIMEOUT_MS));
+}
+
+// Called when the IMU cannot be started. Nothing is printed after the first
+// line, so the host times out and resets the board through DTR.
+static void waitForHostReset(const char* reason)
+{
+  logLine("[IMU] %s; staying silent until the host resets the board", reason);
+
+  if (g_devfd >= 0)
+    {
+      close(g_devfd);
+      g_devfd = -1;
+    }
+
+  if (g_watchdog_armed)
+    {
+      Watchdog.stop();
+      g_watchdog_armed = false;
+    }
+
+  for (;;)
+    {
+      delay(1000);
+    }
+}
 
 /****************************************************************************
  * GNSS Synchronization Functions
@@ -366,8 +474,26 @@ void printCurrentTime() {
  * IMU Driver & Output Functions
  ****************************************************************************/
 
-static int start_sensing(int fd, int rate, int adrange, int gdrange,
-                         int nfifos)
+static void logIoctlError(const char* step, int err)
+{
+  if (err == EBUSY)
+    {
+      // The driver's open() enters firmware update mode when the add-on's
+      // MODE register is 0 or its two chips report different firmware
+      // versions (including a chip that did not answer). In that mode open()
+      // succeeds but every ioctl returns EBUSY.
+      logLine("[IMU] %s failed (errno=%d): add-on is in firmware update mode",
+              step, err);
+    }
+  else
+    {
+      logLine("[IMU] %s failed (errno=%d)", step, err);
+    }
+}
+
+// Returns true when sensing has started.
+static bool start_sensing(int fd, int rate, int adrange, int gdrange,
+                          int nfifos)
 {
   cxd5602pwbimu_range_t range;
   int ret;
@@ -376,8 +502,8 @@ static int start_sensing(int fd, int rate, int adrange, int gdrange,
   ret = ioctl(fd, SNIOC_SSAMPRATE, rate);
   if (ret)
     {
-      printf("ERROR: Set sampling rate failed. %d\n", errno);
-      return 1;
+      logIoctlError("set sampling rate", errno);
+      return false;
     }
 
   /* Set dynamic ranges for accelerometer and gyroscope */
@@ -386,30 +512,33 @@ static int start_sensing(int fd, int rate, int adrange, int gdrange,
   ret = ioctl(fd, SNIOC_SDRANGE, (unsigned long)(uintptr_t)&range);
   if (ret)
     {
-      printf("ERROR: Set dynamic range failed. %d\n", errno);
-      return 1;
+      logIoctlError("set dynamic range", errno);
+      return false;
     }
 
   /* Set hardware FIFO threshold */
   ret = ioctl(fd, SNIOC_SFIFOTHRESH, nfifos);
   if (ret)
     {
-      printf("ERROR: Set FIFO threshold failed. %d\n", errno);
-      return 1;
+      logIoctlError("set FIFO threshold", errno);
+      return false;
     }
 
   /* Start sensing */
   ret = ioctl(fd, SNIOC_ENABLE, 1);
   if (ret)
     {
-      printf("ERROR: Enable failed. %d\n", errno);
-      return 1;
+      logIoctlError("enable", errno);
+      return false;
     }
 
-  return 0;
+  return true;
 }
 
-static int drop_50msdata(int fd, int samprate, int nfifo)
+// Reads and discards the first 50 ms of samples, which can be invalid.
+// The driver's read() blocks without a timeout, so wait with poll() first.
+// Returns false when a sample does not arrive in time.
+static bool drop_50msdata(int fd, int samprate, int nfifo)
 {
   int cnt = samprate / 20; /* data size of 50ms */
 
@@ -418,11 +547,114 @@ static int drop_50msdata(int fd, int samprate, int nfifo)
 
   while (cnt)
     {
+      kickWatchdog();
+
+      struct pollfd fds[1];
+      fds[0].fd = fd;
+      fds[0].events = POLLIN;
+      fds[0].revents = 0;
+
+      int ret = poll(fds, 1, IMU_FIRST_SAMPLE_TIMEOUT_MS);
+      if (ret <= 0 || !(fds[0].revents & POLLIN))
+        {
+          return false;
+        }
+
       read(fd, g_data, sizeof(g_data[0]) * nfifo);
       cnt -= nfifo;
     }
 
-  return 0;
+  return true;
+}
+
+// Opens /dev/imu0 and starts sensing, retrying a few times.
+// The driver's open() resets the add-on (XRST, then a fixed 150 ms wait) and
+// then reads the chips' firmware versions, and close() asserts XRST again.
+// Closing and reopening therefore repeats the whole reset sequence.
+static bool initImu()
+{
+  for (int attempt = 1; attempt <= IMU_INIT_ATTEMPTS; ++attempt)
+    {
+      kickWatchdog();
+      if (attempt > 1)
+        {
+          delay(IMU_RETRY_DELAY_MS);
+          kickWatchdog();
+        }
+
+      int fd = open(CXD5602PWBIMU_DEVPATH, O_RDONLY);
+      if (fd < 0)
+        {
+          logLine("[IMU] attempt %d/%d: open %s failed (errno=%d)",
+                  attempt, IMU_INIT_ATTEMPTS, CXD5602PWBIMU_DEVPATH, errno);
+          continue;
+        }
+
+      kickWatchdog();
+      if (!start_sensing(fd, SAMPLING_RATE, ACCEL_RANGE, GYRO_RANGE,
+                         FIFO_THRESHOLD))
+        {
+          logLine("[IMU] attempt %d/%d: sensor start failed",
+                  attempt, IMU_INIT_ATTEMPTS);
+          close(fd);
+          continue;
+        }
+
+      kickWatchdog();
+      if (!drop_50msdata(fd, SAMPLING_RATE, FIFO_THRESHOLD))
+        {
+          logLine("[IMU] attempt %d/%d: no sample within %d ms after enable",
+                  attempt, IMU_INIT_ATTEMPTS, IMU_FIRST_SAMPLE_TIMEOUT_MS);
+          close(fd);
+          continue;
+        }
+
+      g_devfd = fd;
+      g_imu_started_ms = millis();
+      g_last_imu_sample_ms = g_imu_started_ms;
+      logLine("[IMU] sensing started on attempt %d/%d (%d Hz)",
+              attempt, IMU_INIT_ATTEMPTS, SAMPLING_RATE);
+      return true;
+    }
+
+  return false;
+}
+
+// Called from loop() when no sample has arrived for IMU_STALL_TIMEOUT_MS.
+// One known cause is in the driver: its worker returns without re-enabling
+// the data-ready interrupt when it cannot take the buffer lock in time, and
+// no further samples arrive after that.
+//
+// If the stream keeps stopping soon after each restart, the status lines
+// alone would keep the host from timing out, so give up after a few quick
+// restarts and let the host reset the board.
+static void recoverStalledImu(uint32_t silent_ms)
+{
+  logLine("[IMU] no sample for %lu ms; reinitializing",
+          static_cast<unsigned long>(silent_ms));
+
+  if (millis() - g_imu_started_ms >= IMU_HEALTHY_STREAM_MS)
+    {
+      g_quick_recoveries = 0;
+    }
+  if (++g_quick_recoveries > IMU_MAX_QUICK_RECOVERIES)
+    {
+      waitForHostReset("IMU stalled repeatedly");
+    }
+
+  close(g_devfd);
+  g_devfd = -1;
+
+  if (!initImu())
+    {
+      waitForHostReset("reinitialization failed");
+    }
+
+  // Drop a DRDY edge captured before the restart so that it is not paired
+  // with the first new sample.
+  noInterrupts();
+  drdy_pulse_received = false;
+  interrupts();
 }
 
 static void send_imu_binary(cxd5602pwbimu_data_t *dat, int num, uint64_t sample_utc_us, uint8_t status)
@@ -467,41 +699,25 @@ void setup()
       /* Wait up to 2 seconds for Serial Monitor connection */
     }
 
-  // Serial.println("\n=== Spresense IMU + GNSS TimeSync Starting ===");
+  bootcause_e boot_cause = LowPower.bootCause();
+  logLine("[BOOT] spresense_imu_ext_timesync built %s %s, boot cause %d (%s)",
+          __DATE__, __TIME__, static_cast<int>(boot_cause),
+          bootCauseName(boot_cause));
+  armWatchdog(boot_cause);
 
   // 2. Initialize CXD5602PWBIMU SPI driver (SPI bus 5)
   ret = board_cxd5602pwbimu_initialize(5);
   if (ret < 0)
     {
-      printf("ERROR: board_cxd5602pwbimu_initialize failed: %d\n", ret);
-      while (1) { delay(1000); }
+      logLine("[IMU] board_cxd5602pwbimu_initialize failed: %d", ret);
+      waitForHostReset("driver registration failed");
     }
 
-  // 3. Open IMU character device
-  g_devfd = open(CXD5602PWBIMU_DEVPATH, O_RDONLY);
-  if (g_devfd < 0)
+  // 3. Open the IMU device and start sensing (drops the first 50 ms of data)
+  if (!initImu())
     {
-      printf("ERROR: Could not open %s (errno=%d)\n", CXD5602PWBIMU_DEVPATH, errno);
-      while (1) { delay(1000); }
+      waitForHostReset("could not start the IMU");
     }
-
-  // printf("Configuring IMU sensor:\n");
-  // printf("  Rate: %d Hz\n", SAMPLING_RATE);
-  // printf("  Accel Range: +-%d g\n", ACCEL_RANGE);
-  // printf("  Gyro Range: +-%d dps\n", GYRO_RANGE);
-  // printf("  FIFO Threshold: %d\n", FIFO_THRESHOLD);
-
-  ret = start_sensing(g_devfd, SAMPLING_RATE, ACCEL_RANGE, GYRO_RANGE, FIFO_THRESHOLD);
-  if (ret < 0)
-    {
-      printf("ERROR: Sensor start failed.\n");
-      close(g_devfd);
-      while (1) { delay(1000); }
-    }
-
-  // Drop first 50ms of data as it can be invalid
-  drop_50msdata(g_devfd, SAMPLING_RATE, FIFO_THRESHOLD);
-  // printf("IMU sensing initialized.\n");
 
   // 4. Initialize GNSS PPS input (D3). The interrupt is attached later from
   // loop() once the pin is seen LOW (non-blocking, so startup is not delayed
@@ -520,11 +736,19 @@ void setup()
   pinMode(IMU_DRDY_PIN, INPUT_PULLDOWN);
   waitForImuDrdyLowAndAttachInterrupt();
 
-  // Serial.println("System Ready. Streaming IMU and monitoring GNSS Sync...\n");
+  // The first samples were consumed while dropping the first 50 ms; start the
+  // stall timer from here so that the rest of setup() is not counted.
+  g_last_imu_sample_ms = millis();
+  logLine("[BOOT] ready, streaming IMU packets");
 }
 
 void loop()
 {
+  if (millis() - g_last_watchdog_kick_ms >= WATCHDOG_KICK_INTERVAL_MS)
+    {
+      kickWatchdog();
+    }
+
   // 1. Attach PPS interrupt as soon as PPS is detected LOW (no-op once attached)
   tryAttachPpsInterrupt();
 
@@ -532,42 +756,22 @@ void loop()
   updateGnssClock();
   updateUm982EventComparison();
 
-  // 2. Check for user commands from Serial
-  if (Serial.available())
+  // 2. Discard bytes from the host. There are no serial commands: a single
+  // stray byte must not be able to stop the IMU stream.
+  while (Serial.available() > 0)
     {
-      char c = Serial.read();
-      if (c == 'q' || c == 's')
-        {
-          g_logging_active = !g_logging_active;
-          // printf("\n[CMD] Logging %s\n", g_logging_active ? "resumed" : "paused");
-        }
-      else if (c == 't')
-        {
-          // if (clock_synchronized) {
-          //   char ts[32];
-          //   formatTimestamp(currentTimeUs(), ts, sizeof(ts));
-          //   printf("\n[SYNC] Current UTC: %s (base_unix_sec=%u)\n", ts, base_unix_seconds);
-          // } else {
-          //   printf("\n[SYNC] GNSS clock is not synchronized yet.\n");
-          // }
-        }
-      else if (c == 'h')
-        {
-          // printf("\n--- Available Commands ---\n");
-          // printf("  's' or 'q': Pause/Resume IMU logging\n");
-          // printf("  't'       : Print current synchronized UTC time\n");
-          // printf("  'h'       : Show this help\n");
-          // printf("--------------------------\n");
-        }
+      Serial.read();
     }
 
-  if (!g_logging_active)
+  // 3. Restart the IMU if samples have stopped
+  uint32_t silent_ms = millis() - g_last_imu_sample_ms;
+  if (silent_ms >= IMU_STALL_TIMEOUT_MS)
     {
-      delay(1);
+      recoverStalledImu(silent_ms);
       return;
     }
 
-  // 3. Poll IMU device with 0ms timeout (non-blocking)
+  // 4. Poll IMU device with 0ms timeout (non-blocking)
   // Non-blocking poll ensures loop() continuously processes GNSS bytes on Serial2 and PPS edges
   struct pollfd fds[1];
   fds[0].fd = g_devfd;
@@ -579,6 +783,8 @@ void loop()
       ret = read(g_devfd, g_data, sizeof(g_data[0]) * FIFO_THRESHOLD);
       if (ret == sizeof(g_data[0]) * FIFO_THRESHOLD)
         {
+          g_last_imu_sample_ms = millis();
+
           uint32_t drdy_us = 0;
           bool has_drdy = false;
 
