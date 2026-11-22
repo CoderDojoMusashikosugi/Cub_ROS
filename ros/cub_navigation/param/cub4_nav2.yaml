@@ -349,7 +349,7 @@ controller_server:
     general_goal_checker:
       stateful: False
       plugin: "nav2_controller::SimpleGoalChecker"
-      xy_goal_tolerance: 0.2 # 停止地点の到達判定。途中のwaypointはwaypoint_navigatorが手前で次のゴールに切り替える
+      xy_goal_tolerance: 0.3 # 停止地点の到達判定。途中のwaypointはwaypoint_navigatorが手前で次のゴールに切り替える
       yaw_goal_tolerance: 6.28
 
     # FollowPath:
@@ -399,9 +399,9 @@ controller_server:
       time_steps: 14
       model_dt: 0.2
       batch_size: 2000
-      ax_max: 3.0
+      ax_max: 0.5
       ax_min: -3.0
-      ay_max: 3.0
+      ay_max: 0.5
       ay_min: -3.0
       az_max: 3.5
       vx_std: 0.2
@@ -417,7 +417,7 @@ controller_server:
       temperature: 0.3
       gamma: 0.015
       motion_model: "DiffDrive"
-      visualize: true
+      visualize: false
       regenerate_noises: true
       TrajectoryVisualizer:
         trajectory_step: 5
