@@ -80,6 +80,11 @@ def launch_setup(context):
             # arguments=["/home/cub/colcon_ws/src/cub/cub_behavior_tree/routes/2d_waypoints.yaml"]
         ),
         Node(
+            package='cub_behavior_tree',
+            executable='queue_follower',
+            parameters=[param_dir],
+        ),
+        Node(
             package='cub_navigation',
             executable='waypoint_visualizer',
             parameters=[{'json_file': waypoints_file}],

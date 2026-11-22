@@ -109,6 +109,7 @@ waypoint_groups:
         yaw: 1.4000000953674316
   - group_name: Nets gyoretsu
     require_input: true
+    queue: true
     waypoints:
       - x: 318.4908447265625
         y: 153.77903747558594
@@ -119,11 +120,11 @@ waypoint_groups:
       - x: 321.73397827148438
         y: 189.226318359375
         yaw: 1.600000262260437
-      - x: 323.54708862304688
-        y: 209.69648742675781
+      - x: 323.83163452148438
+        y: 210.01113891601562
         yaw: 1.600000262260437
-      - x: 324.43734741210938
-        y: 216.25444030761719
+      - x: 324.49624633789062
+        y: 216.56552124023438
         yaw: 1.5
   - group_name: Nets Shingou
     require_input: true
@@ -325,6 +326,7 @@ waypoint_groups:
         yaw: 1.5000001192092896
   - group_name: nextage gyoretsu
     require_input: true
+    queue: true
     waypoints:
       - x: 531.6895751953125
         y: 164.87423706054688

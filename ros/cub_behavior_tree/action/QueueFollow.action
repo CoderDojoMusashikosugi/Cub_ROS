@@ -1,0 +1,14 @@
+# 行列区間の走行: start -> end の直線(map座標)に沿って走り、前方の物体の後ろで停止・再発進を繰り返して end で止まる
+geometry_msgs/Point start
+geometry_msgs/Point end
+---
+# end に到達したら true
+bool success
+string message
+---
+# end までの残り距離 [m] (直線に沿った距離)
+float64 distance_to_end
+# 前方の物体までの空き距離 [m] (機体前端から、直線に沿った距離)。検出なしなら -1
+float64 gap
+# 前方の物体待ちで停止中なら true
+bool waiting

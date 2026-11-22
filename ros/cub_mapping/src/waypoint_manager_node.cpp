@@ -496,6 +496,7 @@ bool WaypointManagerNode::loadFromYAML(const std::string& filepath)
       WaypointGroup group;
       group.group_name = group_node["group_name"].as<std::string>();
       group.require_input = group_node["require_input"].as<bool>();
+      group.queue = group_node["queue"] && group_node["queue"].as<bool>();
 
       if (group_node["waypoints"]) {
         for (const auto& wp_node : group_node["waypoints"]) {
@@ -551,6 +552,9 @@ bool WaypointManagerNode::saveToYAML(const std::string& filepath)
       out << YAML::BeginMap;
       out << YAML::Key << "group_name" << YAML::Value << group.group_name;
       out << YAML::Key << "require_input" << YAML::Value << group.require_input;
+      if (group.queue) {
+        out << YAML::Key << "queue" << YAML::Value << true;
+      }
       out << YAML::Key << "waypoints" << YAML::Value << YAML::BeginSeq;
 
       for (const auto& wp : group.waypoints) {

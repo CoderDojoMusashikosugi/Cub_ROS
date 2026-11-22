@@ -18,7 +18,10 @@
 #include <condition_variable>
 #include <cstdint>
 
+#include "cub_behavior_tree/action/queue_follow.hpp"
+
 using NavigateToPose = nav2_msgs::action::NavigateToPose;
+using QueueFollow = cub_behavior_tree::action::QueueFollow;
 using namespace std::chrono_literals;
 
 struct Waypoint {
@@ -30,6 +33,7 @@ struct Waypoint {
 struct WaypointGroup {
   std::string group_name;
   bool require_input;
+  bool queue = false;  // trueなら、最後の2つのwaypointの間を行列区間としてqueue_followerで走る
   std::vector<Waypoint> waypoints;
 };
 
@@ -57,6 +61,7 @@ public:
     speed_limit_pub_ = this->create_publisher<nav2_msgs::msg::SpeedLimit>("/speed_limit", 10);
 
     navigate_to_pose_client_ = rclcpp_action::create_client<NavigateToPose>(this, "navigate_to_pose");
+    queue_follow_client_ = rclcpp_action::create_client<QueueFollow>(this, "queue_follow");
 
     proceed_subscription_ = this->create_subscription<std_msgs::msg::Empty>(
       "/proceed_to_next_group",
@@ -89,6 +94,7 @@ private:
   bool is_waiting_for_input_;
 
   rclcpp_action::Client<NavigateToPose>::SharedPtr navigate_to_pose_client_;
+  rclcpp_action::Client<QueueFollow>::SharedPtr queue_follow_client_;
   rclcpp::Subscription<std_msgs::msg::Empty>::SharedPtr proceed_subscription_;
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr follow_mode_pub_;
   rclcpp::Publisher<nav2_msgs::msg::SpeedLimit>::SharedPtr speed_limit_pub_;
@@ -198,6 +204,7 @@ private:
         WaypointGroup group;
         group.group_name = group_node["group_name"].as<std::string>();
         group.require_input = group_node["require_input"].as<bool>();
+        group.queue = group_node["queue"] && group_node["queue"].as<bool>();
 
         for (const auto & wp_node : group_node["waypoints"]) {
           Waypoint wp;
@@ -249,9 +256,56 @@ private:
       return;
     }
 
+    // 行列グループの最後のwaypointへは、Nav2ではなくqueue_followerで走る
+    if (current_group.queue && current_group.waypoints.size() >= 2 &&
+      current_waypoint_index_ + 1 == current_group.waypoints.size())
+    {
+      start_queue_follow(current_group);
+      return;
+    }
+
     // 追従モードは使わず、全waypointを通常のナビゲーションで走る
     publish_follow_mode(false);
     send_navigate_to_pose(current_group.waypoints[current_waypoint_index_], false);
+  }
+
+  // 行列区間(最後から2番目 -> 最後のwaypointの直線)をqueue_followerに任せる
+  void start_queue_follow(const WaypointGroup & group)
+  {
+    const Waypoint & start = group.waypoints[group.waypoints.size() - 2];
+    const Waypoint & end = group.waypoints.back();
+    RCLCPP_INFO(this->get_logger(), "Queue section in group '%s': handing over to queue_follower.",
+                group.group_name.c_str());
+
+    // 走行中のNav2のゴールを止める。古いゴールのコールバックは通し番号で無視される
+    ++goal_seq_;
+    navigate_to_pose_client_->async_cancel_all_goals();
+
+    if (!queue_follow_client_->wait_for_action_server(5s)) {
+      RCLCPP_ERROR(this->get_logger(), "queue_follow action server not available. Using Nav2 instead.");
+      send_navigate_to_pose(end, false);
+      return;
+    }
+
+    QueueFollow::Goal goal;
+    goal.start.x = start.x;
+    goal.start.y = start.y;
+    goal.end.x = end.x;
+    goal.end.y = end.y;
+
+    rclcpp_action::Client<QueueFollow>::SendGoalOptions options;
+    options.result_callback =
+      [this](const rclcpp_action::ClientGoalHandle<QueueFollow>::WrappedResult & result) {
+        if (result.code == rclcpp_action::ResultCode::SUCCEEDED) {
+          RCLCPP_INFO(this->get_logger(), "Queue section finished.");
+        } else {
+          RCLCPP_ERROR(this->get_logger(), "Queue section failed: %s", result.result->message.c_str());
+        }
+        // 失敗しても次へ進む(require_inputなら入力待ちになる)
+        current_waypoint_index_++;
+        send_next_goal();
+      };
+    queue_follow_client_->async_send_goal(goal, options);
   }
 
   void send_navigate_to_pose(const Waypoint & wp, bool enable_follow_mode)
