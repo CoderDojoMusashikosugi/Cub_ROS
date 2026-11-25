@@ -220,9 +220,9 @@ global_costmap:
           clearing: True
           marking: True
           data_type: "LaserScan"
-          raytrace_max_range: 5.0
+          raytrace_max_range: 10.0
           raytrace_min_range: 0.0
-          obstacle_max_range: 5.0
+          obstacle_max_range: 10.0
           obstacle_min_range: 0.0
         scan_livox:
           topic: /scan_livox
@@ -231,16 +231,16 @@ global_costmap:
           clearing: True
           marking: True
           data_type: "LaserScan"
-          raytrace_max_range: 5.0
+          raytrace_max_range: 10.0
           raytrace_min_range: 0.0
-          obstacle_max_range: 5.0
+          obstacle_max_range: 10.0
           obstacle_min_range: 0.0
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
         map_subscribe_transient_local: True
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 2.5
+        cost_scaling_factor: 5.0
         inflation_radius: 2.0
       always_send_full_costmap: True
       # keepout_filter:
@@ -290,7 +290,7 @@ local_costmap:
       # filters: ["keepout_filter", "inflation_layer"]
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 2.5
+        cost_scaling_factor: 1.0
         inflation_radius: 2.0
       obstacle_layer:
         plugin: "nav2_costmap_2d::ObstacleLayer"
@@ -462,9 +462,9 @@ controller_server:
         cost_power: 1
         cost_weight: 14.0
         max_path_occupancy_ratio: 0.05
-        trajectory_point_step: 4
+        trajectory_point_step: 2
         threshold_to_consider: 0.5
-        offset_from_furthest: 20
+        offset_from_furthest: 10
         use_path_orientations: false
       PathFollowCritic:
         enabled: true
