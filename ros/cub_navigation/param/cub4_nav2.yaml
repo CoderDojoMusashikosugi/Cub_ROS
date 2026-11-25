@@ -240,7 +240,7 @@ global_costmap:
         map_subscribe_transient_local: True
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 5.0
+        cost_scaling_factor: 2.5
         inflation_radius: 2.0
       always_send_full_costmap: True
       # keepout_filter:
@@ -290,7 +290,7 @@ local_costmap:
       # filters: ["keepout_filter", "inflation_layer"]
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 5.0
+        cost_scaling_factor: 2.5
         inflation_radius: 2.0
       obstacle_layer:
         plugin: "nav2_costmap_2d::ObstacleLayer"
@@ -404,7 +404,7 @@ controller_server:
       ay_max: 0.5
       ay_min: -3.0
       az_max: 3.5
-      vx_std: 0.2
+      vx_std: 0.4
       vy_std: 0.0
       wz_std: 0.4
       vx_max: 1.5
@@ -412,7 +412,7 @@ controller_server:
       vy_max: 0.0
       wz_max: 1.57
       iteration_count: 1
-      prune_distance: 3.5
+      prune_distance: 4.0
       transform_tolerance: 0.1
       temperature: 0.3
       gamma: 0.015
