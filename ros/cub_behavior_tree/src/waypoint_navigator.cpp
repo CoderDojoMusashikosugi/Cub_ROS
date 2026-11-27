@@ -118,6 +118,11 @@ private:
   // 送信したゴールの通し番号。上書きされた古いゴールのコールバックを無視するために使う。
   uint64_t goal_seq_{0};
 
+  // /proceed_to_next_group 受信直後のゴール送信に失敗した場合に復帰するための前回状態
+  bool pending_proceed_restore_{false};
+  size_t prev_group_index_{0};
+  size_t prev_waypoint_index_{0};
+
   enum class ResendDecision
   {
     None,
@@ -306,6 +311,20 @@ private:
         send_next_goal();
       };
     queue_follow_client_->async_send_goal(goal, options);
+    pending_proceed_restore_ = false;
+  }
+
+  void restore_waiting_state(const char * reason)
+  {
+    RCLCPP_WARN(
+      this->get_logger(),
+      "%s Returning to waiting state for 'proceed_to_next_group' (group=%zu, waypoint=%zu).",
+      reason, prev_group_index_, prev_waypoint_index_);
+    current_group_index_ = prev_group_index_;
+    current_waypoint_index_ = prev_waypoint_index_;
+    is_waiting_for_input_ = true;
+    pending_proceed_restore_ = false;
+    publish_follow_mode(false);
   }
 
   void send_navigate_to_pose(const Waypoint & wp, bool enable_follow_mode)
@@ -316,6 +335,10 @@ private:
     auto pose = create_pose_stamped(wp);
 
     if (!navigate_to_pose_client_->wait_for_action_server(10s)) {
+      if (pending_proceed_restore_) {
+        restore_waiting_state("NavigateToPose action server not available.");
+        return;
+      }
       RCLCPP_ERROR(this->get_logger(), "NavigateToPose action server not available.");
       rclcpp::shutdown();
       return;
@@ -375,6 +398,10 @@ private:
   void navigate_to_pose_goal_response_callback(rclcpp_action::ClientGoalHandle<NavigateToPose>::SharedPtr goal_handle)
   {
     if (!goal_handle) {
+      if (pending_proceed_restore_) {
+        restore_waiting_state("NavigateToPose goal was rejected by the server (navigation may not be ready).");
+        return;
+      }
       RCLCPP_ERROR(this->get_logger(), "NavigateToPose goal was rejected by the server.");
       publish_follow_mode(false);
       current_waypoint_index_++;
@@ -382,6 +409,7 @@ private:
       return;
     }
 
+    pending_proceed_restore_ = false;
     RCLCPP_INFO(this->get_logger(), "NavigateToPose goal accepted by the server, waiting for result...");
 
     // 新しいゴールでは速度上限を解除し、最後のwaypointに近づいたらフィードバックで上限をかける
@@ -485,7 +513,18 @@ private:
       return;
     }
 
+    if (!navigate_to_pose_client_->action_server_is_ready()) {
+      RCLCPP_WARN(
+        this->get_logger(),
+        "Received 'proceed_to_next_group' message, but NavigateToPose action server is not ready. Staying in waiting state.");
+      return;
+    }
+
     RCLCPP_INFO(this->get_logger(), "Received 'proceed_to_next_group' message. Proceeding...");
+
+    prev_group_index_ = current_group_index_;
+    prev_waypoint_index_ = current_waypoint_index_;
+    pending_proceed_restore_ = true;
 
     is_waiting_for_input_ = false;
     publish_follow_mode(false);
