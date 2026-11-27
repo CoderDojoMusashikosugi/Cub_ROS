@@ -6,7 +6,6 @@
 #include "cub_mapping/waypoint_edit_tool.hpp"
 
 #include <cmath>
-#include <set>
 
 #include <OgreSceneNode.h>
 #include <OgreSceneManager.h>
@@ -18,7 +17,6 @@
 #include <OgreViewport.h>
 
 #include <QKeyEvent>
-#include <QTimer>
 
 #include <rviz_common/display_context.hpp>
 #include <rviz_common/render_panel.hpp>
@@ -34,15 +32,19 @@ namespace cub_mapping
 WaypointEditTool::WaypointEditTool()
 : rviz_common::Tool(),
   node_(nullptr),
-  current_mode_(MODE_ADD_WAYPOINT),
   cursor_position_(0.0f, 0.0f, 0.0f),
   preview_yaw_(0.0f),
   current_group_index_(0),
   scene_node_(nullptr),
   active_(false),
   preview_visible_(false),
-  group_list_initialized_(false),
-  last_known_group_count_(0)
+  dragging_(false),
+  drag_group_index_(-1),
+  drag_waypoint_index_(-1),
+  drag_yaw_(0.0f),
+  drag_moved_(false),
+  hover_group_index_(-1),
+  hover_waypoint_index_(-1)
 {
   shortcut_key_ = 'w';  // Press 'w' to activate this tool
 }
@@ -61,46 +63,36 @@ void WaypointEditTool::onInitialize()
   add_waypoint_client_ = node_->create_client<srv::AddWaypoint>("add_waypoint");
   insert_waypoint_client_ = node_->create_client<srv::InsertWaypoint>("insert_waypoint");
   delete_waypoint_client_ = node_->create_client<srv::DeleteWaypoint>("delete_waypoint");
-  create_group_client_ = node_->create_client<srv::CreateGroup>("create_group");
-  get_group_list_client_ = node_->create_client<srv::GetGroupList>("get_group_list");
+  move_waypoint_client_ = node_->create_client<srv::MoveWaypoint>("move_waypoint");
 
   // Subscribe to waypoint markers
   waypoint_markers_sub_ = node_->create_subscription<visualization_msgs::msg::MarkerArray>(
     "waypoint_markers", 10,
     std::bind(&WaypointEditTool::waypointMarkersCallback, this, std::placeholders::_1));
 
+  // Target group is selected in the Waypoint Editor panel
+  current_group_sub_ = node_->create_subscription<std_msgs::msg::Int32>(
+    kCurrentGroupTopic, rclcpp::QoS(1).transient_local(),
+    [this](const std_msgs::msg::Int32::SharedPtr msg) {
+      current_group_index_ = msg->data;
+      RCLCPP_INFO(node_->get_logger(), "Target group index: %d", current_group_index_);
+    });
+
   // Create properties
-  edit_mode_property_ = new rviz_common::properties::EnumProperty(
-    "Edit Mode", "Add Waypoint",
-    "Current editing mode",
-    getPropertyContainer(), SLOT(updateProperties()), this);
-  edit_mode_property_->addOption("Add Waypoint", MODE_ADD_WAYPOINT);
-  edit_mode_property_->addOption("Delete Waypoint", MODE_DELETE_WAYPOINT);
-  edit_mode_property_->addOption("Select", MODE_SELECT);
-  edit_mode_property_->addOption("Move Position", MODE_MOVE_POSITION);
-  edit_mode_property_->addOption("Rotate Orientation", MODE_ROTATE_ORIENTATION);
-
-  group_selection_property_ = new rviz_common::properties::EnumProperty(
-    "Current Group", "Group 0",
-    "Select current waypoint group",
-    getPropertyContainer(), SLOT(updateCurrentGroup()), this);
-  // Will be populated when we receive marker data
-  group_selection_property_->addOption("Group 0", 0);
-
   default_yaw_property_ = new rviz_common::properties::FloatProperty(
     "Default Yaw", 0.0f, "Default yaw angle for new waypoints (radians)",
     getPropertyContainer(), SLOT(updateProperties()), this);
   default_yaw_property_->setMin(-3.14159f);
   default_yaw_property_->setMax(3.14159f);
 
-  waypoint_file_property_ = new rviz_common::properties::StringProperty(
-    "Waypoint File", "",
-    "Path to waypoint YAML file",
-    getPropertyContainer(), SLOT(updateProperties()), this);
-
   preview_color_property_ = new rviz_common::properties::ColorProperty(
     "Preview Color", QColor(0, 255, 255),
     "Color of the preview arrow",
+    getPropertyContainer(), SLOT(updateProperties()), this);
+
+  highlight_color_property_ = new rviz_common::properties::ColorProperty(
+    "Highlight Color", QColor(255, 140, 0),
+    "Color of the arrow when hovering or dragging an existing waypoint",
     getPropertyContainer(), SLOT(updateProperties()), this);
 
   arrow_scale_property_ = new rviz_common::properties::FloatProperty(
@@ -121,18 +113,13 @@ void WaypointEditTool::activate()
   createVisualization();
   preview_yaw_ = default_yaw_property_->getFloat();
 
-  // Request group list to populate dropdown (only once)
-  if (!group_list_initialized_) {
-    updateGroupList();
-    group_list_initialized_ = true;
-  }
-
   RCLCPP_INFO(node_->get_logger(), "Waypoint Edit Tool activated");
 }
 
 void WaypointEditTool::deactivate()
 {
   active_ = false;
+  dragging_ = false;
   destroyVisualization();
   RCLCPP_INFO(node_->get_logger(), "Waypoint Edit Tool deactivated");
 }
@@ -165,7 +152,36 @@ void WaypointEditTool::destroyVisualization()
   preview_visible_ = false;
 }
 
+void WaypointEditTool::setPreviewVisible(bool visible)
+{
+  if (preview_visible_ == visible) {
+    return;
+  }
+  preview_visible_ = visible;
+  if (preview_arrow_) {
+    preview_arrow_->getSceneNode()->setVisible(visible);
+  }
+}
+
 void WaypointEditTool::updatePreviewArrow()
+{
+  if (hover_group_index_ >= 0) {
+    // Highlight the waypoint under the cursor (can be dragged / deleted)
+    for (const auto & wp_data : waypoint_positions_) {
+      if (wp_data.group_index == hover_group_index_ &&
+          wp_data.waypoint_index == hover_waypoint_index_)
+      {
+        setPreviewArrowPose(wp_data.position, wp_data.yaw, true);
+        return;
+      }
+    }
+  }
+  setPreviewArrowPose(cursor_position_, preview_yaw_, false);
+}
+
+void WaypointEditTool::setPreviewArrowPose(
+  const Ogre::Vector3 & position, float yaw,
+  bool highlight)
 {
   if (!preview_arrow_ || !preview_visible_) {
     return;
@@ -173,9 +189,9 @@ void WaypointEditTool::updatePreviewArrow()
 
   // Set position
   preview_arrow_->setPosition(Ogre::Vector3(
-    cursor_position_.x,
-    cursor_position_.y,
-    cursor_position_.z + 0.01f));  // Slightly above ground
+    position.x,
+    position.y,
+    position.z + 0.01f));  // Slightly above ground
 
   // Set orientation based on yaw
   // Ogre::Arrow points along +Z by default, so we need to:
@@ -185,14 +201,15 @@ void WaypointEditTool::updatePreviewArrow()
   pitch_rotation.FromAngleAxis(Ogre::Radian(-Ogre::Math::HALF_PI), Ogre::Vector3::UNIT_Y);
 
   Ogre::Quaternion yaw_rotation;
-  yaw_rotation.FromAngleAxis(Ogre::Radian(preview_yaw_), Ogre::Vector3::UNIT_Z);
+  yaw_rotation.FromAngleAxis(Ogre::Radian(yaw), Ogre::Vector3::UNIT_Z);
 
   // Combine rotations: first pitch down to XY plane, then yaw
   Ogre::Quaternion orientation = yaw_rotation * pitch_rotation;
   preview_arrow_->setOrientation(orientation);
 
   // Update color
-  QColor color = preview_color_property_->getColor();
+  QColor color = highlight ?
+    highlight_color_property_->getColor() : preview_color_property_->getColor();
   preview_arrow_->setColor(
     color.redF(), color.greenF(), color.blueF(), 0.7f);
 
@@ -249,12 +266,10 @@ int WaypointEditTool::processMouseEvent(rviz_common::ViewportMouseEvent & event)
     return 0;
   }
 
-  // Handle scroll wheel for yaw adjustment (process first to prevent propagation)
+  // Scroll wheel: adjust yaw of the next waypoint to be added
   if (event.type == QEvent::Wheel) {
-    if (current_mode_ == MODE_ADD_WAYPOINT) {
+    if (!dragging_) {
       float delta = event.wheel_delta / 120.0f;  // Normalized wheel delta
-
-      // Adjust yaw based on scroll direction
       float yaw_step = 0.1f;  // radians per scroll step
       preview_yaw_ += delta * yaw_step;
 
@@ -265,98 +280,89 @@ int WaypointEditTool::processMouseEvent(rviz_common::ViewportMouseEvent & event)
       updatePreviewArrow();
     }
     // IMPORTANT: Return Render only (not Finished) to keep tool active
-    // Finished flag would cause the tool to switch back to default
     return Render;
   }
 
   Ogre::Vector3 intersection;
   bool intersects = getGroundPlaneIntersection(event, intersection);
-
-  // Update cursor position
   if (intersects) {
     cursor_position_ = intersection;
   }
 
-  // Handle different modes
-  if (current_mode_ == MODE_ADD_WAYPOINT) {
-    // Show preview arrow
+  // ---- Dragging an existing waypoint ----
+  if (dragging_) {
+    if (event.rightDown()) {
+      RCLCPP_INFO(node_->get_logger(), "Move cancelled");
+      cancelDrag();
+      updatePreviewArrow();
+      return Render;
+    }
+
     if (intersects) {
-      if (!preview_visible_) {
-        preview_visible_ = true;
-        if (preview_arrow_) {
-          preview_arrow_->getSceneNode()->setVisible(true);
-        }
+      Ogre::Vector3 diff = cursor_position_ - drag_start_position_;
+      if (diff.x * diff.x + diff.y * diff.y > kDragThreshold * kDragThreshold) {
+        drag_moved_ = true;
+      }
+      setPreviewArrowPose(cursor_position_, drag_yaw_, true);
+    }
+
+    if (event.leftUp()) {
+      if (!drag_moved_) {
+        // Simple click on an existing waypoint: do nothing
+        cancelDrag();
+      } else if (intersects) {
+        finishDrag(cursor_position_);
+      } else {
+        RCLCPP_WARN(node_->get_logger(), "Released outside ground plane, move cancelled");
+        cancelDrag();
       }
       updatePreviewArrow();
+    } else if (!event.left()) {
+      // Button released without receiving leftUp (e.g. outside the viewport)
+      cancelDrag();
+      updatePreviewArrow();
     }
-
-    // Handle left click to place waypoint
-    if (event.leftDown() && intersects) {
-      // Shift + Click: Insert waypoint after nearest existing waypoint
-      if (event.shift()) {
-        insertWaypointAfterNearest();
-      } else {
-        // Normal Click: Add waypoint to end of group
-        addWaypointToCurrentGroup();
-      }
-      return Render;
-    }
-  } else if (current_mode_ == MODE_DELETE_WAYPOINT) {
-    // Hide preview arrow in delete mode
-    if (preview_visible_) {
-      preview_visible_ = false;
-      if (preview_arrow_) {
-        preview_arrow_->getSceneNode()->setVisible(false);
-      }
-    }
-
-    // Handle left click to delete waypoint
-    if (event.leftDown() && intersects) {
-      deleteWaypointAtPosition(cursor_position_);
-      return Render;
-    }
+    return Render;
   }
 
-  // Return Render to keep the tool active
+  if (!intersects) {
+    return Render;
+  }
+
+  // ---- Hover feedback ----
+  updateHover();
+  setPreviewVisible(true);
+  updatePreviewArrow();
+
+  // ---- Clicks ----
+  if (event.leftDown()) {
+    if (event.shift()) {
+      // Shift + Click: insert after nearest waypoint
+      insertWaypointAfterNearest();
+    } else if (hover_group_index_ >= 0) {
+      // Click on existing waypoint: start dragging it
+      startDrag(hover_group_index_, hover_waypoint_index_);
+    } else {
+      // Click on empty space: append to current group
+      addWaypointToCurrentGroup();
+    }
+  } else if (event.rightDown() && hover_group_index_ >= 0) {
+    // Right click on existing waypoint: delete it
+    deleteWaypoint(hover_group_index_, hover_waypoint_index_);
+    hover_group_index_ = -1;
+    hover_waypoint_index_ = -1;
+  }
+
   return Render;
 }
 
 int WaypointEditTool::processKeyEvent(
-  QKeyEvent * event,
+  QKeyEvent * /*event*/,
   rviz_common::RenderPanel * /*panel*/)
 {
-  if (!active_) {
-    return 0;
-  }
-
-  // Handle mode switching keys
-  if (event->key() == Qt::Key_A) {
-    current_mode_ = MODE_ADD_WAYPOINT;
-    edit_mode_property_->setValue(MODE_ADD_WAYPOINT);
-    RCLCPP_INFO(node_->get_logger(), "Switched to Add Waypoint mode");
-    return Render;
-  } else if (event->key() == Qt::Key_D) {
-    current_mode_ = MODE_DELETE_WAYPOINT;
-    edit_mode_property_->setValue(MODE_DELETE_WAYPOINT);
-    RCLCPP_INFO(node_->get_logger(), "Switched to Delete Waypoint mode");
-    return Render;
-  } else if (event->key() == Qt::Key_S) {
-    current_mode_ = MODE_SELECT;
-    edit_mode_property_->setValue(MODE_SELECT);
-    RCLCPP_INFO(node_->get_logger(), "Switched to Select mode");
-    return Render;
-  } else if (event->key() == Qt::Key_M) {
-    current_mode_ = MODE_MOVE_POSITION;
-    edit_mode_property_->setValue(MODE_MOVE_POSITION);
-    RCLCPP_INFO(node_->get_logger(), "Switched to Move Position mode");
-    return Render;
-  } else if (event->key() == Qt::Key_R) {
-    current_mode_ = MODE_ROTATE_ORIENTATION;
-    edit_mode_property_->setValue(MODE_ROTATE_ORIENTATION);
-    RCLCPP_INFO(node_->get_logger(), "Switched to Rotate Orientation mode");
-    return Render;
-  }
-
+  // No key bindings: letter keys collide with other RViz tools' shortcuts
+  // (e.g. 'm' = Move Camera, 's' = Select) and Esc always switches to the
+  // default tool, so all editing is done with the mouse.
   return 0;
 }
 
@@ -450,9 +456,6 @@ void WaypointEditTool::waypointMarkersCallback(
   // Clear previous waypoint positions
   waypoint_positions_.clear();
 
-  // Track unique group indices to detect group count changes
-  std::set<int> unique_groups;
-
   // Extract waypoint positions from arrow markers
   for (const auto & marker : msg->markers) {
     // Look for arrow markers (type 0)
@@ -469,8 +472,6 @@ void WaypointEditTool::waypointMarkersCallback(
                                                second_underscore - first_underscore - 1));
           int wp_idx = std::stoi(ns.substr(second_underscore + 1));
 
-          unique_groups.insert(group_idx);
-
           WaypointMarkerData data;
           data.group_index = group_idx;
           data.waypoint_index = wp_idx;
@@ -478,6 +479,10 @@ void WaypointEditTool::waypointMarkersCallback(
             marker.pose.position.x,
             marker.pose.position.y,
             marker.pose.position.z);
+          const auto & q = marker.pose.orientation;
+          data.yaw = static_cast<float>(std::atan2(
+            2.0 * (q.w * q.z + q.x * q.y),
+            1.0 - 2.0 * (q.y * q.y + q.z * q.z)));
 
           waypoint_positions_.push_back(data);
         } catch (const std::exception&) {
@@ -485,14 +490,6 @@ void WaypointEditTool::waypointMarkersCallback(
         }
       }
     }
-  }
-
-  // Check if the number of groups has changed
-  if (unique_groups.size() != last_known_group_count_) {
-    last_known_group_count_ = unique_groups.size();
-    RCLCPP_INFO(node_->get_logger(), "Group count changed to %zu, updating group list",
-                last_known_group_count_);
-    updateGroupList();
   }
 }
 
@@ -502,95 +499,11 @@ void WaypointEditTool::updateProperties()
     return;
   }
 
-  // Update current mode from property
-  current_mode_ = static_cast<EditMode>(edit_mode_property_->getOptionInt());
-
   // Update default yaw
   preview_yaw_ = default_yaw_property_->getFloat();
 
   // Update visualization
   updatePreviewArrow();
-}
-
-void WaypointEditTool::updateCurrentGroup()
-{
-  current_group_index_ = group_selection_property_->getOptionInt();
-  RCLCPP_INFO(node_->get_logger(), "Switched to group index: %d", current_group_index_);
-}
-
-void WaypointEditTool::updateGroupList()
-{
-  // Wait for service to become available (with timeout)
-  if (!get_group_list_client_->wait_for_service(std::chrono::milliseconds(100))) {
-    RCLCPP_WARN(node_->get_logger(), "get_group_list service not available yet, will retry");
-
-    // Retry after a delay using QTimer
-    QTimer::singleShot(500, [this]() {
-      if (!group_list_initialized_) {
-        RCLCPP_INFO(node_->get_logger(), "Retrying group list update...");
-        updateGroupList();
-      }
-    });
-    return;
-  }
-
-  auto request = std::make_shared<srv::GetGroupList::Request>();
-
-  get_group_list_client_->async_send_request(
-    request,
-    [this](rclcpp::Client<srv::GetGroupList>::SharedFuture future) {
-      try {
-        auto result = future.get();
-
-        // Save current selection index before clearing
-        int previous_selection = current_group_index_;
-
-        // Clear existing options
-        group_selection_property_->clearOptions();
-
-        // Add each group with its name
-        for (size_t i = 0; i < result->group_names.size(); ++i) {
-          std::string label = result->group_names[i];
-
-          // Add require_input indicator if needed
-          if (i < result->require_input_flags.size() && result->require_input_flags[i]) {
-            label += " *";
-          }
-
-          group_selection_property_->addOptionStd(label, static_cast<int>(i));
-        }
-
-        // If no groups exist, add a default one
-        if (result->group_names.empty()) {
-          group_selection_property_->addOption("Group 0", 0);
-          RCLCPP_WARN(node_->get_logger(), "No groups found, showing default");
-          current_group_index_ = 0;
-          last_known_group_count_ = 0;
-        } else {
-          RCLCPP_INFO(node_->get_logger(), "Loaded %zu groups:", result->group_names.size());
-          for (size_t i = 0; i < result->group_names.size(); ++i) {
-            RCLCPP_INFO(node_->get_logger(), "  [%zu] %s", i, result->group_names[i].c_str());
-          }
-
-          // Update the known group count
-          last_known_group_count_ = result->group_names.size();
-
-          // Restore previous selection if still valid
-          if (previous_selection >= 0 &&
-              previous_selection < static_cast<int>(result->group_names.size())) {
-            current_group_index_ = previous_selection;
-          } else {
-            current_group_index_ = 0;
-          }
-        }
-
-        // Set the property to the current selection
-        group_selection_property_->setValue(current_group_index_);
-
-      } catch (const std::exception& e) {
-        RCLCPP_ERROR(node_->get_logger(), "Failed to get group list: %s", e.what());
-      }
-    });
 }
 
 bool WaypointEditTool::findNearestWaypoint(
@@ -618,16 +531,8 @@ bool WaypointEditTool::findNearestWaypoint(
   return found;
 }
 
-void WaypointEditTool::deleteWaypointAtPosition(const Ogre::Vector3 & position)
+void WaypointEditTool::deleteWaypoint(int group_idx, int wp_idx)
 {
-  int group_idx = -1;
-  int wp_idx = -1;
-
-  if (!findNearestWaypoint(position, group_idx, wp_idx, 0.5f)) {
-    RCLCPP_WARN(node_->get_logger(), "No waypoint found near click position");
-    return;
-  }
-
   if (!delete_waypoint_client_->service_is_ready()) {
     RCLCPP_WARN(node_->get_logger(), "delete_waypoint service not available");
     return;
@@ -648,6 +553,80 @@ void WaypointEditTool::deleteWaypointAtPosition(const Ogre::Vector3 & position)
                       group_idx, wp_idx, result->message.c_str());
         } else {
           RCLCPP_ERROR(node_->get_logger(), "Failed to delete waypoint: %s",
+                       result->message.c_str());
+        }
+      } catch (const std::exception& e) {
+        RCLCPP_ERROR(node_->get_logger(), "Service call exception: %s", e.what());
+      }
+    });
+}
+
+void WaypointEditTool::startDrag(int group_idx, int wp_idx)
+{
+  drag_yaw_ = 0.0f;
+  for (const auto & wp_data : waypoint_positions_) {
+    if (wp_data.group_index == group_idx && wp_data.waypoint_index == wp_idx) {
+      drag_yaw_ = wp_data.yaw;
+      break;
+    }
+  }
+
+  dragging_ = true;
+  drag_moved_ = false;
+  drag_group_index_ = group_idx;
+  drag_waypoint_index_ = wp_idx;
+  drag_start_position_ = cursor_position_;
+
+  setPreviewVisible(true);
+  setPreviewArrowPose(cursor_position_, drag_yaw_, true);
+}
+
+void WaypointEditTool::updateHover()
+{
+  hover_group_index_ = -1;
+  hover_waypoint_index_ = -1;
+  findNearestWaypoint(cursor_position_, hover_group_index_, hover_waypoint_index_,
+                      kPickRadius);
+}
+
+void WaypointEditTool::cancelDrag()
+{
+  dragging_ = false;
+  drag_moved_ = false;
+  drag_group_index_ = -1;
+  drag_waypoint_index_ = -1;
+}
+
+void WaypointEditTool::finishDrag(const Ogre::Vector3 & position)
+{
+  const int group_idx = drag_group_index_;
+  const int wp_idx = drag_waypoint_index_;
+  cancelDrag();
+
+  if (!move_waypoint_client_->service_is_ready()) {
+    RCLCPP_WARN(node_->get_logger(), "move_waypoint service not available");
+    return;
+  }
+
+  auto request = std::make_shared<srv::MoveWaypoint::Request>();
+  request->group_index = group_idx;
+  request->waypoint_index = wp_idx;
+  request->new_x = position.x;
+  request->new_y = position.y;
+
+  // Send async request with callback (non-blocking)
+  move_waypoint_client_->async_send_request(
+    request,
+    [this, request](rclcpp::Client<srv::MoveWaypoint>::SharedFuture future) {
+      try {
+        auto result = future.get();
+        if (result->success) {
+          RCLCPP_INFO(node_->get_logger(),
+                      "Moved waypoint [group %d, index %d] to (%.2f, %.2f) - %s",
+                      request->group_index, request->waypoint_index,
+                      request->new_x, request->new_y, result->message.c_str());
+        } else {
+          RCLCPP_ERROR(node_->get_logger(), "Failed to move waypoint: %s",
                        result->message.c_str());
         }
       } catch (const std::exception& e) {

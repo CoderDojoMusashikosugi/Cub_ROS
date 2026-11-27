@@ -630,7 +630,7 @@ Waypoint Editor Toolは、Navigation2で使用するウェイポイント（経�
   ros2 launch cub_mapping waypoint_editor.launch.py \
   waypoint_file:=/home/cub/colcon_ws/src/cub/cub_behavior_tree/routes/kakunin.yaml \
   map_file:=/home/cub/maps/1017_02/map.yaml \
-  pcd_file:=/home/cub/maps/1017_02/clean_map.pcd"
+  pcd_file:=/home/cub/maps/1017_02/1017_velodyne.pcd"
 ```
 
 ### 2. RViz2でウェイポイントを配置
@@ -638,42 +638,71 @@ Waypoint Editor Toolは、Navigation2で使用するウェイポイント（経�
 #### 基本操作
 
 1. **ツールを有効化**: RViz2のツールバーから「WaypointEditTool」を選択、または `w` キーを押す
+   - 追加・挿入先のグループは「Waypoint Editor パネル」で選択します（[後述](#3-waypoint-editor-パネル)）
 
-2. **ウェイポイントを配置**:
-   - **マウス移動**: カーソル位置にプレビュー矢印が表示されます
-   - **マウススクロール**: ウェイポイントの向き(yaw角)を調整
-   - **左クリック**: 現在の位置と向きでウェイポイントを配置
+2. **マウスで編集**（モード切り替えは不要です）:
 
-3. **配置されたウェイポイント**: RViz2上に矢印マーカーとして表示されます
+   | 操作 | 動作 |
+   |------|------|
+   | マウス移動 | カーソル位置にプレビュー矢印（シアン）を表示。既存ウェイポイントの上（0.5m以内）では、そのウェイポイントがハイライト（オレンジ）されます |
+   | マウススクロール | 次に追加するウェイポイントの向き(yaw角)を調整 |
+   | 何もない場所を左クリック | パネルで選択中のグループの末尾にウェイポイントを追加 |
+   | Shift + 左クリック | カーソルに最も近い既存ウェイポイントの直後に挿入（途中への追加） |
+   | 既存ウェイポイントを左ドラッグ | 離した位置へ移動（向きと順番は変わりません） |
+   | ドラッグ中に右クリック | 移動をキャンセル |
+   | 既存ウェイポイントを右クリック | 削除（後続の番号は1つずつ詰められます） |
 
-#### キーボードショートカット
+   - Shift + 左クリックの挿入対象は選択中のグループ内でカーソルから5m以内のウェイポイントです。条件に合うものがない場合は末尾に追加されます
+   - 既存ウェイポイントを左クリックしただけ（ほぼ動かさずに離した）の場合は何も起きません
 
-| キー | 機能 |
-|------|------|
-| `w` | ツールを有効化 |
-| `a` | 追加モード (Add Waypoint) |
-| `s` | 選択モード (Select) ※将来実装予定 |
-| `m` | 移動モード (Move Position) ※将来実装予定 |
-| `r` | 回転モード (Rotate Orientation) ※将来実装予定 |
+3. **配置されたウェイポイント**: RViz2上に矢印マーカーとして表示されます。矢印の上の数字はグループ内の番号です
+
+#### キーボード操作について
+
+このツールは `w`（ツールの有効化/無効化）以外のキーを使いません。RViz2では他ツールのショートカットキーが優先されるためです（`m` = Move Camera、`s` = Select、`i` = Interact、`c` = Focus Camera、`n` = Measure、`p` = 2D Pose Estimate、`g` = 2D Goal Pose、`u` = Publish Point）。また、`Esc` を押すとデフォルトツール（Interact）に戻ります。
 
 #### Tool Properties パネル
 
 RViz2の「Tool Properties」パネルで以下を調整できます:
 
-- **Edit Mode**: 編集モード選択（現在は Add Waypoint のみ）
-- **Current Group**: 追加先のウェイポイントグループ
 - **Default Yaw**: デフォルトの向き角度（-π ～ π rad）
 - **Preview Color**: プレビュー矢印の色（デフォルト: シアン）
+- **Highlight Color**: 既存ウェイポイントをハイライト・ドラッグ中の矢印の色（デフォルト: オレンジ）
 - **Arrow Scale**: 矢印のサイズ（0.1 ～ 2.0）
 
-### 3. ウェイポイントの保存
+### 3. Waypoint Editor パネル
 
-ウェイポイントは自動保存されません。サービスを呼び出して手動で保存してください:
+グループの管理とファイルの保存・読み込みは、RViz2の「WaypointEditorPanel」から行います（CLIでのサービス呼び出しは不要です）。`waypoint_editor.rviz` では最初から表示されています。表示されていない場合は、メニューの「Panels」→「Add New Panel」→「cub_mapping/WaypointEditorPanel」で追加してください。
 
-```bash
-./docker/run_in_container.sh "source ~/colcon_ws/install/setup.bash && \
-  ros2 service call /save_waypoints std_srvs/srv/Trigger"
 ```
+┌ WaypointEditorPanel ─────────────────────────┐
+│ File: furo_waypoints.yaml  [unsaved changes] │
+│ [Save] [Load...]                             │
+├──────────────────────────────────────────────┤
+│   │ Group               │ WPs │ Require Input │
+│ 0 │ first corner        │  3  │      □        │ ← 選択中 = 追加先
+│ 1 │ city hall right top │  8  │      ☑        │
+├──────────────────────────────────────────────┤
+│ [New Group] [Rename] [Delete]                │
+│ (ステータスメッセージ)                        │
+└──────────────────────────────────────────────┘
+```
+
+| 操作 | 動作 |
+|------|------|
+| 行を選択 | そのグループを WaypointEditTool の追加・挿入先にする |
+| **New Group** | 名前を入力してグループを作成（作成したグループが選択されます） |
+| 名前をダブルクリック / **Rename** | グループ名をその場で編集（Enterで確定、Escで取り消し） |
+| **Delete** | 確認ダイアログの後、選択中のグループとそのウェイポイントを削除 |
+| **Require Input** のチェック | グループの `require_input` を切り替え |
+| **Save** | 現在のファイル（File欄）に上書き保存 |
+| **Load...** | ファイルダイアログでYAMLを選んで読み込み（未保存の変更がある場合は確認あり） |
+
+- 行番号はグループのインデックス（0始まり）です
+- 一覧は1秒ごとにバックエンドから更新されます。CLIなど外部から変更した内容も反映されます
+- 未保存の変更があると File 欄に `[unsaved changes]` と表示されます。`auto_save: false`（デフォルト）の場合は自動保存されないので、終了前に Save してください
+- ファイルダイアログに表示されるのはコンテナ内のパスです（`/home/cub/colcon_ws/src/cub/` がホストの `ros/` に対応）
+- コンテナに日本語フォントがない環境を考慮し、パネルの表示は英語です。グループ名も英数字を推奨します
 
 ## ウェイポイント形式
 
@@ -882,6 +911,10 @@ waypoint_manager_node:
 
 ## パブリッシュされるトピック
 
+- **`/waypoint_editor/current_group`** (`std_msgs/msg/Int32`, transient local)
+  - Waypoint Editor パネルが配信する、追加・挿入先のグループインデックス
+  - WaypointEditTool が購読します
+
 - **`/waypoint_markers`** (`visualization_msgs/msg/MarkerArray`)
   - ウェイポイントの可視化マーカー
   - グループごとに異なる色（虹色）で表示
@@ -927,9 +960,9 @@ waypoint_manager_node:
 
 Phase 3以降で以下の機能を実装予定:
 
-- [ ] **Select Mode**: クリックでウェイポイントを選択
-- [ ] **Move Position Mode**: ドラッグでウェイポイントを移動
-- [ ] **Rotate Orientation Mode**: ドラッグまたはスクロールで向きを変更
+- [x] **ウェイポイントの移動**: 既存ウェイポイントを左ドラッグ
+- [x] **グループ管理パネル**: Waypoint Editor パネル
+- [ ] **向きの変更**: 既存ウェイポイントのyawを変更（バックエンドの `/update_waypoint_yaw` は実装済み）
 - [ ] **Undo/Redo**: 操作の取り消し・やり直し
 - [ ] **Copy/Paste**: ウェイポイントのコピー＆ペースト
 - [ ] **Multi-selection**: 複数ウェイポイントの同時選択・移動

@@ -63,6 +63,9 @@ def _launch_setup(context, *args, **kwargs):
         name='um982_node',
         output='screen',
         parameters=parameters,
+        # The node exits if its serial threads cannot be stopped; restart it.
+        respawn=True,
+        respawn_delay=3.0,
     )
     return [um982_node]
 

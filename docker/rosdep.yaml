@@ -3,6 +3,11 @@ libmetis-dev:
   debian: [libmetis-dev]
   ubuntu: [libmetis-dev]
 
+# usbreset for the M5Dial USB NCM watchdog (cub4_bringup/dial_ncm_watchdog.py).
+usbutils:
+  debian: [usbutils]
+  ubuntu: [usbutils]
+
 # GLIM from the koide3 PPA requires GTSAM 4.3, not ros-${ROS_DISTRO}-gtsam.
 gtsam-notbb:
   ubuntu: [libgtsam-notbb-dev]

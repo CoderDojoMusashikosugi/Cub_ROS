@@ -9,6 +9,15 @@
     output_rate: 10                 # Output frequency in Hz (1 - 20)
     configure_on_start: true        # Request GPGGA, GPGGAH, HEADINGA and time logs on startup
     enable_rmc: false               # Enable GPRMC output in addition to GPGGA and HEADINGA
+    write_timeout: 1.0              # Serial write timeout (seconds, 0=block forever)
+
+    # ----------------------------------------------------
+    # Serial Link Recovery
+    # ----------------------------------------------------
+    serial_watchdog_timeout: 5.0    # Reconnect if no line is received for this long (seconds, 0=disable)
+    usb_reset_enabled: true         # Reset the USB-serial device after repeated link failures
+    usb_reset_after_failures: 2     # Consecutive link failures before a USB reset
+    usb_reset_min_interval: 30.0    # Minimum interval between USB resets (seconds)
 
     # ----------------------------------------------------
     # RTK / NTRIP Settings
@@ -38,5 +47,5 @@
     # ----------------------------------------------------
     hardware_id: "um982"            # Hardware ID in diagnostic messages
     diagnostic_update_period: 1.0   # Diagnostic publishing interval (seconds)
-    diagnostic_timeout: 2.0         # Timeout threshold to report ERROR status (seconds)
-    diagnostic_status_name: "UM982 Status" # Status name for diagnostic_aggregator
+    diagnostic_timeout: 2.0         # No data -> STALE, no GGA/GGAH -> ERROR after this many seconds
+    diagnostic_name_prefix: "UM982"  # Status name prefix: "<prefix> Main Antenna", "<prefix> Secondary Antenna", "<prefix> NTRIP"

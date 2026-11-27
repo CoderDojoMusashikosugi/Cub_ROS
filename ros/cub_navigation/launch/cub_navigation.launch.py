@@ -61,7 +61,9 @@ def launch_setup(context):
         'param',
         'nav2_rviz_view.rviz')
 
-    return [
+    nav2_delay = float(LaunchConfiguration('nav2_delay').perform(context))
+    rviz_delay = float(LaunchConfiguration('rviz_delay').perform(context))
+    nav2_actions = [
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource([cub_navigation_launch_dir, '/nav2_bringup_launch.py']),
             launch_arguments={
@@ -78,20 +80,37 @@ def launch_setup(context):
             # arguments=["/home/cub/colcon_ws/src/cub/cub_behavior_tree/routes/2d_waypoints.yaml"]
         ),
         Node(
+            package='cub_behavior_tree',
+            executable='queue_follower',
+            parameters=[param_dir],
+        ),
+        Node(
             package='cub_navigation',
             executable='waypoint_visualizer',
-            parameters=[{'json_file': waypoints_file}]
+            parameters=[{'json_file': waypoints_file}],
+            ros_arguments=['--log-level', 'json_line_visualizer:=info'],
         ),
-
-
-        Node(
-            package='rviz2',
-            executable='rviz2',
-            name='rviz2',
-            arguments=['-d', rviz_config_dir],
-            parameters=[{'use_sim_time': use_sim_time}],
-            output='screen'),
     ]
+
+    rviz_node = Node(
+        package='rviz2',
+        executable='rviz2',
+        name='rviz2',
+        arguments=['-d', rviz_config_dir],
+        parameters=[{'use_sim_time': use_sim_time}],
+        output='screen',
+    )
+
+    actions = []
+    if nav2_delay > 0.0:
+        actions.append(TimerAction(period=nav2_delay, actions=nav2_actions))
+    else:
+        actions.extend(nav2_actions)
+    if rviz_delay > 0.0:
+        actions.append(TimerAction(period=rviz_delay, actions=[rviz_node]))
+    else:
+        actions.append(rviz_node)
+    return actions
 
 
 def generate_launch_description():
@@ -105,7 +124,7 @@ def generate_launch_description():
 
     waypoints_dir = LaunchConfiguration(
         'waypoints',
-        default="/home/cub/colcon_ws/src/cub/cub_behavior_tree/routes/kakunin.yaml")
+        default="/home/cub/colcon_ws/src/cub/cub_behavior_tree/routes/tc26_1017_all.yaml")
 
     return LaunchDescription([
         DeclareLaunchArgument(
@@ -132,6 +151,16 @@ def generate_launch_description():
             'use_sim_time',
             default_value='false',
             description='Use simulation (Gazebo) clock if true'),
+
+        DeclareLaunchArgument(
+            'nav2_delay',
+            default_value='0.0',
+            description='Delay in seconds before launching Nav2 nodes'),
+
+        DeclareLaunchArgument(
+            'rviz_delay',
+            default_value='0.0',
+            description='Delay in seconds before launching RViz2'),
 
         OpaqueFunction(function=launch_setup),
     ])

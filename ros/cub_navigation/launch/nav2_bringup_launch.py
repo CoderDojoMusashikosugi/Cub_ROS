@@ -205,7 +205,8 @@ def generate_launch_description():
                 emulate_tty=True,
                 parameters=[{'use_sim_time': False},
                             {'autostart': True},
-                            {'node_names': ['map_server']}],
+                            {'node_names': ['map_server']},
+                            {'bond_timeout': 15.0}],
             ),
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(

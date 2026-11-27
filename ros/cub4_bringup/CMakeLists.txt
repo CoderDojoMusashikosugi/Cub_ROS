@@ -21,6 +21,12 @@ install(TARGETS
   DESTINATION lib/${PROJECT_NAME}
 )
 
+install(PROGRAMS
+  scripts/dial_ncm_watchdog.py
+  scripts/imu_usb_watchdog.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 install(DIRECTORY launch
   DESTINATION share/${PROJECT_NAME}
 )
@@ -28,5 +34,10 @@ install(DIRECTORY launch
 install(DIRECTORY config
   DESTINATION share/${PROJECT_NAME}
 )
+
+if(BUILD_TESTING)
+  find_package(ament_cmake_pytest REQUIRED)
+  ament_add_pytest_test(test_imu_usb_watchdog test/test_imu_usb_watchdog.py)
+endif()
 
 ament_package()

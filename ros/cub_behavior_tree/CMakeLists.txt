@@ -30,10 +30,14 @@ include_directories(
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "action/AcquireFrontTarget.action"
+  "action/QueueFollow.action"
   DEPENDENCIES geometry_msgs std_msgs
 )
 
+rosidl_get_typesupport_target(cub_behavior_tree__rosidl_typesupport_cpp ${PROJECT_NAME} "rosidl_typesupport_cpp")
+
 add_executable(waypoint_navigator src/waypoint_navigator.cpp)
+add_executable(queue_follower src/queue_follower.cpp)
 add_library(bt_follow_zone_plugins SHARED src/follow_zone_plugins.cpp)
 add_library(front_target_server_component SHARED src/front_target_server.cpp)
 add_executable(front_target_server src/front_target_server_main.cpp)
@@ -55,6 +59,17 @@ ament_target_dependencies(waypoint_navigator
 )
 target_link_libraries(waypoint_navigator
   yaml-cpp
+  ${cub_behavior_tree__rosidl_typesupport_cpp}
+)
+
+ament_target_dependencies(queue_follower
+  rclcpp
+  rclcpp_action
+  geometry_msgs
+  sensor_msgs
+  tf2
+  tf2_ros
+  tf2_geometry_msgs
 )
 
 ament_target_dependencies(bt_follow_zone_plugins
@@ -84,10 +99,14 @@ ament_target_dependencies(front_target_server
   rclcpp_components
 )
 
-rosidl_get_typesupport_target(cub_behavior_tree__rosidl_typesupport_cpp ${PROJECT_NAME} "rosidl_typesupport_cpp")
 target_link_libraries(bt_follow_zone_plugins ${cub_behavior_tree__rosidl_typesupport_cpp})
 target_link_libraries(front_target_server_component ${cub_behavior_tree__rosidl_typesupport_cpp})
 target_link_libraries(front_target_server ${cub_behavior_tree__rosidl_typesupport_cpp} front_target_server_component)
+target_link_libraries(queue_follower ${cub_behavior_tree__rosidl_typesupport_cpp})
+target_include_directories(waypoint_navigator PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/rosidl_generator_cpp>)
+target_include_directories(queue_follower PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/rosidl_generator_cpp>)
 target_include_directories(bt_follow_zone_plugins PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/rosidl_generator_cpp>
   $<INSTALL_INTERFACE:include>)
@@ -106,7 +125,7 @@ rclcpp_components_register_nodes(front_target_server_component "cub_behavior_tre
 
 pluginlib_export_plugin_description_file(nav2_behavior_tree bt_plugins.xml)
 
-install(TARGETS waypoint_navigator
+install(TARGETS waypoint_navigator queue_follower
   DESTINATION lib/${PROJECT_NAME})
 
 install(TARGETS bt_follow_zone_plugins

@@ -467,11 +467,16 @@ void WaypointManagerNode::getGroupListCallback(
 {
   response->group_names.clear();
   response->require_input_flags.clear();
+  response->waypoint_counts.clear();
 
   for (const auto& group : waypoint_groups_) {
     response->group_names.push_back(group.group_name);
     response->require_input_flags.push_back(group.require_input);
+    response->waypoint_counts.push_back(static_cast<int32_t>(group.size()));
   }
+
+  response->file_path = waypoint_file_path_;
+  response->modified = data_modified_;
 }
 
 // YAML I/O implementation
@@ -491,6 +496,7 @@ bool WaypointManagerNode::loadFromYAML(const std::string& filepath)
       WaypointGroup group;
       group.group_name = group_node["group_name"].as<std::string>();
       group.require_input = group_node["require_input"].as<bool>();
+      group.queue = group_node["queue"] && group_node["queue"].as<bool>();
 
       if (group_node["waypoints"]) {
         for (const auto& wp_node : group_node["waypoints"]) {
@@ -546,6 +552,9 @@ bool WaypointManagerNode::saveToYAML(const std::string& filepath)
       out << YAML::BeginMap;
       out << YAML::Key << "group_name" << YAML::Value << group.group_name;
       out << YAML::Key << "require_input" << YAML::Value << group.require_input;
+      if (group.queue) {
+        out << YAML::Key << "queue" << YAML::Value << true;
+      }
       out << YAML::Key << "waypoints" << YAML::Value << YAML::BeginSeq;
 
       for (const auto& wp : group.waypoints) {
@@ -576,6 +585,8 @@ bool WaypointManagerNode::saveToYAML(const std::string& filepath)
     RCLCPP_INFO(this->get_logger(), "Saved %zu groups to %s",
                 waypoint_groups_.size(), filepath.c_str());
 
+    // Also covers auto_save, so the panel's "unsaved" indicator clears
+    data_modified_ = false;
     return true;
 
   } catch (const std::exception& e) {

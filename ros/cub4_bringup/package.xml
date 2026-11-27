@@ -13,6 +13,9 @@
   <depend>libserial-dev</depend>
 
   <exec_depend>micro_ros_agent</exec_depend>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>diagnostic_msgs</exec_depend>
+  <exec_depend>usbutils</exec_depend>
   <exec_depend>cxd5602pwbimu_localizer_node</exec_depend>
   <exec_depend>velodyne_driver</exec_depend>
   <exec_depend>velodyne_pointcloud</exec_depend>
@@ -32,6 +35,8 @@
   <exec_depend>rosbag2_storage_mcap</exec_depend>
 
   <exec_depend>cub_simulation</exec_depend>
+
+  <test_depend>ament_cmake_pytest</test_depend>
 
   <export>
     <build_type>ament_cmake</build_type>

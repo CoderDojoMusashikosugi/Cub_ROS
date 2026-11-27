@@ -47,10 +47,11 @@ def generate_launch_description():
         'route_server',
         'behavior_server',
         'velocity_smoother',
+        'collision_monitor_limit',
         'collision_monitor',
         'bt_navigator',
         'waypoint_follower',
-        'docking_server',
+        # 'docking_server',
     ]
 
     # Map fully qualified names to relative ones so the node's namespace can be prepended.
@@ -226,6 +227,17 @@ def generate_launch_description():
             Node(
                 package='nav2_collision_monitor',
                 executable='collision_monitor',
+                name='collision_monitor_limit',
+                output='screen',
+                respawn=use_respawn,
+                respawn_delay=2.0,
+                parameters=[configured_params],
+                arguments=['--ros-args', '--log-level', log_level],
+                remappings=remappings,
+            ),
+            Node(
+                package='nav2_collision_monitor',
+                executable='collision_monitor',
                 name='collision_monitor',
                 output='screen',
                 respawn=use_respawn,
@@ -234,24 +246,28 @@ def generate_launch_description():
                 arguments=['--ros-args', '--log-level', log_level],
                 remappings=remappings,
             ),
-            Node(
-                package='opennav_docking',
-                executable='opennav_docking',
-                name='docking_server',
-                output='screen',
-                respawn=use_respawn,
-                respawn_delay=2.0,
-                parameters=[configured_params],
-                arguments=['--ros-args', '--log-level', log_level],
-                remappings=remappings,
-            ),
+            # Node(
+            #     package='opennav_docking',
+            #     executable='opennav_docking',
+            #     name='docking_server',
+            #     output='screen',
+            #     respawn=use_respawn,
+            #     respawn_delay=2.0,
+            #     parameters=[configured_params],
+            #     arguments=['--ros-args', '--log-level', log_level],
+            #     remappings=remappings,
+            # ),
             Node(
                 package='nav2_lifecycle_manager',
                 executable='lifecycle_manager',
                 name='lifecycle_manager_navigation',
                 output='screen',
                 arguments=['--ros-args', '--log-level', log_level],
-                parameters=[{'autostart': autostart}, {'node_names': lifecycle_nodes}],
+                parameters=[
+                    {'autostart': autostart},
+                    {'node_names': lifecycle_nodes},
+                    {'bond_timeout': 15.0},
+                ],
             ),
         ],
     )
@@ -323,23 +339,34 @@ def generate_launch_description():
                     ComposableNode(
                         package='nav2_collision_monitor',
                         plugin='nav2_collision_monitor::CollisionMonitor',
-                        name='collision_monitor',
+                        name='collision_monitor_limit',
                         parameters=[configured_params],
                         remappings=remappings,
                     ),
                     ComposableNode(
-                        package='opennav_docking',
-                        plugin='opennav_docking::DockingServer',
-                        name='docking_server',
+                        package='nav2_collision_monitor',
+                        plugin='nav2_collision_monitor::CollisionMonitor',
+                        name='collision_monitor',
                         parameters=[configured_params],
                         remappings=remappings,
                     ),
+                    # ComposableNode(
+                    #     package='opennav_docking',
+                    #     plugin='opennav_docking::DockingServer',
+                    #     name='docking_server',
+                    #     parameters=[configured_params],
+                    #     remappings=remappings,
+                    # ),
                     ComposableNode(
                         package='nav2_lifecycle_manager',
                         plugin='nav2_lifecycle_manager::LifecycleManager',
                         name='lifecycle_manager_navigation',
                         parameters=[
-                            {'autostart': autostart, 'node_names': lifecycle_nodes}
+                            {
+                                'autostart': autostart,
+                                'node_names': lifecycle_nodes,
+                                'bond_timeout': 15.0,
+                            }
                         ],
                     ),
                     ComposableNode(

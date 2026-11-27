@@ -32,6 +32,7 @@ struct Waypoint {
 struct WaypointGroup {
   std::string group_name;      ///< Name of the waypoint group
   bool require_input;          ///< Whether user input is required before navigating this group
+  bool queue = false;          ///< Whether the last two waypoints form a queue section (waypoint_navigator)
   std::vector<Waypoint> waypoints;  ///< List of waypoints in this group
 
   WaypointGroup() : require_input(false) {}

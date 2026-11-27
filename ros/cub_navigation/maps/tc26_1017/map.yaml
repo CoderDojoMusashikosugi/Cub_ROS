@@ -1,0 +1,7 @@
+image: map_avoid.pgm
+resolution: 0.2
+origin: [-92.4275, -100.706, 0.0]
+negate: 0
+occupied_thresh: 0.65
+free_thresh: 0.196
+mode: scale

@@ -203,11 +203,8 @@ global_costmap:
       width: 100
       height: 100
       use_sim_time: False
-      # footprint: "[[0.3, 0.175], [0.3, -0.175], [-0.15, -0.175], [-0.15, 0.175]]" #実際サイズ
-      # footprint: "[[0.3, 0.25], [0.3, -0.25], [-0.15, -0.25], [-0.15, 0.25]]" # ちょっと大きめサイズ.
-      # footprint: "[[0.4, 0.375], [0.4 -0.375], [-0.25, -0.375], [-0.25, 0.375]]" # 大きめサイズ
-      # footprint: "[[0.45, 0.425], [0.45 -0.425], [-0.30, -0.425], [-0.30, 0.425]]" # さらに大きめサイズ +5
-      footprint: "[[0.45, 0.475], [0.45, -0.475], [-0.30, -0.475], [-0.30, 0.475]]" # もっと大きめサイズ +10
+      # footprint: "[[0.20, 0.14], [0.20, -0.14], [-0.20, -0.14], [-0.20, 0.14]]" #実際サイズ
+      footprint: "[[0.40, 0.34], [0.40, -0.34], [-0.40, -0.34], [-0.40, 0.34]]" # 実際+20
       resolution: 0.2
       track_unknown_space: true
       plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
@@ -215,7 +212,7 @@ global_costmap:
       obstacle_layer:
         plugin: "nav2_costmap_2d::ObstacleLayer"
         enabled: True
-        observation_sources: scan
+        observation_sources: scan scan_livox
         scan:
           topic: /scan
           min_obstacle_height: -8.0
@@ -223,9 +220,20 @@ global_costmap:
           clearing: True
           marking: True
           data_type: "LaserScan"
-          raytrace_max_range: 3.0
+          raytrace_max_range: 10.0
           raytrace_min_range: 0.0
-          obstacle_max_range: 2.5
+          obstacle_max_range: 10.0
+          obstacle_min_range: 0.0
+        scan_livox:
+          topic: /scan_livox
+          min_obstacle_height: -8.0
+          max_obstacle_height: 2.0
+          clearing: True
+          marking: True
+          data_type: "LaserScan"
+          raytrace_max_range: 10.0
+          raytrace_min_range: 0.0
+          obstacle_max_range: 10.0
           obstacle_min_range: 0.0
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
@@ -239,6 +247,8 @@ global_costmap:
       #   plugin: "nav2_costmap_2d::KeepoutFilter"
       #   enabled: True
       #   filter_info_topic: "/costmap_filter_info"
+      trinary_costmap: false
+      lethal_cost_threshold: 100
   global_costmap_client:
     ros__parameters:
       use_sim_time: False
@@ -248,7 +258,7 @@ global_costmap:
 
 planner_server:
   ros__parameters:
-    expected_planner_frequency: 10.0
+    expected_planner_frequency: 5.0
     use_sim_time: False
     planner_plugins: ["GridBased"]
     GridBased:
@@ -265,29 +275,27 @@ planner_server_rclcpp_node:
 local_costmap:
   local_costmap:
     ros__parameters:
-      update_frequency: 2.0
+      update_frequency: 5.0
       publish_frequency: 2.0
       global_frame: map
       robot_base_frame: base_link
       use_sim_time: False
       rolling_window: true
-      width: 5
-      height: 5
+      width: 8
+      height: 8
       resolution: 0.05
-      # footprint: "[[0.3, 0.175], [0.3, -0.175], [-0.15, -0.175], [-0.15, 0.175]]" #実際サイズ
-      footprint: "[[0.3, 0.25], [0.3, -0.25], [-0.15, -0.25], [-0.15, 0.25]]" # ちょっと大きめサイズ
-      # footprint: "[[0.4, 0.375], [0.4 -0.375], [-0.25, -0.375], [-0.25, 0.375]]" # 大きめサイズ
-      # footprint: "[[0.45, 0.475], [0.45, -0.475], [-0.30, -0.475], [-0.30, 0.475]]" # もっと大きめサイズ +10
+      # footprint: "[[0.20, 0.14], [0.20, -0.14], [-0.20, -0.14], [-0.20, 0.14]]" #実際サイズ
+      footprint: "[[0.25, 0.19], [0.25, -0.19], [-0.25, -0.19], [-0.25, 0.19]]" # 実際+5
       plugins: ["obstacle_layer", "inflation_layer"]
       # filters: ["keepout_filter", "inflation_layer"]
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
+        cost_scaling_factor: 1.0
         inflation_radius: 2.0
-        cost_scaling_factor: 5.0
       obstacle_layer:
         plugin: "nav2_costmap_2d::ObstacleLayer"
         enabled: True
-        observation_sources: scan
+        observation_sources: scan scan_livox
         scan:
           topic: /scan
           min_obstacle_height: -8.0
@@ -295,28 +303,21 @@ local_costmap:
           clearing: True
           marking: True
           data_type: "LaserScan"
-        SLC1L_scan:
-          topic: /SLC1L_scan
+          raytrace_max_range: 3.0
+          raytrace_min_range: 0.0
+          obstacle_max_range: 2.5
+          obstacle_min_range: 0.0
+        scan_livox:
+          topic: /scan_livox
           min_obstacle_height: -8.0
           max_obstacle_height: 2.0
-          obstacle_max_range: 1.5
-          obstable_min_range: 0.1
           clearing: True
           marking: True
           data_type: "LaserScan"
-        SLC1R_scan:
-          topic: /SLC1R_scan
-          min_obstacle_height: -8.0
-          max_obstacle_height: 2.0
-          obstacle_max_range: 1.5
-          obstable_min_range: 0.1
-          clearing: True
-          marking: True
-          data_type: "LaserScan"
-      # keepout_filter:
-      #   plugin: "nav2_costmap_2d::KeepoutFilter"
-      #   enabled: True
-      #   filter_info_topic: "/costmap_filter_info"
+          raytrace_max_range: 3.0
+          raytrace_min_range: 0.0
+          obstacle_max_range: 2.5
+          obstacle_min_range: 0.0
   local_costmap_client:
     ros__parameters:
       use_sim_time: False
@@ -327,7 +328,7 @@ local_costmap:
 controller_server:
   ros__parameters:
     use_sim_time: False
-    controller_frequency: 10.0
+    controller_frequency: 5.0
     min_x_velocity_threshold: 0.001
     min_y_velocity_threshold: 0.5
     min_theta_velocity_threshold: 0.001
@@ -336,6 +337,8 @@ controller_server:
     progress_checker_plugins: ["progress_checker"]
     goal_checker_plugins: ["general_goal_checker"] 
     controller_plugins: ["FollowPath"]
+    use_realtime_priority: false
+    costmap_update_timeout: 1.0 
 
     # Progress checker parameters
     progress_checker:
@@ -346,114 +349,294 @@ controller_server:
     general_goal_checker:
       stateful: False
       plugin: "nav2_controller::SimpleGoalChecker"
-      xy_goal_tolerance: 3.0
+      xy_goal_tolerance: 0.3 # 停止地点の到達判定。途中のwaypointはwaypoint_navigatorが手前で次のゴールに切り替える
       yaw_goal_tolerance: 6.28
 
-    # DWB parameters
     # FollowPath:
-    #   plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
-    #   desired_linear_vel: 0.2
-    #   lookahead_dist: 0.6
-    #   min_lookahead_dist: 0.3
-    #   max_lookahead_dist: 0.9
-    #   lookahead_time: 1.5
-    #   rotate_to_heading_angular_vel: 0.9
-    #   transform_tolerance: 0.1
-    #   use_velocity_scaled_lookahead_dist: false
-    #   min_approach_linear_velocity: 0.05
-    #   approach_velocity_scaling_dist: 0.6
-    #   use_collision_detection: true
-    #   max_allowed_time_to_collision_up_to_carrot: 1.0
-    #   use_regulated_linear_velocity_scaling: true
-    #   use_fixed_curvature_lookahead: false
-    #   curvature_lookahead_dist: 0.25
-    #   use_cost_regulated_linear_velocity_scaling: false
-    #   cost_scaling_dist: 0.3
-    #   cost_scaling_gain: 1.0
-    #   regulated_linear_scaling_min_radius: 0.9
-    #   regulated_linear_scaling_min_speed: 0.25
-    #   use_rotate_to_heading: true
-    #   allow_reversing: false
-    #   rotate_to_heading_min_angle: 0.785
-    #   max_angular_accel: 3.2
-    #   max_robot_pose_search_dist: 10.0
-    #   min_distance_to_obstacle: 0.0
-    #   stateful: true
+    #   plugin: "dwb_core::DWBLocalPlanner"
+    #   debug_trajectory_details: True
+    #   min_vel_x: 0.0
+    #   min_vel_y: 0.0
+    #   max_vel_x: 1.0
+    #   max_vel_y: 0.0
+    #   max_vel_theta: 0.628
+    #   min_speed_xy: 0.0
+    #   max_speed_xy: 1.0
+    #   min_speed_theta: 0.0
+    #   # Add high threshold velocity for turtlebot 3 issue.
+    #   # https://github.com/ROBOTIS-GIT/turtlebot3_simulations/issues/75
+    #   acc_lim_x: 2.5
+    #   acc_lim_y: 0.0
+    #   acc_lim_theta: 3.2
+    #   decel_lim_x: -2.5
+    #   decel_lim_y: 0.0
+    #   decel_lim_theta: -3.2
+    #   vx_samples: 20
+    #   vy_samples: 0
+    #   vtheta_samples: 40
+    #   sim_time: 1.5
+    #   linear_granularity: 0.05
+    #   angular_granularity: 0.025
+    #   transform_tolerance: 0.2
+    #   xy_goal_tolerance: 0.05
+    #   trans_stopped_velocity: 0.25
+    #   short_circuit_trajectory_evaluation: True
+    #   stateful: True
+    #   critics: ["RotateToGoal", "Oscillation", "BaseObstacle", "GoalAlign", "PathAlign", "PathDist", "GoalDist"]
+    #   BaseObstacle.scale: 0.02
+    #   PathAlign.scale: 32.0
+    #   PathAlign.forward_point_distance: 0.1
+    #   GoalAlign.scale: 24.0
+    #   GoalAlign.forward_point_distance: 0.1
+    #   PathDist.scale: 32.0
+    #   GoalDist.scale: 24.0
+    #   RotateToGoal.scale: 32.0
+    #   RotateToGoal.slowing_factor: 5.0
+    #   RotateToGoal.lookahead_time: -1.0
+
     FollowPath:
-      plugin: "dwb_core::DWBLocalPlanner"
-      debug_trajectory_details: True
-      min_vel_x: 0.0
-      min_vel_y: 0.0
-      max_vel_x: 1.0
-      max_vel_y: 0.0
-      max_vel_theta: 0.628
-      min_speed_xy: 0.0
-      max_speed_xy: 1.0
-      min_speed_theta: 0.0
-      # Add high threshold velocity for turtlebot 3 issue.
-      # https://github.com/ROBOTIS-GIT/turtlebot3_simulations/issues/75
-      acc_lim_x: 2.5
-      acc_lim_y: 0.0
-      acc_lim_theta: 3.2
-      decel_lim_x: -2.5
-      decel_lim_y: 0.0
-      decel_lim_theta: -3.2
-      vx_samples: 20
-      vy_samples: 0
-      vtheta_samples: 40
-      sim_time: 1.5
-      linear_granularity: 0.05
-      angular_granularity: 0.025
-      transform_tolerance: 0.2
-      xy_goal_tolerance: 0.05
-      trans_stopped_velocity: 0.25
-      short_circuit_trajectory_evaluation: True
-      stateful: True
-      critics: ["RotateToGoal", "Oscillation", "BaseObstacle", "GoalAlign", "PathAlign", "PathDist", "GoalDist"]
-      BaseObstacle.scale: 0.02
-      PathAlign.scale: 32.0
-      PathAlign.forward_point_distance: 0.1
-      GoalAlign.scale: 24.0
-      GoalAlign.forward_point_distance: 0.1
-      PathDist.scale: 32.0
-      GoalDist.scale: 24.0
-      RotateToGoal.scale: 32.0
-      RotateToGoal.slowing_factor: 5.0
-      RotateToGoal.lookahead_time: -1.0
+      plugin: "nav2_mppi_controller::MPPIController"
+      time_steps: 14
+      model_dt: 0.2
+      batch_size: 2000
+      ax_max: 0.5
+      ax_min: -3.0
+      ay_max: 0.5
+      ay_min: -3.0
+      az_max: 3.5
+      vx_std: 0.4
+      vy_std: 0.0
+      wz_std: 0.4
+      vx_max: 1.5
+      vx_min: -0.3
+      vy_max: 0.0
+      wz_max: 1.57
+      iteration_count: 1
+      prune_distance: 4.0
+      transform_tolerance: 0.1
+      temperature: 0.3
+      gamma: 0.015
+      motion_model: "DiffDrive"
+      visualize: false
+      regenerate_noises: true
+      TrajectoryVisualizer:
+        trajectory_step: 5
+        time_step: 3
+      AckermannConstraints:
+        min_turning_r: 0.2
+      critics: [
+        "ConstraintCritic", "CostCritic", "GoalCritic",
+        "GoalAngleCritic", "PathAlignCritic", "PathFollowCritic",
+        "PathAngleCritic", "PreferForwardCritic"]
+      ConstraintCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 4.0
+      GoalCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 5.0
+        threshold_to_consider: 1.4
+      GoalAngleCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 3.0
+        threshold_to_consider: 0.5
+      PreferForwardCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 5.0
+        threshold_to_consider: 0.5
+      CostCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 3.81
+        near_collision_cost: 253
+        critical_cost: 300.0
+        consider_footprint: true
+        collision_cost: 1000000.0
+        near_goal_distance: 1.0
+        trajectory_point_step: 1
+      PathAlignCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 14.0
+        max_path_occupancy_ratio: 0.05
+        trajectory_point_step: 2
+        threshold_to_consider: 0.5
+        offset_from_furthest: 10
+        use_path_orientations: false
+      PathFollowCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 5.0
+        offset_from_furthest: 5
+        threshold_to_consider: 1.4
+      PathAngleCritic:
+        enabled: true
+        cost_power: 1
+        cost_weight: 2.0
+        offset_from_furthest: 4
+        threshold_to_consider: 0.5
+        max_angle_to_furthest: 1.0
+        mode: 0
+      # TwirlingCritic:
+      #   enabled: true
+      #   twirling_cost_power: 1
+      #   twirling_cost_weight: 10.0
+
       
 controller_server_rclcpp_node:
   ros__parameters:
     use_sim_time: False
 
-collision_monitor:
+# collision_monitorは2段構成にしている。
+#   velocity_smoother -> cmd_vel_smoothed -> collision_monitor_limit -> cmd_vel_limited -> collision_monitor -> cmd_vel
+# 停止ポリゴンは制限後の(実際に出る)速度で決定出来るようにしている。
+collision_monitor_limit:
   ros__parameters:
     use_sim_time: False
     base_frame_id: "base_link"
     odom_frame_id: "odom"
     cmd_vel_in_topic: "cmd_vel_smoothed"
-    cmd_vel_out_topic: "cmd_vel"
-    state_topic: "collision_monitor_state"
+    cmd_vel_out_topic: "cmd_vel_limited"
+    state_topic: "collision_monitor_limit_state"
     transform_tolerance: 0.5
-    source_timeout: 5.0
+    source_timeout: 0.0
     base_shift_correction: True
     stop_pub_timeout: 2.0
-    polygons: ["FootprintApproach"]
-    FootprintApproach:
+    polygons: ["LimitNear", "LimitMid", "LimitFar"]
+    LimitFar:          # 遠め: 弱い制限
       type: "polygon"
-      action_type: "approach"
-      footprint_topic: "/local_costmap/published_footprint"
-      time_before_collision: 1.2
-      simulation_time_step: 0.1
+      action_type: "limit"
+      points: "[[3.0, 0.20], [3.0, -0.20], [-0.30, -0.60], [-0.30, 0.60]]"
+      linear_limit: 0.8    # [m/s]
+      angular_limit: 6.28   # [rad/s]
       min_points: 6
-      visualize: False
+      visualize: True
       enabled: True
-    observation_sources: ["scan"]
+      polygon_pub_topic: "polygon_slow_far"
+    LimitMid:         # 近め: 強い制限
+      type: "polygon"
+      action_type: "limit"
+      points: "[[1.5, 0.60], [1.5, -0.60], [-0.30, -0.60], [-0.30, 0.60]]"
+      linear_limit: 0.5    # [m/s]
+      angular_limit: 6.28   # [rad/s]
+      min_points: 6
+      visualize: True
+      enabled: True
+      polygon_pub_topic: "polygon_slow_mid"
+    LimitNear:         # 近め: 強い制限
+      type: "polygon"
+      action_type: "limit"
+      points: "[[0.6, 0.34], [0.6, -0.34], [-0.3, -0.34], [-0.3, 0.34]]"
+      linear_limit: 0.19    # [m/s]
+      angular_limit: 6.28   # [rad/s]
+      min_points: 6
+      visualize: True
+      enabled: True
+      polygon_pub_topic: "polygon_slow_near"
+    observation_sources: ["scan", "scan_livox"]
     scan:
       type: "scan"
       topic: "/scan"
       min_height: 0.15
       max_height: 2.0
       enabled: True
+    scan_livox:
+      type: "scan"
+      topic: "/scan_livox"
+      min_height: 0.15
+      max_height: 2.0
+      enabled: True
+# 停止を担当する後段
+collision_monitor:
+  ros__parameters:
+    use_sim_time: False
+    base_frame_id: "base_link"
+    odom_frame_id: "odom"
+    cmd_vel_in_topic: "cmd_vel_limited"
+    cmd_vel_out_topic: "cmd_vel"
+    state_topic: "collision_monitor_state"
+    transform_tolerance: 0.5
+    source_timeout: 0.0
+    base_shift_correction: True
+    stop_pub_timeout: 2.0
+    polygons: ["VelocityPolygonStop"]
+    VelocityPolygonStop:
+      type: "velocity_polygon"
+      action_type: "stop"
+      min_points: 6
+      visualize: True
+      enabled: True
+      polygon_pub_topic: "velocity_polygon"
+      holonomic: false
+      velocity_polygons: ["rotation", "forward_slow", "forward_medium", "forward_fast", "backward", "stopped"]
+      rotation:          # その場旋回: footprint ぎりぎり
+        points: "[[0.20, 0.14], [0.20, -0.14], [-0.20, -0.14], [-0.20, 0.14]]"
+        linear_min: -0.05
+        linear_max: 0.05
+        theta_min: -10.0
+        theta_max: 10.0
+      forward_slow:           # 前進: 前方のみ
+        points: "[[0.4, 0.19], [0.4, -0.19], [0.05, -0.19], [0.05, 0.19]]"
+        linear_min: 0.0
+        linear_max: 0.2
+        theta_min: -2.0
+        theta_max: 2.0
+      forward_medium:           # 前進: 前方のみ
+        points: "[[0.5, 0.29], [0.5, -0.29], [0.05, -0.19], [0.05, 0.19]]"
+        linear_min: 0.0
+        linear_max: 0.6
+        theta_min: -2.0
+        theta_max: 2.0
+      forward_fast:           # 前進: 前方のみ
+        points: "[[0.6, 0.34], [0.6, -0.34], [0.05, -0.19], [0.05, 0.19]]"
+        linear_min: 0.0
+        linear_max: 1.5
+        theta_min: -2.0
+        theta_max: 2.0
+      backward:          # 後退: 後方のみ
+        points: "[[-0.05, 0.19], [-0.05, -0.19], [-0.45, -0.19], [-0.45, 0.19]]"
+        linear_min: -2.0
+        linear_max: 0.0
+        theta_min: -2.0
+        theta_max: 2.0
+      stopped:
+        points: "[[0.20, 0.14], [0.20, -0.14], [-0.20, -0.14], [-0.20, 0.14]]" # 本当にギリギリサイズ
+        linear_min: -1.0
+        linear_max: 1.0
+        theta_min: -2.0
+        theta_max: 2.0
+    observation_sources: ["scan", "scan_livox"]
+    scan:
+      type: "scan"
+      topic: "/scan"
+      min_height: 0.15
+      max_height: 2.0
+      enabled: True
+    scan_livox:
+      type: "scan"
+      topic: "/scan_livox"
+      min_height: 0.15
+      max_height: 2.0
+      enabled: True
+
+# 行列区間(queue: trueのグループの最後の2点の間)を走るノード。cub_behavior_tree/src/queue_follower.cpp
+queue_follower:
+  ros__parameters:
+    lane_half_width: 0.2      # 通路の半幅[m]。直線からこれ以上横の点は無視
+    robot_front_offset: 0.2   # base_linkから機体前端まで[m]
+    detect_range: 5.0         # 前方を見る距離[m]
+    stop_gap: 0.6             # 前の物体との空き距離がこれ以下で停止[m]
+    resume_gap: 1.0           # 停止中、空き距離がこれ以上で再発進[m]
+    max_speed: 0.5            # [m/s]
+    min_speed: 0.1            # [m/s]
+    slowdown_gain: 0.5        # 前の物体・終点に近づいたときの減速 (速度 = gain * 残り距離)
+    lookahead_distance: 1.0   # pure pursuitの先読み距離[m]
+    max_angular_speed: 0.6    # [rad/s]
+    goal_tolerance: 0.15      # 終点までの残りがこれ以下で到着[m]
+    scan_topics: ["/scan", "/scan_livox"]
 
 smoother_server:
   ros__parameters:
@@ -470,7 +653,7 @@ velocity_smoother:
     stamp_smoothed_velocity_with_smoothing_time: False
     scale_velocities: False
     feedback: "OPEN_LOOP"
-    max_velocity: [1.0, 0.0, 2.0]
+    max_velocity: [1.2, 0.0, 2.0]
     min_velocity: [-0.5, 0.0, -2.0]
     max_accel: [2.5, 0.0, 3.2]
     max_decel: [-2.5, 0.0, -3.2]
@@ -479,46 +662,46 @@ velocity_smoother:
     deadband_velocity: [0.0, 0.0, 0.0]
     velocity_timeout: 1.0
 
-docking_server:
-  ros__parameters:
-    controller_frequency: 50.0
-    initial_perception_timeout: 5.0
-    wait_charge_timeout: 5.0
-    dock_approach_timeout: 30.0
-    undock_linear_tolerance: 0.05
-    undock_angular_tolerance: 0.1
-    max_retries: 3
-    base_frame: "base_link"
-    fixed_frame: "odom"
-    dock_backwards: false
-    dock_prestaging_tolerance: 0.5
-    dock_plugins: ['simple_charging_dock']
-    simple_charging_dock:
-      plugin: 'opennav_docking::SimpleChargingDock'
-      docking_threshold: 0.05
-      staging_x_offset: -0.7
-      use_external_detection_pose: true
-      use_battery_status: false
-      use_stall_detection: false
-      external_detection_timeout: 1.0
-      external_detection_translation_x: -0.18
-      external_detection_translation_y: 0.0
-      external_detection_rotation_roll: -1.57
-      external_detection_rotation_pitch: -1.57
-      external_detection_rotation_yaw: 0.0
-      filter_coef: 0.1
-    controller:
-      k_phi: 3.0
-      k_delta: 2.0
-      v_linear_min: 0.15
-      v_linear_max: 0.15
-      use_collision_detection: true
-      costmap_topic: "local_costmap/costmap_raw"
-      footprint_topic: "local_costmap/published_footprint"
-      transform_tolerance: 0.1
-      projection_time: 5.0
-      simulation_step: 0.1
-      dock_collision_threshold: 0.3
+# docking_server:
+#   ros__parameters:
+#     controller_frequency: 50.0
+#     initial_perception_timeout: 5.0
+#     wait_charge_timeout: 5.0
+#     dock_approach_timeout: 30.0
+#     undock_linear_tolerance: 0.05
+#     undock_angular_tolerance: 0.1
+#     max_retries: 3
+#     base_frame: "base_link"
+#     fixed_frame: "odom"
+#     dock_backwards: false
+#     dock_prestaging_tolerance: 0.5
+#     dock_plugins: ['simple_charging_dock']
+#     simple_charging_dock:
+#       plugin: 'opennav_docking::SimpleChargingDock'
+#       docking_threshold: 0.05
+#       staging_x_offset: -0.7
+#       use_external_detection_pose: true
+#       use_battery_status: false
+#       use_stall_detection: false
+#       external_detection_timeout: 1.0
+#       external_detection_translation_x: -0.18
+#       external_detection_translation_y: 0.0
+#       external_detection_rotation_roll: -1.57
+#       external_detection_rotation_pitch: -1.57
+#       external_detection_rotation_yaw: 0.0
+#       filter_coef: 0.1
+#     controller:
+#       k_phi: 3.0
+#       k_delta: 2.0
+#       v_linear_min: 0.15
+#       v_linear_max: 0.15
+#       use_collision_detection: true
+#       costmap_topic: "local_costmap/costmap_raw"
+#       footprint_topic: "local_costmap/published_footprint"
+#       transform_tolerance: 0.1
+#       projection_time: 5.0
+#       simulation_step: 0.1
+#       dock_collision_threshold: 0.3
 
 # collision_monitor:
 #   ros__parameters:

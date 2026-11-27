@@ -23,6 +23,10 @@ extern "C" {
 namespace {
 constexpr int BEEP_FREQ = 4000;
 constexpr int BEEP_DURATION_MS = 50;
+constexpr int CONNECT_BEEP_DURATION_MS = 100;
+constexpr int DISCONNECT_BEEP_DURATION_MS = 200;
+
+enum class DialStatus { Updating, Error, Pressed, Ready };
 
 int udp_socket = -1;
 rclc_support_t support{};
@@ -35,6 +39,7 @@ bool pressed = false;
 bool last_published = false;
 bool connected = false;
 bool updating = false;
+bool usb_connected = false;
 uint32_t connected_host = 0;
 unsigned long last_publish = 0;
 unsigned long last_agent_check = 0;
@@ -120,13 +125,43 @@ bool create_ros() {
     return true;
 }
 
+DialStatus current_status() {
+    if (updating) return DialStatus::Updating;
+    if (!connected) return DialStatus::Error;
+    return pressed ? DialStatus::Pressed : DialStatus::Ready;
+}
+
 void display_state() {
-    M5Dial.Display.fillScreen(pressed ? TFT_BLUE : TFT_BLACK);
+    uint16_t background = TFT_BLACK;
+    uint16_t foreground = TFT_GREEN;
+    const char *title = "READY";
+    const char *detail = "ROS CONNECTED";
+    switch (current_status()) {
+    case DialStatus::Updating:
+        foreground = TFT_YELLOW;
+        title = "UPDATING";
+        detail = "OTA";
+        break;
+    case DialStatus::Error:
+        background = pressed ? TFT_RED : TFT_BLACK;
+        foreground = pressed ? TFT_WHITE : TFT_RED;
+        title = "ERROR";
+        detail = usb_connected ? "ROS WAITING" : "USB WAITING";
+        break;
+    case DialStatus::Pressed:
+        background = TFT_BLUE;
+        foreground = TFT_WHITE;
+        title = "PRESSED";
+        break;
+    case DialStatus::Ready:
+        break;
+    }
+    M5Dial.Display.fillScreen(background);
     M5Dial.Display.setTextDatum(middle_center);
-    M5Dial.Display.setTextColor(pressed ? TFT_WHITE : TFT_GREEN);
+    M5Dial.Display.setTextColor(foreground);
     M5Dial.Display.setTextSize(2);
-    M5Dial.Display.drawString(pressed ? "PRESSED" : "READY", 120, 65);
-    M5Dial.Display.drawString(updating ? "UPDATING" : connected ? "ROS CONNECTED" : "ROS WAITING", 120, 105);
+    M5Dial.Display.drawString(title, 120, 65);
+    M5Dial.Display.drawString(detail, 120, 105);
     M5Dial.Display.setTextSize(1);
     M5Dial.Display.drawString("USB: 192.168.77.1", 120, 140);
     M5Dial.Display.drawString("/dial/button", 120, 160);
@@ -154,15 +189,17 @@ void loop() {
     M5Dial.update();
     const bool was_pressed = pressed;
     pressed = M5Dial.BtnA.isPressed();
-    if (pressed && !was_pressed)
+    if (pressed && !was_pressed && connected)
         M5Dial.Speaker.tone(BEEP_FREQ, BEEP_DURATION_MS);
+    const bool was_usb_connected = usb_connected;
+    usb_connected = usb_ncm_connected();
     const bool was_updating = updating;
     updating = usb_ota_updating();
     const bool was_connected = connected;
     const unsigned long now = millis();
-    if (connected && (!usb_ncm_connected() || connected_host != usb_ncm_host_address()))
+    if (connected && (!usb_connected || connected_host != usb_ncm_host_address()))
         destroy_ros();
-    if (!updating && usb_ncm_connected() && now - last_agent_check >= 1000) {
+    if (!updating && usb_connected && now - last_agent_check >= 1000) {
         last_agent_check = now;
         if (rmw_uros_ping_agent(100, 1) == RMW_RET_OK) {
             if (!connected) {
@@ -184,6 +221,12 @@ void loop() {
             last_publish = now;
         }
     }
-    if (was_pressed != pressed || was_connected != connected || was_updating != updating) display_state();
+    if (!was_connected && connected)
+        M5Dial.Speaker.tone(BEEP_FREQ, CONNECT_BEEP_DURATION_MS);
+    else if (was_connected && !connected)
+        M5Dial.Speaker.tone(BEEP_FREQ, DISCONNECT_BEEP_DURATION_MS);
+    if (was_pressed != pressed || was_connected != connected || was_updating != updating ||
+        was_usb_connected != usb_connected)
+        display_state();
     delay(5);
 }

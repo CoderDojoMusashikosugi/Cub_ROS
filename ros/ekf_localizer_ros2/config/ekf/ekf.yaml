@@ -30,10 +30,13 @@ ekf_localizer_node:
     # EKF Initial pose
     INIT_X: 62.6
     INIT_Y: 31.2
+    # INIT_X: 0.0
+    # INIT_Y: 0.0
     INIT_Z: 0.0
     INIT_ROLL: 0.0
     INIT_PITCH: 0.0
     INIT_YAW: 2.82
+    # INIT_YAW: 0.0
     INIT_SIGMA: 0.2
     
     # Sensor noise parameters

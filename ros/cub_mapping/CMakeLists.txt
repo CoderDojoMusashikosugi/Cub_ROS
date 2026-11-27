@@ -77,6 +77,8 @@ add_library(${PROJECT_NAME}_plugin SHARED
   include/cub_mapping/pointcloud_to_2d_tool.hpp
   src/waypoint_edit_tool.cpp
   include/cub_mapping/waypoint_edit_tool.hpp
+  src/waypoint_editor_panel.cpp
+  include/cub_mapping/waypoint_editor_panel.hpp
 )
 
 set_target_properties(${PROJECT_NAME}_plugin PROPERTIES
@@ -93,6 +95,7 @@ target_compile_definitions(${PROJECT_NAME}_plugin PRIVATE "CUB_MAPPING_BUILDING_
 ament_target_dependencies(${PROJECT_NAME}_plugin
   rclcpp
   std_msgs
+  std_srvs
   rviz_common
   rviz_rendering
   rviz_ogre_vendor

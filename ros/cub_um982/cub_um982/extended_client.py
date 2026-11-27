@@ -18,6 +18,10 @@ import time
 from dataclasses import dataclass, field
 from typing import Callable, Optional
 
+from cub_um982.usb_reset import UsbDeviceInfo, find_usb_device_for_tty
+
+import serial
+
 # Try importing base client from submodule or workspace
 try:
     from um982.client import UM982Client
@@ -431,6 +435,20 @@ class ExtendedNtripClient(threading.Thread):
                 )
 
 
+@dataclass(frozen=True)
+class AntennaGgaState:
+    """
+    State of the latest GGA (primary) or GGAH (secondary) sentence.
+
+    Updated for every sentence including empty no-fix ones, so it always
+    reflects what the receiver reported most recently.
+    """
+    time: float                     # time.monotonic() when received
+    has_position: bool              # coordinates available (quality != 0)
+    rtk_state: str                  # determine_rtk_state() result, or 'no_fix'
+    gga: Optional[GGAData] = None   # None for sentences with an empty UTC field
+
+
 class ExtendedUM982Client(UM982Client):
     """
     Subclass of UM982Client that:
@@ -445,8 +463,20 @@ class ExtendedUM982Client(UM982Client):
         baud: int = 115200,
         timeout: float = 0.5,
         output_rate: int = 10,
+        write_timeout: Optional[float] = 1.0,
     ):
         super().__init__(port=port, baud=baud, timeout=timeout, output_rate=output_rate)
+
+        # Bound serial writes so that a stalled USB-serial link cannot block
+        # the writer thread forever (Python threads cannot be killed).
+        self.write_timeout = write_timeout
+
+        # Link health (time.monotonic() based)
+        self.open_time: Optional[float] = None
+        self.last_line_time: Optional[float] = None
+        self.serial_error: Optional[str] = None
+        # USB device behind the tty, resolved when the port is opened
+        self.usb_device: Optional[UsbDeviceInfo] = None
 
         # Secondary (slave) antenna state
         self._gga_secondary: Optional[GGAData] = None
@@ -459,9 +489,92 @@ class ExtendedUM982Client(UM982Client):
         self.secondary_no_fix_count = 0
         self.last_secondary_no_fix_time: Optional[float] = None
 
+        # Latest GGA / GGAH per antenna (replaced atomically, safe to read from other threads)
+        self.primary_gga_state: Optional[AntennaGgaState] = None
+        self.secondary_gga_state: Optional[AntennaGgaState] = None
+
         # NTRIP logging & stats
         self._ntrip_log_callback: Optional[Callable[[str, str], None]] = None
         self._ntrip_stats = NtripStats()
+
+    def open(self):
+        """Open the serial port with a write timeout and remember its USB device."""
+        self._ser = serial.Serial(
+            self.port, self.baud, timeout=self.timeout, write_timeout=self.write_timeout
+        )
+        self.open_time = time.monotonic()
+        try:
+            self.usb_device = find_usb_device_for_tty(self.port)
+        except OSError:
+            self.usb_device = None
+
+    def stop(self, join_timeout: float = 2.0) -> bool:
+        """
+        Stop the reader and NTRIP threads and close the serial port.
+
+        Returns:
+            True if the serial reader thread terminated, False if it is still
+            alive (e.g. blocked in a system call). The NTRIP thread may still be
+            finishing a network operation (e.g. connect timeout); it is a daemon
+            thread that exits on its own and only fails writes to the closed port.
+        """
+        self._stop.set()
+        ntrip = self._ntrip_client
+        if ntrip:
+            ntrip.stop()
+
+        for thread in (self._reader_thread, ntrip):
+            if (thread is not None and thread is not threading.current_thread()
+                    and thread.is_alive()):
+                thread.join(timeout=join_timeout)
+        if ntrip is not None and ntrip.is_alive():
+            logger.warning("NTRIP thread is still finishing; it will exit on its own")
+        try:
+            self.close()
+        except Exception as e:
+            logger.warning("Error while closing serial port: %s", e)
+        reader = self._reader_thread
+        return reader is None or reader is threading.current_thread() or not reader.is_alive()
+
+    def _record_serial_error(self, message: str):
+        """Remember the first fatal serial error (ignored while stopping)."""
+        if self.serial_error is None and not self._stop.is_set():
+            self.serial_error = message
+            logger.error("Serial link error: %s", message)
+
+    def get_health_problem(self, watchdog_timeout: float) -> Optional[str]:
+        """
+        Return a description of why the serial link is considered broken,
+        or None if it looks healthy.
+
+        Args:
+            watchdog_timeout: Seconds without any received line before the link
+                is considered stalled (<= 0 disables the watchdog).
+        """
+        if self.serial_error is not None:
+            return self.serial_error
+        if self._reader_thread is None or not self._reader_thread.is_alive():
+            return "serial reader thread is not running"
+        if watchdog_timeout > 0:
+            reference = self.last_line_time if self.last_line_time is not None else self.open_time
+            if reference is not None:
+                silent = time.monotonic() - reference
+                if silent > watchdog_timeout:
+                    return f"no data received from UM982 for {silent:.1f}s"
+        return None
+
+    def _write_bytes(self, data: bytes):
+        """Write bytes; record and re-raise serial errors (e.g. write timeout, EIO)."""
+        ser = self._ser
+        if not ser:
+            raise RuntimeError("serial port is not open")
+        try:
+            with self._write_lock:
+                written = ser.write(data)
+        except Exception as e:
+            self._record_serial_error(f"serial write failed: {e}")
+            raise
+        return len(data) if written is None else written
 
     def set_output_rate(self, rate: int, enable_rmc: bool = False):
         """Request both antenna outputs using UM982 abbreviated ASCII commands."""
@@ -479,6 +592,26 @@ class ExtendedUM982Client(UM982Client):
         for command in commands:
             self._write_line(command)
             time.sleep(0.1)
+
+    def _update_gga_state(self, secondary: bool, gga: Optional[GGAData]):
+        has_position = (
+            gga is not None and gga.quality != 0
+            and gga.lat is not None and gga.lon is not None
+        )
+        state = AntennaGgaState(
+            time=time.monotonic(),
+            has_position=has_position,
+            rtk_state=determine_rtk_state(gga, None) if has_position else 'no_fix',
+            gga=gga,
+        )
+        if secondary:
+            self.secondary_gga_state = state
+        else:
+            self.primary_gga_state = state
+
+    def get_gga_state(self, secondary: bool) -> Optional[AntennaGgaState]:
+        """Latest GGA (primary) or GGAH (secondary) state, or None if never received."""
+        return self.secondary_gga_state if secondary else self.primary_gga_state
 
     def _record_no_fix(self, secondary: bool):
         if secondary:
@@ -532,14 +665,10 @@ class ExtendedUM982Client(UM982Client):
     def _write_rtcm(self, data: bytes) -> int:
         """
         Write RTCM bytes to the receiver and return the number of bytes written.
-        Unlike the base _write_bytes, this raises if the port is not open so that
-        failed writes are never counted as successful.
+        Raises if the port is not open or the write fails, so that failed
+        writes are never counted as successful.
         """
-        if not self._ser:
-            raise RuntimeError("serial port is not open")
-        with self._write_lock:
-            written = self._ser.write(data)
-        written = len(data) if written is None else written
+        written = self._write_bytes(data)
         self._update_rtcm_count(written)
         return written
 
@@ -580,10 +709,13 @@ class ExtendedUM982Client(UM982Client):
             try:
                 line = self._readline()
             except Exception as e:
-                # Serial error (e.g. device unplugged): avoid busy loop
-                logger.error("Serial read error: %s", e)
-                self._stop.wait(0.5)
+                # Serial error (e.g. device unplugged). The port cannot recover
+                # by itself, so stop reading and let the owner reconnect.
+                self._record_serial_error(f"serial read failed: {e}")
+                return
+            if line is None:
                 continue
+            self.last_line_time = time.monotonic()
             if not line:
                 continue
 
@@ -608,7 +740,9 @@ class ExtendedUM982Client(UM982Client):
                 if (header.endswith(('GGA', 'GGAH', 'RMC'))
                         and len(fields) > 1 and not fields[1]):
                     if header.endswith(('GGA', 'GGAH')):
-                        self._record_no_fix(header.endswith('GGAH'))
+                        is_secondary = header.endswith('GGAH')
+                        self._record_no_fix(is_secondary)
+                        self._update_gga_state(is_secondary, None)
                     continue
 
             # GGA & GGAH parsing
@@ -620,6 +754,7 @@ class ExtendedUM982Client(UM982Client):
 
                 if gga.quality == 0 or gga.lat is None or gga.lon is None:
                     self._record_no_fix(is_secondary)
+                self._update_gga_state(is_secondary, gga)
 
                 if is_secondary:
                     with self._data_lock:

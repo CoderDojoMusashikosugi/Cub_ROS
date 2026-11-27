@@ -94,20 +94,43 @@ def generate_launch_description():
             remappings=[('cloud_in', '/velodyne_points'),
                         ('scan', '/scan')],
             parameters=[{
-                'target_frame': '',
+                'target_frame': 'base_link',
                 'transform_tolerance': 0.01,
-                'min_height': -0.15,
-                'max_height': 1.5,
+                'min_height': 0.10,
+                'max_height': 1.0,
                 'angle_min': -3.14,  # -M_PI
                 'angle_max': 3.14,  # M_PI
                 'angle_increment': 0.0087,  # M_PI/360.0
                 'scan_time': 0.3333,
                 'range_min': 0.1,
-                'range_max': 100.0,
+                'range_max': 30.0,
                 'use_inf': True,
                 'inf_epsilon': 1.0
             }],
             name='pointcloud_to_laserscan'
+        ),
+
+        # pointcloud to laser scan (Livox MID360)
+        # MID360はpitch 45°で取り付けられているため、target_frameをbase_linkにして高さを切り出す
+        Node(
+            package='pointcloud_to_laserscan', executable='pointcloud_to_laserscan_node',
+            remappings=[('cloud_in', '/livox/livox/lidar'),
+                        ('scan', '/scan_livox')],
+            parameters=[{
+                'target_frame': 'base_link',
+                'transform_tolerance': 0.05,
+                'min_height': 0.10,  # base_link基準 (velodyne側の-0.15 + 0.2492 相当)
+                'max_height': 1.00,  # base_link基準 (velodyne側の1.5 + 0.2492 相当)
+                'angle_min': -3.14,  # -M_PI
+                'angle_max': 3.14,  # M_PI
+                'angle_increment': 0.0087,  # M_PI/360.0
+                'scan_time': 0.1,  # MID360 publish_freq 10Hz
+                'range_min': 0.1,  # 車体の写り込みがあれば大きくする
+                'range_max': 30.0,
+                'use_inf': True,
+                'inf_epsilon': 1.0
+            }],
+            name='pointcloud_to_laserscan_livox'
         ),
 
         # 2Dのマッピングやナビゲーションを実行する際はこれを有効化、3Dでは無効化

@@ -19,7 +19,7 @@ def generate_launch_description():
         package='micro_ros_agent',
         executable='micro_ros_agent',
         name='micro_ros_agent_wheel',
-        arguments=["serial", "--dev", "/dev/ttyATOM", "-b", "115200", "-v6"]
+        arguments=["serial", "--dev", "/dev/ttyATOM", "-b", "115200", "-v2"]
     )
 
     # M5Dial: USB NCM上のUDPで接続。シリアル用Agentとは別プロセス。
@@ -31,15 +31,54 @@ def generate_launch_description():
         output='screen',
     )
 
+    # M5Dial: USB NCMでDialからの受信が止まったら、USBバスリセットで復旧させる
+    # Dialのリセットで直らない、またはハブのTTが詰まっている場合はハブごとリセットする
+    dial_ncm_watchdog = Node(
+        package='cub4_bringup',
+        executable='dial_ncm_watchdog.py',
+        name='dial_ncm_watchdog',
+        parameters=[{
+            'stall_timeout_sec': 30.0,    # 受信がこの秒数止まったら異常と判定
+            'reset_cooldown_sec': 120.0,  # リセット後、次のリセットまで待つ時間(連続失敗で倍々に延長)
+            'hub_reset_enabled': True,    # ハブごとのリセットを許可(同じハブのUM982等も一瞬切断される)
+            'dry_run': False,             # Trueなら検知とログのみでリセットしない
+        }],
+        respawn=True,
+        respawn_delay=3.0,
+        output='screen',
+    )
+
+    imu_serial_port = "/dev/ttyMULIMU"
     spresense_imu = Node(
         package='cub4_bringup',
         executable='spresense_imu_node',
         name='spresense_imu_node',
         parameters=[{
-            'serial_port': "/dev/ttyMULIMU",
+            'serial_port': imu_serial_port,
             'baud_rate': 230400,
         }],
         output='screen'
+    )
+
+    # spresense IMU: /imu/data_rawが止まったら、USBバスリセットで復旧させる
+    # IMUのリセットで直らない、USBの認識に失敗している、またはハブのTTが詰まっている場合はハブごとリセットする
+    imu_usb_watchdog = Node(
+        package='cub4_bringup',
+        executable='imu_usb_watchdog.py',
+        name='imu_usb_watchdog',
+        parameters=[{
+            'serial_port': imu_serial_port,  # spresense_imu_nodeと同じポート(USB機器の特定に使う)
+            'stall_timeout_sec': 30.0,    # 受信がこの秒数止まったら異常と判定
+            'reset_cooldown_sec': 120.0,  # リセット後、次のリセットまで待つ時間(連続失敗で倍々に延長)
+            'hub_reset_enabled': True,    # ハブごとのリセットを許可(同じハブの他の機器も一瞬切断される)
+            # 最初からハブをリセットする。CP2102N単体のリセットの後にCP2102Nが応答しなくなる例があったため。
+            # ハブにIMU以外の機器が繋がっている時は、巻き込まないようにIMUのリセットから始める
+            'first_reset': 'hub',
+            'dry_run': False,             # Trueなら検知とログのみでリセットしない
+        }],
+        respawn=True,
+        respawn_delay=3.0,
+        output='screen',
     )
 
     joy_dev = "/dev/input/js0"
@@ -123,6 +162,9 @@ def generate_launch_description():
         name='um982_node',
         output='screen',
         parameters = [um982_params_file],
+        # シリアル処理のスレッドが止められない場合はノードが終了するので再起動する
+        respawn=True,
+        respawn_delay=3.0,
     )
 
     # LIDARのGroupAction
@@ -138,9 +180,11 @@ def generate_launch_description():
         
         # M5Dial
         micro_ros_agent_dial,
+        dial_ncm_watchdog,
 
         # spresense IMUノード
         spresense_imu,
+        imu_usb_watchdog,
         
         # 手動操縦
         cub_commander,        
