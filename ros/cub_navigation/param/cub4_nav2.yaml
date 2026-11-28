@@ -403,14 +403,14 @@ controller_server:
       ax_min: -3.0
       ay_max: 0.5
       ay_min: -3.0
-      az_max: 3.5
+      az_max: 0.8
       vx_std: 0.4
       vy_std: 0.0
       wz_std: 0.4
       vx_max: 1.5
       vx_min: -0.3
       vy_max: 0.0
-      wz_max: 1.57
+      wz_max: 1.0
       iteration_count: 1
       prune_distance: 4.0
       transform_tolerance: 0.1
@@ -649,7 +649,7 @@ smoother_server:
 
 velocity_smoother:
   ros__parameters:
-    smoothing_frequency: 20.0
+    smoothing_frequency: 5.0
     stamp_smoothed_velocity_with_smoothing_time: False
     scale_velocities: False
     feedback: "OPEN_LOOP"

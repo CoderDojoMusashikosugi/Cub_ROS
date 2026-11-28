@@ -122,13 +122,13 @@
   <joint name="base_to_velodyne" type="fixed">
     <parent link="base_link"/>
     <child link="velodyne"/>
-    <origin xyz="0.0 0 0.2492" rpy="0 0 0"/>
+    <origin xyz="0.0 0 0.2492" rpy="0 0.12217 0"/>
   </joint>
 
   <joint name="base_to_livox" type="fixed">
     <parent link="base_link"/>
     <child link="livox_frame"/>
-    <origin xyz="-0.0379 0 0.5779" rpy="0 0.7854 0"/>
+    <origin xyz="-0.0379 0 0.5779" rpy="0 0.90757 0"/>
   </joint>
 
   <joint name="base_to_imu" type="fixed">
